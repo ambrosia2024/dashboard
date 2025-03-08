@@ -6,5 +6,5 @@ urlpatterns = [
 
     path('accounts/', include('allauth.urls')),
 
-    path('dashboard/', include('lumenix.urls')),
+    path('', include('lumenix.urls')),
 ]

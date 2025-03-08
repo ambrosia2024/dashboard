@@ -1,0 +1,165 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Forms{% endblock title %}
+
+{% block extra_css %}
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- start page title -->
+<div class="row">
+    <div class="col-12">
+        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+            <h4 class="mb-sm-0 font-size-18">Ambrosia Dashboard</h4>
+
+            <div class="page-title-right">
+                <ol class="breadcrumb m-0">
+                    <li class="breadcrumb-item"><a href="javascript: void(0);">Ambrosia Dashboard</a></li>
+{#                    <li class="breadcrumb-item active"></li>#}
+                </ol>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Coordinate Input Form & Locate Me Button -->
+<div class="row">
+    <div class="col-sm-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Define Area by Coordinates</h5>
+                <form id="coordinateForm">
+                    <div class="mb-2">
+                        <label for="coordinates" class="form-label">Enter Coordinates (e.g., [[lat1, lon1], [lat2, lon2], ...])</label>
+                        <input type="text" id="coordinates" class="form-control" placeholder="[[50, 10], [52, 12], [53, 8]]">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Draw on Map</button>
+                    <button type="button" id="locateMe" class="btn btn-success ms-2">📍 Locate Me</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <!-- card -->
+        <div class="card">
+            <!-- card body -->
+            <div class="card-body">
+                <div id="farms_by_locations" data-colors='["#33c38e"]' style="height: 500px"></div>
+            </div>
+            <!-- end card body -->
+        </div>
+        <!-- end card -->
+    </div><!-- end col -->
+</div><!-- end row -->
+<!-- end page title -->
+{% endblock content %}
+
+{% block extra_js %}
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Initialize the map centered on Europe
+            var map = L.map('farms_by_locations').setView([50, 10], 4);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add drawing functionality
+            var drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            var drawControl = new L.Control.Draw({
+                edit: {
+                    featureGroup: drawnItems
+                },
+                draw: {
+                    polygon: true,
+                    polyline: false,
+                    rectangle: true,
+                    circle: true,
+                    marker: true
+                }
+            });
+            map.addControl(drawControl);
+
+            // Handle drawing events
+            map.on(L.Draw.Event.CREATED, function (event) {
+                var layer = event.layer;
+                drawnItems.addLayer(layer);
+
+                // Convert to GeoJSON for backend processing
+                var geojson = layer.toGeoJSON();
+                console.log("Selected Area:", geojson);
+            });
+
+            // Handle form submission for manual coordinates
+            $("#coordinateForm").on("submit", function (e) {
+                e.preventDefault();
+                var coordInput = $("#coordinates").val().trim();
+
+                try {
+                    var coords = JSON.parse(coordInput); // Parse the input as an array
+
+                    if (!Array.isArray(coords) || coords.length < 2) {
+                        alert("Please enter at least two coordinate points.");
+                        return;
+                    }
+
+                    // Check if the input is for a rectangle or polygon
+                    if (coords.length === 2) {
+                        // Create a rectangle if exactly two points are provided
+                        var bounds = [coords[0], coords[1]];
+                        var rectangle = L.rectangle(bounds, {color: "blue", weight: 2}).addTo(drawnItems);
+                        map.fitBounds(bounds);
+                    } else {
+                        // Create a polygon if more than two points are provided
+                        var polygon = L.polygon(coords, {color: "green", weight: 2}).addTo(drawnItems);
+                        map.fitBounds(polygon.getBounds());
+                    }
+
+                } catch (error) {
+                    alert("Invalid coordinate format. Use [[lat1, lon1], [lat2, lon2], ...]");
+                }
+            });
+
+            // "Locate Me" functionality
+            $("#locateMe").click(function () {
+                if (!navigator.geolocation) {
+                    alert("Geolocation is not supported by your browser.");
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        var lat = position.coords.latitude;
+                        var lon = position.coords.longitude;
+
+                        // Add marker for user location
+                        var userMarker = L.marker([lat, lon]).addTo(map)
+                            .bindPopup("You are here!").openPopup();
+
+                        // Zoom in to user location
+                        map.setView([lat, lon], 12);
+                    },
+                    function () {
+                        alert("Unable to retrieve your location.");
+                    }
+                );
+            });
+
+        });
+    </script>
+{% endblock extra_js %}
