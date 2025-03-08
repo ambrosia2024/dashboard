@@ -2,7 +2,7 @@
 .venv
 venv/
 
-# Ignore PostgreSQL directory (if not needed in the image)
+# Ignore PostgreSQL directory
 postgres/
 
 # Ignore compiled Python files

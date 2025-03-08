@@ -3,7 +3,6 @@
 venv/
 
 # Ignore database and credentials
-postgres/
 *.sqlite3
 .env
 
