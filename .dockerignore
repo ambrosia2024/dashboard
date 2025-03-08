@@ -1,0 +1,28 @@
+# Ignore Python virtual environment
+.venv
+venv/
+
+# Ignore PostgreSQL directory (if not needed in the image)
+postgres/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore environment and secret files
+.env
+*.log
+
+# Ignore IDE/editor config files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore Docker build cache
+.dockerignore
+Dockerfile~
+
+.gitignore
