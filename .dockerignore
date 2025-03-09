@@ -10,9 +10,11 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.sqlite3
 
 # Ignore environment and secret files
 .env
+.env.sample
 *.log
 
 # Ignore IDE/editor config files
@@ -25,4 +27,8 @@ __pycache__/
 .dockerignore
 Dockerfile~
 
+.DS_Store
+.git
 .gitignore
+
+media/

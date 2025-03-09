@@ -5,8 +5,8 @@
 
 {% block extra_css %}
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <link rel="stylesheet" href="{% static 'libs/leaflet/css/leaflet.css' %}" />
+    <link rel="stylesheet" href="{% static 'libs/leaflet/css/leaflet.draw.css' %}" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -58,14 +58,18 @@
         </div>
         <!-- end card -->
     </div><!-- end col -->
+    <div class="mb-2">
+        <label for="selectedCoordinates" class="form-label">Selected Coordinates</label>
+        <textarea id="selectedCoordinates" class="form-control" rows="5" readonly></textarea>
+    </div>
 </div><!-- end row -->
 <!-- end page title -->
 {% endblock content %}
 
 {% block extra_js %}
     <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="{% static 'libs/leaflet/js/leaflet.js' %}"></script>
+    <script src="{% static 'libs/leaflet/js/leaflet.draw.js' %}"></script>
 
     <script>
         $(document).ready(function () {
@@ -103,6 +107,29 @@
                 // Convert to GeoJSON for backend processing
                 var geojson = layer.toGeoJSON();
                 console.log("Selected Area:", geojson);
+
+                // Extract coordinates based on geometry type
+                var coords;
+                if (geojson.geometry.type === "Polygon") {
+                    coords = geojson.geometry.coordinates[0]; // First ring of the polygon
+                } else if (geojson.geometry.type === "Point") {
+                    coords = [geojson.geometry.coordinates]; // Single point
+                } else if (geojson.geometry.type === "Rectangle") {
+                    coords = geojson.geometry.coordinates[0]; // Rectangles are polygons
+                } else {
+                    return; // Skip unsupported types
+                }
+
+                // Format and append to the textarea
+                var coordTextArea = $("#selectedCoordinates");
+                var existingText = coordTextArea.val();
+                var newEntry = JSON.stringify(coords);
+
+                if (existingText) {
+                    coordTextArea.val(existingText + "\n" + newEntry);
+                } else {
+                    coordTextArea.val(newEntry);
+                }
             });
 
             // Handle form submission for manual coordinates
@@ -159,7 +186,6 @@
                     }
                 );
             });
-
         });
     </script>
 {% endblock extra_js %}

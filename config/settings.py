@@ -12,11 +12,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
+# Detect if running inside Docker
+RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = not RUNNING_IN_DOCKER  # Debug True in local, False in Docker
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
+if RUNNING_IN_DOCKER:
+    ALLOWED_HOSTS.append(os.getenv("ALLOWED_HOST", "*"))  # Allow all in prod
 
 # Application definition
 INSTALLED_APPS = [
@@ -128,9 +133,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 
-STATICFILES_DIRS = [BASE_DIR / "static",]
-
-# STATIC_ROOT = BASE_DIR / "assets"
+if RUNNING_IN_DOCKER:
+    STATIC_ROOT = BASE_DIR / "staticfiles"  # Use collected static files in Docker
+    STATICFILES_DIRS = []
+else:
+    STATICFILES_DIRS = [BASE_DIR / "static"]  # Use local static files in dev
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

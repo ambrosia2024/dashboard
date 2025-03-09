@@ -1,0 +1,37 @@
+services:
+  ambrosia_dashboard:
+    build: .
+    container_name: ambrosia_dashboard
+    restart: unless-stopped
+    entrypoint: ["/app/entrypoint.sh"]
+    env_file:
+      - .env
+    environment:
+      - RUNNING_IN_DOCKER=true
+    ports:
+      - "8100:8000"
+    volumes:
+      - ambrosia_static_volume:/app/staticfiles
+    networks:
+      - ambrosia_network
+
+  ambrosia_nginx:
+    image: nginx:latest
+    container_name: ambrosia_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ambrosia_static_volume:/app/staticfiles
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - ambrosia_dashboard
+    networks:
+      - ambrosia_network
+
+volumes:
+  ambrosia_static_volume:
+
+networks:
+  ambrosia_network:
+    external: true

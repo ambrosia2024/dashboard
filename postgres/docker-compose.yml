@@ -1,5 +1,5 @@
 services:
-  postgres:
+  ambrosia_postgres:
     image: postgres:latest
     container_name: ambrosia_pg_db
     restart: always
@@ -7,12 +7,17 @@ services:
       - .env
     ports:
       - "5432:5432"
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "$POSTGRES_USER" ]
+      interval: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - ambrosia_pg_db_data:/var/lib/postgresql/data
     networks:
       - ambrosia_network
 
-  pgadmin:
+  ambrosia_pgadmin:
     image: dpage/pgadmin4
     container_name: ambrosia_pgadmin
     restart: always
@@ -21,7 +26,7 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - postgres
+      - ambrosia_postgres
     networks:
       - ambrosia_network
 
@@ -30,4 +35,4 @@ volumes:
 
 networks:
   ambrosia_network:
-    driver: bridge
+    external: true

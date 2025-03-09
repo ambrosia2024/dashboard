@@ -21,3 +21,5 @@ __pycache__/
 # Ignore IDE/editor config files
 .vscode/
 .idea/
+
+assets/
