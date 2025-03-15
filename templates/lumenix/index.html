@@ -5,8 +5,8 @@
 
 {% block extra_css %}
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="{% static 'libs/leaflet/css/leaflet.css' %}" />
-    <link rel="stylesheet" href="{% static 'libs/leaflet/css/leaflet.draw.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" integrity="sha512-gc3xjCmIy673V6MyOAZhIW93xhM9ei1I+gLbmFjUHIjocENRsLX/QUE1htk5q1XV2D/iie/VQ8DXI6Vu8bexvQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -27,20 +27,37 @@
     </div>
 </div>
 
-<!-- Coordinate Input Form & Locate Me Button -->
+<!-- Location Input Form & Locate Me Button -->
 <div class="row">
-    <div class="col-sm-12">
+    <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Define Area by Coordinates</h5>
-                <form id="coordinateForm">
+                <h5 class="card-title">Select Your Location</h5>
+                <form id="locationForm">
                     <div class="mb-2">
-                        <label for="coordinates" class="form-label">Enter Coordinates (e.g., [[lat1, lon1], [lat2, lon2], ...])</label>
-                        <input type="text" id="coordinates" class="form-control" placeholder="[[50, 10], [52, 12], [53, 8]]">
+                        <label for="searchAddress" class="form-label">Enter Address, City, or Province</label>
+                        <input type="text" id="searchAddress" class="form-control" placeholder="E.g., Amsterdam, Bavaria, 1012 AB">
                     </div>
-                    <button type="submit" class="btn btn-primary">Draw on Map</button>
+                    <button type="button" id="searchButton" class="btn btn-primary">🔍 Search</button>
                     <button type="button" id="locateMe" class="btn btn-success ms-2">📍 Locate Me</button>
                 </form>
+                <p id="loadingMessage" style="display: none; color: red; font-weight: bold;">Please wait... Searching for location.</p>
+                <ul id="locationResults" class="list-group mt-2" style="display:none;"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Select your crop</h5>
+                <div class="mb-2">
+                    <select id="crop_list" class="form-control">
+                        <option value="">-- Select a Crop --</option>
+                        {% for crop in crops %}
+                            <option value="{{ crop.id }}">{{ crop.crop_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -68,8 +85,9 @@
 
 {% block extra_js %}
     <!-- Leaflet JS -->
-    <script src="{% static 'libs/leaflet/js/leaflet.js' %}"></script>
-    <script src="{% static 'libs/leaflet/js/leaflet.draw.js' %}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" integrity="sha512-ozq8xQKq6urvuU6jNgkfqAmT7jKN2XumbrX1JiB3TnF7tI48DPI4Gy1GXKD/V3EExgAs1V+pRO7vwtS1LHg0Gw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
     <script>
         $(document).ready(function () {
@@ -132,36 +150,6 @@
                 }
             });
 
-            // Handle form submission for manual coordinates
-            $("#coordinateForm").on("submit", function (e) {
-                e.preventDefault();
-                var coordInput = $("#coordinates").val().trim();
-
-                try {
-                    var coords = JSON.parse(coordInput); // Parse the input as an array
-
-                    if (!Array.isArray(coords) || coords.length < 2) {
-                        alert("Please enter at least two coordinate points.");
-                        return;
-                    }
-
-                    // Check if the input is for a rectangle or polygon
-                    if (coords.length === 2) {
-                        // Create a rectangle if exactly two points are provided
-                        var bounds = [coords[0], coords[1]];
-                        var rectangle = L.rectangle(bounds, {color: "blue", weight: 2}).addTo(drawnItems);
-                        map.fitBounds(bounds);
-                    } else {
-                        // Create a polygon if more than two points are provided
-                        var polygon = L.polygon(coords, {color: "green", weight: 2}).addTo(drawnItems);
-                        map.fitBounds(polygon.getBounds());
-                    }
-
-                } catch (error) {
-                    alert("Invalid coordinate format. Use [[lat1, lon1], [lat2, lon2], ...]");
-                }
-            });
-
             // "Locate Me" functionality
             $("#locateMe").click(function () {
                 if (!navigator.geolocation) {
@@ -174,18 +162,173 @@
                         var lat = position.coords.latitude;
                         var lon = position.coords.longitude;
 
+                        // Remove previous marker if it exists
+                        if (window.searchMarker) {
+                            map.removeLayer(window.searchMarker);
+                        }
+
                         // Add marker for user location
-                        var userMarker = L.marker([lat, lon]).addTo(map)
+                        window.searchMarker = L.marker([lat, lon]).addTo(map)
                             .bindPopup("You are here!").openPopup();
 
-                        // Zoom in to user location
-                        map.setView([lat, lon], 12);
+                        // Zoom to user location
+                        map.setView([lat, lon], 10);
+
+                        // Fetch and highlight NUTS2 region
+                        fetchNUTSRegions(lat, lon);
                     },
                     function () {
                         alert("Unable to retrieve your location.");
                     }
                 );
             });
+
+            var nutsLayer = L.geoJSON(null, {
+                style: function () {
+                    return { color: "blue", weight: 2, fillOpacity: 0.3 };
+                }
+            }).addTo(map);
+
+            function searchLocation() {
+                var query = $("#searchAddress").val().trim();
+
+                if (!query) {
+                    alert("Please enter a location.");
+                    return;
+                }
+
+                $("#searchButton").prop("disabled", true).text("Searching...");
+                $("#loadingMessage").show();
+
+                var url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&addressdetails=1`;
+
+                $.getJSON(url, function (data) {
+                    if (data.length === 0) {
+                        alert("Location not found. Try another search.");
+                        resetSearchButton();
+                        return;
+                    }
+
+                    // Clear previous results
+                    $("#locationResults").empty().show();
+
+                    // Display all matching locations in a list
+                    data.forEach((location, index) => {
+                        $("#locationResults").append(`
+                            <li class="list-group-item location-option" data-lat="${location.lat}" data-lon="${location.lon}">
+                                ${location.display_name}
+                            </li>
+                        `);
+                    });
+
+                    resetSearchButton();
+                }).fail(function () {
+                    alert("Error retrieving location data.");
+                    resetSearchButton();
+                });
+            }
+
+            // Event listener for selecting a location
+            $(document).on("click", ".location-option", function () {
+                var lat = $(this).data("lat");
+                var lon = $(this).data("lon");
+                var displayName = $(this).text();
+
+                // Hide the list after selection
+                $("#locationResults").hide();
+
+                // Zoom to the selected location
+                map.setView([lat, lon], 10);
+
+                // Add a marker at the selected location
+                if (window.searchMarker) {
+                    map.removeLayer(window.searchMarker);
+                }
+                window.searchMarker = L.marker([lat, lon]).addTo(map)
+                    .bindPopup(displayName).openPopup();
+
+                // Fetch and highlight the NUTS2 region
+                fetchNUTSRegions(lat, lon);
+            });
+
+            // Global variable to store the selected region layer
+            var selectedRegionLayer = null;
+
+            function fetchNUTSRegions(lat, lon) {
+                var nutsUrl = "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2021_4326_LEVL_2.geojson";
+
+                $.getJSON(nutsUrl, function (geojsonData) {
+                    nutsLayer.clearLayers();
+                    nutsLayer.addData(geojsonData);
+
+                    // Style all NUTS2 regions in blue
+                    nutsLayer.setStyle({
+                        color: "blue",
+                        weight: 2,
+                        fillOpacity: 0.3
+                    });
+
+                    // Find the selected region
+                    var selectedRegion = geojsonData.features.find(feature => {
+                        let geometry = feature.geometry;
+                        let coords = geometry.coordinates;
+
+                        if (geometry.type === "MultiPolygon") {
+                            return coords.some(polygon => {
+                                return polygon.some(ring => {
+                                    if (ring.length < 4) return false;
+                                    return turf.booleanPointInPolygon(
+                                        turf.point([lon, lat]),
+                                        turf.polygon([ring])
+                                    );
+                                });
+                            });
+                        } else if (geometry.type === "Polygon") {
+                            return coords.some(ring => {
+                                if (ring.length < 4) return false;
+                                return turf.booleanPointInPolygon(
+                                    turf.point([lon, lat]),
+                                    turf.polygon([ring])
+                                );
+                            });
+                        }
+                        return false;
+                    });
+
+                    if (selectedRegion) {
+                        // Remove the previous selected region if it exists
+                        if (selectedRegionLayer) {
+                            map.removeLayer(selectedRegionLayer);
+                        }
+
+                        // Highlight the selected NUTS2 region in green
+                        selectedRegionLayer = L.geoJSON(selectedRegion, {
+                            style: {
+                                color: "green",
+                                weight: 3,
+                                fillOpacity: 0.5
+                            }
+                        }).addTo(map);
+
+                        // Fit map to selected region
+                        map.fitBounds(selectedRegionLayer.getBounds());
+
+                        console.log("Selected NUTS2 Region:", selectedRegion.properties.NUTS_ID);
+                    } else {
+                        alert("No NUTS2 region found for this location.");
+                    }
+                }).fail(function () {
+                    alert("Error loading NUTS regions.");
+                });
+            }
+
+
+            function resetSearchButton() {
+                $("#searchButton").prop("disabled", false).text("🔍 Search");
+                $("#loadingMessage").hide();
+            }
+
+            $("#searchButton").click(searchLocation);
         });
     </script>
 {% endblock extra_js %}

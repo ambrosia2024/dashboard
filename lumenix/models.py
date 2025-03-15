@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -29,3 +31,34 @@ class BaseModel(models.Model):
         self.status = 2
         self.deleted_at = timezone.now()
         self.save()
+
+
+class CropMaster(BaseModel):
+    ontology_id = models.CharField(max_length=10, unique=True, verbose_name="Ontology ID",
+                                   validators=[RegexValidator(
+                                       regex=r"^CO_\d{3}$",
+                                       message="Ontology ID must be in the format 'CO_XXX' where XXX is a 3-digit number.",
+                                       code="invalid_ontology_id"
+                                   )
+                                   ])
+    crop_name = models.CharField(max_length=255, verbose_name="Crop Name",
+                                 validators=[
+                                     RegexValidator(
+                                         regex=r"^[A-Za-z\s\-]+$",
+                                         message="Crop name must only contain letters, spaces, and hyphens.",
+                                         code="invalid_crop_name"
+                                     )
+                                 ])
+
+    class Meta:
+        db_table = "crop_master"
+        verbose_name = "Crop Master"
+        verbose_name_plural = "Crops Master"
+
+    def clean(self):
+        self.crop_name = self.crop_name.strip().title()  # Capitalize first letter
+        if CropMaster.objects.filter(crop_name__iexact=self.crop_name).exclude(id=self.id).exists():
+            raise ValidationError({"crop_name": "A crop with this name already exists."})
+
+    def __str__(self):
+        return f"{self.crop_name} ({self.ontology_id})"
