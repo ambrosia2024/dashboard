@@ -49,10 +49,4 @@ This will:
 
 ## 🔥 Access the Application
 ### 🌐 Web App	http://localhost/
-### 🎛️ Admin Panel	http://localhost/admin/
-### 📊 PgAdmin	http://localhost:5050/
-### 📌 Default PgAdmin Login:
-```
-Email: youremail@domain.com
-Password: password
-```
+
