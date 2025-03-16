@@ -22,11 +22,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install gunicorn
 
-# Copy rest of the project files (after dependencies are installed)
+# Copy rest of the project files
 COPY . /app/
-
-# Copy entrypoint script and give execute permissions
-RUN chmod +x /app/entrypoint.sh
 
 # Copy entrypoint script and give execute permissions
 COPY entrypoint.sh /app/entrypoint.sh
