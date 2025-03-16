@@ -1,13 +1,47 @@
 services:
+  ambrosia_postgres:
+    image: postgres:latest
+    container_name: ambrosia_pg_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ambrosia_pg_db_data:/var/lib/postgresql/data
+    networks:
+      - ambrosia_network
+
+  ambrosia_pgadmin:
+    image: dpage/pgadmin4
+    container_name: ambrosia_pgadmin
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5050:80"
+    depends_on:
+      - ambrosia_postgres
+    networks:
+      - ambrosia_network
+
   ambrosia_dashboard:
     build: .
     container_name: ambrosia_dashboard
     restart: unless-stopped
-    entrypoint: ["/app/entrypoint.sh"]
+    entrypoint: /app/entrypoint.sh
     env_file:
       - .env
     environment:
       - RUNNING_IN_DOCKER=true
+    depends_on:
+      ambrosia_postgres:
+        condition: service_healthy
     ports:
       - "8100:8000"
     volumes:
@@ -18,7 +52,7 @@ services:
   ambrosia_nginx:
     image: nginx:latest
     container_name: ambrosia_nginx
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:
@@ -31,7 +65,7 @@ services:
 
 volumes:
   ambrosia_static_volume:
+  ambrosia_pg_db_data:
 
 networks:
   ambrosia_network:
-    external: true

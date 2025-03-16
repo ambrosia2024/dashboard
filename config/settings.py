@@ -131,11 +131,11 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 if RUNNING_IN_DOCKER:
     STATIC_ROOT = BASE_DIR / "staticfiles"  # Use collected static files in Docker
-    STATICFILES_DIRS = []
+    STATICFILES_DIRS = [BASE_DIR / "static"]
 else:
     STATICFILES_DIRS = [BASE_DIR / "static"]  # Use local static files in dev
 
