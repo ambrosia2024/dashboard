@@ -33,3 +33,6 @@ Dockerfile~
 .gitignore
 
 media/
+data/
+
+/*.nc

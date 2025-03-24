@@ -7,6 +7,11 @@ echo "Checking PostgreSQL status at $POSTGRES_HOST:$POSTGRES_PORT..."
 MAX_TRIES=30
 TRIES=0
 
+#until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" > /dev/null 2>&1; do
+#  echo "Waiting for PostgreSQL to be ready..."
+#  sleep 2
+#done
+
 while ! nc -z "$POSTGRES_HOST" "$POSTGRES_PORT"; do
   TRIES=$((TRIES+1))
   if [ $TRIES -ge $MAX_TRIES ]; then

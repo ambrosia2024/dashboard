@@ -9,10 +9,22 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    binutils \
+    gdal-bin \
+    libgdal-dev \
+    python3-dev \
     libpq-dev \
+    postgresql-client \
     gcc \
+    g++ \
     netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# Then pip install GDAL
+RUN pip install --no-cache-dir GDAL==3.6.2
 
 # Copy only requirements first for better caching
 COPY requirements.txt /app/requirements.txt

@@ -1,6 +1,7 @@
 services:
   ambrosia_postgres:
-    image: postgres:latest
+#    image: postgres:latest
+    image: postgis/postgis:16-3.4
     container_name: ambrosia_pg_db
     restart: unless-stopped
     env_file:
@@ -11,7 +12,7 @@ services:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     volumes:
       - ambrosia_pg_db_data:/var/lib/postgresql/data
     networks:
