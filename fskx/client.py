@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 from oauthlib.oauth2 import LegacyApplicationClient
 from requests_oauthlib import OAuth2Session
 from django.conf import settings
@@ -44,48 +44,63 @@ class FSKXOAuth2Client:
         )
         self.token = None
 
-    def run_simulation(self, model_id):
+    def run_simulation(self, model_id, **params):
         url = urljoin(
             self.base_url,
             settings.FSKX_SETTINGS['API']['RUN_SIMULATION_ENDPOINT']
         )
-        # hardcoding payload for this model, just for now, to test the workflow
-        payload = {
+
+        query_params = {
             "model_id": model_id,
-            "plot_type": "png",
-            "parameters": {
-                "runs": 100,
-                "meanTemp": 5.9,
-                "sdTemp": 2.9,
-                "Tmin": -1.18,
-                "Input_prev": "prev_inputs3.csv",
-                "Input_conc": "conc_inputs3.csv"
-            }
+            "plot_type": "png"
         }
+        if params:
+            query_params.update({
+                "parameters": json.dumps(params)
+            })
+
+        full_url = f"{url}?{urlencode(query_params)}"
         try:
-            response = self.post(url, json=payload)
+            response = self.post(full_url)
             response.raise_for_status()
             return response.json()
         except Exception as e:
             print(f"Simulation failed: {str(e)}")
             raise e
 
+    def get_simulation_status(self, simulation_id):
+        url = urljoin(
+            self.base_url,
+            settings.FSKX_SETTINGS['API']['GET_SIMULATION_ENDPOINT'].format(simulation_id=simulation_id)
+        )
+        try:
+            response = self.get(url)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Simulation could not be retrieved: {str(e)}")
+            raise e
 
-    # def get_model(self, model_id):
-    #     url = urljoin(
-    #         self.base_url,
-    #         settings.FSKX_SETTINGS['API']['GET_MODEL_ENDPOINT']
-    #     ).format(model_id=model_id)
-    #     payload = {
-    #         "model_id": model_id,
-    #         "plot_type": "png",
-    #         "parameters": {
-    #             "additionalProp1": "string",
-    #             "additionalProp2": "string",
-    #             "additionalProp3": "string"
-    #         }
-    #     }
-    #     self.get(url)
+    def get_simulation_result(self, simulation_id, file_type='json'):
+        url = urljoin(
+            self.base_url,
+            settings.FSKX_SETTINGS['API']['GET_RESULTS_ENDPOINT']
+        )
+        query_params = {
+            "simulation_id": simulation_id,
+            "file_type": file_type,
+        }
+        full_url = f"{url}?{urlencode(query_params)}"
+        try:
+            response = self.get(full_url)
+            response.raise_for_status()
+            if file_type == 'json':
+                return json.loads(response.json())
+            else:
+                return response
+        except Exception as e:
+            print(f"Simulation results could not be retrieved: {str(e)}")
+            raise e
 
     def _save_token(self, token):
         self.token = token
@@ -124,6 +139,7 @@ if __name__ == "__main__":
     # adding a butch of hacky hack to setup django,
     # will change this to a actual manage subcommand once its
     # working
+    import time
     import sys
     from pathlib import Path
     project_root = Path(__file__).resolve().parent.parent
@@ -140,13 +156,33 @@ if __name__ == "__main__":
             print(" Successfully authenticated!")
             print(f"Access token: {client.token['access_token'][:50]}...")
 
-            response = client.run_simulation(settings.FSKX_SETTINGS['MODELS']['SIMPLE_QMRA_ID'])
+            # simulation_data = client.run_simulation(settings.FSKX_SETTINGS['MODELS']['SIMPLE_QMRA_ID'])
 
-            if response.status_code == 200:
-                print("\Simulation Information:")
-                print(json.dumps(response.json(), indent=2))
-            else:
-                print(f" Failed to run simulation (Status {response.status_code}): {response.text}")
+            # if simulation_data is not None:
+            #     print("Simulation Information:")
+            #     print(json.dumps(simulation_data, indent=4))
+
+            # for i in range(10):
+            #     print('Will get simulation status...')
+            #     simulation_id = '99f66458-078b-47ae-897b-b499b81153f5'
+            #     simulation_res = client.get_simulation_status(simulation_id)
+
+            #     if simulation_res is not None:
+            #         print("Simulation Information:")
+            #         print(json.dumps(simulation_res, indent=4))
+            #         end_time = simulation_res.get('end_time')
+            #         if end_time is not None and end_time != '':
+            #             break
+            #     time.sleep(10)
+
+            print('Will get simulation result...')
+            simulation_id = '99f66458-078b-47ae-897b-b499b81153f5'
+            simulation_res = client.get_simulation_result(simulation_id)
+
+            if simulation_res is not None:
+                print("Simulation Result:")
+                print(json.dumps(simulation_res, indent=4))
+
 
     except Exception as e:
         print(f" Error: {str(e)}")
