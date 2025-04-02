@@ -25,8 +25,12 @@ done
 echo "PostgreSQL is up - applying migrations..."
 python manage.py migrate --noinput
 
-echo "Running 'get_crops' command..."
-python manage.py get_crops
+if [ "$SKIP_CROP_FETCH" != "1" ]; then
+  echo "Running 'get_crops' command..."
+  python manage.py get_crops || echo "get_crops failed but continuing..."
+else
+  echo "Skipping 'get_crops' as SKIP_CROP_FETCH is set"
+fi
 
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
