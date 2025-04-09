@@ -6,7 +6,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path('fskx-run/', fskx_run_test, name='fskx-run'),
+    path('fskx-run/<int:model_type>/', fskx_run_test, name='fskx-run'),
     path('fskx-status/<str:simulation_id>/', fskx_status_test, name='fskx-status'),
     path('fskx-res/<str:simulation_id>/', fskx_res_test, name='fskx-res'),
 ]
