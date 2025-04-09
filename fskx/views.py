@@ -5,18 +5,32 @@ from django.conf import settings
 from .client import FSKXOAuth2Client
 
 
-def fskx_run_test(request):
+def fskx_run_test(request, model_type=0):
     client = FSKXOAuth2Client()
-    parameters = {
-        "runs": 100,
-        "meanTemp": 5.9,
-        "sdTemp": 2.9,
-        "Tmin": -1.18,
-        "Input_prev": "prev_inputs3.csv",
-        "Input_conc": "conc_inputs3.csv"
-    }
+    if model_type == 0:
+        model_id = settings.FSKX_SETTINGS['MODELS']['FSKX_SIMPLE_KOSEKI_ID']
+        parameters = {
+            "temp_celsius": 20,
+            "y0": 4,
+            "b": 0.033,
+            "Tmin": 4.96,
+            "alpha0": 0.097,
+            "tmax": 72
+        }
+    elif model_type == 1:
+        model_id = settings.FSKX_SETTINGS['MODELS']['SIMPLE_QMRA_ID']
+        parameters = {
+            "runs": 100,
+            "meanTemp": 5.9,
+            "sdTemp": 2.9,
+            "Tmin": -1.18,
+            "Input_prev": "prev_inputs3.csv",
+            "Input_conc": "conc_inputs3.csv"
+        }
+
+
     simulation_data = client.run_simulation(
-        settings.FSKX_SETTINGS['MODELS']['SIMPLE_QMRA_ID'],
+        model_id,
         params=parameters
     )
     return HttpResponse(json.dumps(simulation_data))

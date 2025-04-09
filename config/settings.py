@@ -165,5 +165,7 @@ FSKX_SETTINGS = {
     },
     'MODELS': {
         'SIMPLE_QMRA_ID': config("FSKX_SIMPLE_QMRA_ID", default='c42738eb-d6d6-449b-a313-6051432f536f'),
-    }
+        'FSKX_SIMPLE_KOSEKI_ID': config("FSKX_SIMPLE_KOSEKI_ID", default='ac398182-01ab-48f0-b25c-ca432631b018'),
+    },
+    'TESTING_JSON_RISK_PATH': config("FSKX_TESTING_JSON_RISK_PATH", default='fskx/testing_data/risk_index.json'),
 }
