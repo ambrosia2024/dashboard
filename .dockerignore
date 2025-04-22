@@ -34,5 +34,6 @@ Dockerfile~
 
 media/
 data/
+synda/
 
 /*.nc
