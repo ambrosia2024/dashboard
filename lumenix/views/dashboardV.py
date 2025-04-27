@@ -1,3 +1,5 @@
+# lumenix/views/dashboardV.py
+
 from django.views.generic import TemplateView
 
 from lumenix.models import CropMaster

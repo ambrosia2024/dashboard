@@ -204,6 +204,14 @@ $(document).ready(function () {
             });
 
             if (selectedRegion) {
+                console.log("Selected NUTS2 Region ID:", selectedRegion.properties.NUTS_ID);
+                console.log("All Available Properties:");
+                console.table(selectedRegion.properties); // This gives a nice formatted table in browser console
+
+                console.log("Geometry Type:", selectedRegion.geometry.type);
+                console.log("Coordinates:", selectedRegion.geometry.coordinates);
+
+
                 // Remove the previous selected region if it exists
                 if (selectedRegionLayer) {
                     map.removeLayer(selectedRegionLayer);
@@ -220,8 +228,6 @@ $(document).ready(function () {
 
                 // Fit map to selected region
                 map.fitBounds(selectedRegionLayer.getBounds());
-
-                console.log("Selected NUTS2 Region:", selectedRegion.properties.NUTS_ID);
             } else {
                 alert("No NUTS2 region found for this location.");
             }

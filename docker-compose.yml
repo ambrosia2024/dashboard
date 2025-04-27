@@ -46,6 +46,7 @@ services:
     ports:
       - "8100:8000"
     volumes:
+      - .:/app
       - ambrosia_static_volume:/app/staticfiles
     networks:
       - ambrosia_network
