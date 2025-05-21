@@ -1,11 +1,12 @@
 import os
+import sys
 
 from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables from .env
 load_dotenv()
-from decouple import config
+from decouple import config, UndefinedValueError
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -148,6 +149,13 @@ else:
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+try:
+    FSKX_USERNAME = config('FSKX_USERNAME')
+    FSKX_PASSWORD = config('FSKX_PASSWORD')
+except UndefinedValueError as e:
+    print("\nEnvironment configuration error:")
+    print(f"{e}")
+    sys.exit(1)
 
 FSKX_SETTINGS = {
     'API': {

@@ -1,22 +1,26 @@
 #!/usr/bin/env python
 
-from urllib.parse import urlencode, urljoin
-from oauthlib.oauth2 import LegacyApplicationClient
-from requests_oauthlib import OAuth2Session
-from django.conf import settings
 import json
+import sys
+
+from django.conf import settings
+from oauthlib.oauth2 import LegacyApplicationClient
+from oauthlib.oauth2.rfc6749.errors import MissingTokenError
+from requests_oauthlib import OAuth2Session
+from urllib.parse import urlencode, urljoin
 
 
 class FixedLegacyClient(LegacyApplicationClient):
     def parse_request_body_response(self, body, scope=None):
         """Quick fix: Remove null error before processing"""
         try:
+            print("DEBUG: Raw auth response body:")
+            print(body)
             # Parse the JSON and remove null error if exists
             data = json.loads(body)
             if 'error' in data and data['error'] is None:
                 del data['error']
                 body = json.dumps(data)
-
             return super().parse_request_body_response(body, scope)
         except json.JSONDecodeError:
             return super().parse_request_body_response(body, scope)
@@ -108,13 +112,25 @@ class FSKXOAuth2Client:
 
     def _ensure_token(self):
         if not self.token or not self.client.token:
-            self.token = self.client.fetch_token(
-                token_url=self.AUTH_URL,
-                username=self.FSKX_USERNAME,
-                password=self.FSKX_PASSWORD,
-                include_client_id=True
-            )
-            self.client.token = self.token
+            try:
+                self.token = self.client.fetch_token(
+                    token_url=self.AUTH_URL,
+                    username=self.FSKX_USERNAME,
+                    password=self.FSKX_PASSWORD,
+                    include_client_id=True
+                )
+                self.client.token = self.token
+            except MissingTokenError:
+                print("\nAuthentication failed: Missing access token in response.")
+                print("🔍 Please verify:")
+                print(f"   - AUTH_URL is correct: {self.AUTH_URL}")
+                print(f"   - Credentials are correct: {self.FSKX_USERNAME} / (password hidden)")
+                print("   - Server returns JSON with 'access_token'")
+                sys.exit(1)
+            except Exception as e:
+                print(f"\nUnexpected error during token fetch: {str(e)}")
+                sys.exit(1)
+
 
     def request(self, method, url, **kwargs):
         self._ensure_token()
