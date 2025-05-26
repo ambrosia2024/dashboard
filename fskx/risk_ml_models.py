@@ -51,13 +51,33 @@ class SimpleKosekiMLModel(BaseRiskMLModel):
         else:
             raise Exception("Failed to start simulation")
 
+    def growth_perc_to_risk_index(self, growth_perc, min_growth=0, max_growth=200):
+        """
+        Convert growth percentage to risk index.
+        The risk index is scaled between 0 and 1.
+        Args:
+            growth_perc: The growth percentage to convert.
+            min_growth: The minimum growth percentage (maps to risk index 0).
+            max_growth: The maximum growth percentage (maps to risk index 1).
+
+        Returns:
+            float: The risk index between 0 and 1.
+        """
+        if min_growth >= max_growth:
+            raise ValueError("min_growth must be less than max_growth")
+
+        # Normalize the growth percentage between 0 and 1
+        normalized = (growth_perc - min_growth) / (max_growth - min_growth)
+
+        # Clip the result to ensure it's between 0 and 1
+        return min(max(normalized, 0), 1)
+
     def calculate_risk_index(self, model_output):
         """
         Calculate a risk index based on Salmonella growth predictions.
 
         Parameters:
         - model_output (dict): Koseki model output with "model_values".
-        - N_max (float): Maximum hypotetical bacterial concentration (default: 1e5 CFU/g).
 
         Returns:
         - float: Risk index (scaled between 0 and 1).
@@ -68,14 +88,15 @@ class SimpleKosekiMLModel(BaseRiskMLModel):
         growth = N_final - N_initial
 
         growth_perc = growth / N_initial
-        # risk_index = min(max(growth_perc, 0), 1)  # Scale between 0 and 1
-        risk_index = growth_perc
+
+        risk_index = self.growth_perc_to_risk_index(growth_perc, min_growth=0, max_growth=200)
         return risk_index
 
     def get_result_sim(self, simulation_id):
         simulation_status = self.client.get_simulation_status(simulation_id)
         clean_result = None
         if simulation_status.get('status') == 'SUCCESS':
+            params = self.client.get_simulation_params(simulation_id)
             simulation_res = self.client.get_simulation_result(simulation_id, file_type='json')
             risk_index = self.calculate_risk_index(simulation_res)
             clean_result = {

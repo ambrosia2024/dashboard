@@ -48,7 +48,7 @@ class FSKXOAuth2Client:
         )
         self.token = None
 
-    def run_simulation(self, model_id, **params):
+    def run_simulation(self, model_id, params):
         url = urljoin(
             self.base_url,
             settings.FSKX_SETTINGS['API']['RUN_SIMULATION_ENDPOINT']
@@ -58,18 +58,36 @@ class FSKXOAuth2Client:
             "model_id": model_id,
             "plot_type": "png"
         }
-        if params:
-            query_params.update({
-                "parameters": json.dumps(params)
-            })
-
+        data = {
+            "parameters": params
+        }
         full_url = f"{url}?{urlencode(query_params)}"
         try:
-            response = self.post(full_url)
+            response = self.post(full_url, json=data)
             response.raise_for_status()
             return response.json()
         except Exception as e:
             print(f"Simulation failed: {str(e)}")
+            raise e
+
+    def get_simulation_params(self, simulation_id):
+        url = urljoin(
+            self.base_url,
+            settings.FSKX_SETTINGS['API']['GET_PARAMS_ENDPOINT']
+        )
+
+        query_params = {
+            "simulation_id": simulation_id,
+        }
+
+        full_url = f"{url}?{urlencode(query_params)}"
+
+        try:
+            response = self.get(full_url)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Simulation params could not be retrieved: {str(e)}")
             raise e
 
     def get_simulation_status(self, simulation_id):

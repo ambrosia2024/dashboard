@@ -71,6 +71,7 @@ class Command(BaseCommand):
 
                     interpolated_risks = simple_interpolate(key_years, risk_indexes, full_years=years)
                     final_results = {
+                        'initial_temperature': initial_temperature,
                         'temp_changes': full_temperature_anomalies,
                         'risk': interpolated_risks,
                     }

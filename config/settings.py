@@ -162,6 +162,7 @@ FSKX_SETTINGS = {
         'GET_MODEL_ENDPOINT': config('FSKX_GET_MODEL_ENDPOINT', default='/model-execution-service/models/{model_id}'),
         'RUN_SIMULATION_ENDPOINT': config('FSKX_RUN_SIMULATION_ENDPOINT', default='/model-execution-service/simulations'),
         'GET_SIMULATION_ENDPOINT': config('FSKX_GET_SIMULATION_ENDPOINT', default='/model-execution-service/simulations/{simulation_id}'),
+        'GET_PARAMS_ENDPOINT': config('FSKX_GET_PARAMS_ENDPOINT', default='/model-execution-service/parameters'),
         'GET_RESULTS_ENDPOINT': config('FSKX_GET_RESULTS_ENDPOINT', default='/model-execution-service/results'),
     },
     'CREDENTIALS':{
