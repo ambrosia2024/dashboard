@@ -16,7 +16,8 @@ def simple_interpolate(key_years, risk_indexes, full_years=30):
     for year in range(full_years + 1):
         # Find the two closest key years for interpolation
         for i in range(len(key_years) - 1):
-            if year >= key_years[i] and year <= key_years[i + 1]:
+            if key_years[i] <= year <= key_years[i + 1]:
+            # if year >= key_years[i] and year <= key_years[i + 1]:
                 # Linear interpolation formula
                 x0, x1 = key_years[i], key_years[i + 1]
                 y0, y1 = risk_indexes[i], risk_indexes[i + 1]
@@ -24,6 +25,10 @@ def simple_interpolate(key_years, risk_indexes, full_years=30):
                 interpolated_risk = y0 + (y1 - y0) * (year - x0) / (x1 - x0)
                 interpolated_risks.append(interpolated_risk)
                 break
+        else:
+            # If year == key_years[-1] or extrapolation case
+            if year == key_years[-1]:
+                interpolated_risks.append(risk_indexes[-1])
 
     return interpolated_risks
 
@@ -44,38 +49,46 @@ class Command(BaseCommand):
         model.default_params['temp_celsius'] = initial_temperature
 
         # Run simulations
-        # sims = model.run_risk_by_temp_changes_batch(temperature_anomalies)
+        self.stdout.write(self.style.SUCCESS('Running simulations...'))
+        sims = model.run_risk_by_temp_changes_batch(temperature_anomalies)
+        self.stdout.write(self.style.SUCCESS(f'Simulations started: {sims}'))
         # sims = {0: {'simulation_id': 'b539e073-b436-4c9f-a0be-df657bf61cf1', 'temp_change': 0.0, 'temperature': 10.68}, 1: {'simulation_id': '4a6aace1-4b3b-412c-a87c-21f4991cabe0', 'temp_change': 0.5, 'temperature': 11.18}, 2: {'simulation_id': '2e29c4e7-35b8-4335-b5e5-ef7e9eea9295', 'temp_change': 1.0, 'temperature': 11.68}, 3: {'simulation_id': 'fb19b6f0-4404-471a-a35d-45f643b4d440', 'temp_change': 1.5, 'temperature': 12.18}}
-        sims = {0: {'simulation_id': '9b273091-9250-46d9-9f03-0088fd5d42b7', 'temp_change': 0.0, 'temperature': 10.68}, 1: {'simulation_id': 'fc18c5a6-fe49-41cb-ac41-8bd153ce373c', 'temp_change': 5.0, 'temperature': 15.68}, 2: {'simulation_id': '98894fed-2755-42a9-af5f-ec98cb3817bf', 'temp_change': 10.0, 'temperature': 20.68}, 3: {'simulation_id': '3136ae1b-24df-441d-81f4-225672c32397', 'temp_change': 15.0, 'temperature': 25.68}}
-        self.stdout.write(self.style.SUCCESS(f'Simulations running... {sims}'))
+        # sims = {0: {'simulation_id': '9b273091-9250-46d9-9f03-0088fd5d42b7', 'temp_change': 0.0, 'temperature': 10.68}, 1: {'simulation_id': 'fc18c5a6-fe49-41cb-ac41-8bd153ce373c', 'temp_change': 5.0, 'temperature': 15.68}, 2: {'simulation_id': '98894fed-2755-42a9-af5f-ec98cb3817bf', 'temp_change': 10.0, 'temperature': 20.68}, 3: {'simulation_id': '3136ae1b-24df-441d-81f4-225672c32397', 'temp_change': 15.0, 'temperature': 25.68}}
+        # self.stdout.write(self.style.SUCCESS(f'Simulations running... {sims}'))
 
-        while True:
-            # Check status and retrieve results
+        max_attempts = 30
+        for attempt in range(max_attempts):
             if model.check_status_batch(sims):
-            # if True:
-                self.stdout.write(self.style.SUCCESS('Sim results ready..'))
+                self.stdout.write(self.style.SUCCESS('Simulation results are ready.'))
                 results = model.get_risk_by_temp_changes_batch(sims)
-                if results:
-                    self.stdout.write(self.style.SUCCESS('Sim results retrieved, performing interpolation...'))
+                if results and 'temp_changes' in results and 'risk' in results:
+                    temp_changes = results['temp_changes']
+                    risk_indexes = results['risk']
 
-                    # Extract risk index values
-                    temp_changes = results['temp_changes']  # Extracted temp changes (should match key_years)
-                    risk_indexes = results['risk']  # Extracted risk values
+                    if len(temp_changes) != len(risk_indexes):
+                        self.stdout.write(self.style.ERROR('Mismatch in temp_changes and risk length. Aborting.'))
+                        return
 
-                    # Interpolate missing years
                     interpolated_risks = simple_interpolate(key_years, risk_indexes, full_years=years)
                     final_results = {
-                        'temp_changes':full_temperature_anomalies,  # All years from 0 to 30
+                        'temp_changes': full_temperature_anomalies,
                         'risk': interpolated_risks,
                     }
 
-                    # Save to file
-                    file_path = settings.FSKX_SETTINGS['TESTING_JSON_RISK_PATH']
-                    with open(file_path, 'w') as f:
-                        json.dump(final_results, f, indent=4)
-
-                    self.stdout.write(self.style.SUCCESS(f'Risk index simulation results saved to {file_path}'))
-                    break
+                    try:
+                        file_path = settings.FSKX_SETTINGS['TESTING_JSON_RISK_PATH']
+                        with open(file_path, 'w') as f:
+                            json.dump(final_results, f, indent=4)
+                        self.stdout.write(self.style.SUCCESS(f'Risk index simulation results saved to {file_path}'))
+                    except Exception as e:
+                        self.stdout.write(self.style.ERROR(f'Failed to save file: {e}'))
+                    return
+                else:
+                    self.stdout.write(self.style.ERROR('Empty or malformed simulation results.'))
+                    return
             else:
-                self.stdout.write(self.style.WARNING('Results not ready, try again later.'))
+                self.stdout.write(
+                    self.style.WARNING(f'Attempt {attempt + 1}/{max_attempts}: Results not ready. Retrying...'))
                 time.sleep(10)
+
+        self.stdout.write(self.style.ERROR('Timed out waiting for simulation results.'))

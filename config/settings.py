@@ -91,9 +91,10 @@ AUTHENTICATION_BACKENDS = [
 SITE_ID = 1  # Required for django-allauth
 
 # Allauth Settings
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = "email"
+# ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+# ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 
@@ -149,13 +150,9 @@ else:
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-try:
-    FSKX_USERNAME = config('FSKX_USERNAME')
-    FSKX_PASSWORD = config('FSKX_PASSWORD')
-except UndefinedValueError as e:
-    print("\nEnvironment configuration error:")
-    print(f"{e}")
-    sys.exit(1)
+
+FSKX_USERNAME = config('FSKX_USERNAME')
+FSKX_PASSWORD = config('FSKX_PASSWORD')
 
 FSKX_SETTINGS = {
     'API': {
