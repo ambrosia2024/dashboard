@@ -138,6 +138,7 @@ class SimpleKosekiMLModel(BaseRiskMLModel):
         """
         Get the risk index for a batch of simulations.
         """
+        # Maybe redundant
         if not self.check_status_batch(sims):
             return None
 
@@ -147,8 +148,11 @@ class SimpleKosekiMLModel(BaseRiskMLModel):
             sim_id = sim_values['simulation_id']
             temp_change = sim_values['temp_change']
             result = self.get_result_sim(sim_id)
-            risk.append(result['risk_index'])
-            temp_changes.append(temp_change)
+            if result and 'risk_index' in result:
+                risk.append(result['risk_index'])
+                temp_changes.append(temp_change)
+            else:
+                raise Exception(f"Missing result for simulation ID: {sim_id}")
 
         return {
             'temp_changes': temp_changes,

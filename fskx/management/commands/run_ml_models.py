@@ -7,30 +7,38 @@ from django.core.management.base import BaseCommand
 from fskx.risk_ml_models import SimpleKosekiMLModel
 
 
-def simple_interpolate(key_years, risk_indexes, full_years=30):
-    """simple interpolation, just to avoid adding more deps right now"""
-    # Initialize an empty list to store the interpolated risk indexes
-    interpolated_risks = []
+def simple_interpolate(x_known, y_known, x_full):
+    """
+    Linearly interpolates y-values for a full set of x-values using known (x, y) pairs.
+    Also performs simple linear extrapolation for x-values beyond the last known point.
+    """
+    interpolated_y = []
 
-    # Loop through each year from 0 to full_years (e.g., 0 to 30)
-    for year in range(full_years + 1):
-        # Find the two closest key years for interpolation
-        for i in range(len(key_years) - 1):
-            if key_years[i] <= year <= key_years[i + 1]:
-            # if year >= key_years[i] and year <= key_years[i + 1]:
-                # Linear interpolation formula
-                x0, x1 = key_years[i], key_years[i + 1]
-                y0, y1 = risk_indexes[i], risk_indexes[i + 1]
-                # Calculate the interpolated risk index
-                interpolated_risk = y0 + (y1 - y0) * (year - x0) / (x1 - x0)
-                interpolated_risks.append(interpolated_risk)
+    for x in x_full:
+        # Loop through known x intervals to find the right range for interpolation
+        for i in range(len(x_known) - 1):
+            if x_known[i] <= x <= x_known[i + 1]:
+                # Perform linear interpolation between two known points
+                x0, x1 = x_known[i], x_known[i + 1]
+                y0, y1 = y_known[i], y_known[i + 1]
+                y = y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+                interpolated_y.append(y)
                 break
         else:
-            # If year == key_years[-1] or extrapolation case
-            if year == key_years[-1]:
-                interpolated_risks.append(risk_indexes[-1])
+            # If x exactly matches the last known point, just use the last y
+            if x == x_known[-1]:
+                interpolated_y.append(y_known[-1])
 
-    return interpolated_risks
+            # If x is beyond the last known x (i.e., extrapolation), estimate by continuing the slope
+            elif x > x_known[-1]:
+                # Take the last segment (last two known points) to compute the slope
+                x0, x1 = x_known[-2], x_known[-1]
+                y0, y1 = y_known[-2], y_known[-1]
+                y = y1 + (y1 - y0) / (x1 - x0) * (x - x1)
+                interpolated_y.append(y)
+
+    return interpolated_y
+
 
 class Command(BaseCommand):
     help = "Runs the FSKX model and retrieves the JSON with risk indexes by temperature changes (interpolated with pure Python)"
@@ -69,7 +77,13 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.ERROR('Mismatch in temp_changes and risk length. Aborting.'))
                         return
 
-                    interpolated_risks = simple_interpolate(key_years, risk_indexes, full_years=years)
+                    # interpolated_risks = simple_interpolate(key_years, risk_indexes, full_years=years)
+                    interpolated_risks = simple_interpolate(
+                        temperature_anomalies,
+                        risk_indexes,
+                        full_temperature_anomalies
+                    )
+
                     final_results = {
                         'initial_temperature': initial_temperature,
                         'temp_changes': full_temperature_anomalies,
