@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'allauth',
     'allauth.account',
-    # 'allauth.socialaccount',
 
     'django.contrib.gis',  # Required for GeoDjango/PostGIS
 ]
@@ -91,9 +90,7 @@ AUTHENTICATION_BACKENDS = [
 SITE_ID = 1  # Required for django-allauth
 
 # Allauth Settings
-# ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
-# ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
