@@ -1,10 +1,12 @@
 import os
+import sys
 
 from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables from .env
 load_dotenv()
+from decouple import config, UndefinedValueError
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +36,8 @@ INSTALLED_APPS = [
 
     # Dashboard app
     'lumenix',
+
+    'fskx',
 
     # Django REST Framework
     'rest_framework',
@@ -142,3 +146,29 @@ else:
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+FSKX_USERNAME = config('FSKX_USERNAME')
+FSKX_PASSWORD = config('FSKX_PASSWORD')
+
+FSKX_SETTINGS = {
+    'API': {
+        'BASE_URL': config(f'FSKX_BASE_URL', default='https://fskx-api-gateway-service.risk-ai-cloud.com'),
+        'AUTH_ENDPOINT': config('FSKX_AUTH_ENDPOINT', default='/auth-service/generateToken'),
+        'REFRESH_ENDPOINT': config('FSKX_AUTH_ENDPOINT', default='/auth-service/refreshToken'),
+        'GET_MODEL_ENDPOINT': config('FSKX_GET_MODEL_ENDPOINT', default='/model-execution-service/models/{model_id}'),
+        'RUN_SIMULATION_ENDPOINT': config('FSKX_RUN_SIMULATION_ENDPOINT', default='/model-execution-service/simulations'),
+        'GET_SIMULATION_ENDPOINT': config('FSKX_GET_SIMULATION_ENDPOINT', default='/model-execution-service/simulations/{simulation_id}'),
+        'GET_PARAMS_ENDPOINT': config('FSKX_GET_PARAMS_ENDPOINT', default='/model-execution-service/parameters'),
+        'GET_RESULTS_ENDPOINT': config('FSKX_GET_RESULTS_ENDPOINT', default='/model-execution-service/results'),
+    },
+    'CREDENTIALS':{
+        'USERNAME': config(f'FSKX_USERNAME'),
+        'PASSWORD': config(f'FSKX_PASSWORD')
+    },
+    'MODELS': {
+        'SIMPLE_QMRA_ID': config("FSKX_SIMPLE_QMRA_ID", default='c42738eb-d6d6-449b-a313-6051432f536f'),
+        'FSKX_SIMPLE_KOSEKI_ID': config("FSKX_SIMPLE_KOSEKI_ID", default='ac398182-01ab-48f0-b25c-ca432631b018'),
+    },
+    'TESTING_JSON_RISK_PATH': config("FSKX_TESTING_JSON_RISK_PATH", default='fskx/testing_data/risk_index.json'),
+}
