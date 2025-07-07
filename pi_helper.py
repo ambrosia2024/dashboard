@@ -80,11 +80,18 @@ class PiSSHClient:
         target_dir = os.path.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
         command = f"ls -lh {target_dir}"
         stdin, stdout, stderr = self.ssh.exec_command(command)
-        out, err = stdout.read().decode(), stderr.read().decode()
-        if out:
-            print(out)
+        out = stdout.read().decode().strip()
+        err = stderr.read().decode().strip()
+
         if err:
-            print(f"Error:\n{err}")
+            if "No such file or directory" in err:
+                print(f"[Info] Remote folder '{target_dir}' does not exist.")
+            else:
+                print(f"[Error] Failed to list files in '{target_dir}':\n{err}")
+        elif out:
+            print(f"[Contents of '{target_dir}']:\n{out}")
+        else:
+            print(f"[Info] Folder '{target_dir}' is empty.")
 
     def _ensure_remote_dirs(self, path):
         """Recursively create directories on the remote Pi if they don't exist."""
@@ -157,3 +164,31 @@ class PiSSHClient:
         self.sftp.get(remote_path, local_path, callback=self._progress_callback(file_size))
 
         print(f"Downloaded: {remote_path} → {local_path}")
+
+    def delete_file_or_folder(self, target, remote_folder=None):
+        import stat
+
+        if remote_folder:
+            base_dir = os.path.join(self.remote_dir, remote_folder)
+        else:
+            base_dir = self.remote_dir
+
+        target_path = os.path.join(base_dir, target)
+
+        def _recursive_delete(path):
+            try:
+                mode = self.sftp.stat(path).st_mode
+                if stat.S_ISDIR(mode):
+                    for item in self.sftp.listdir(path):
+                        _recursive_delete(os.path.join(path, item))
+                    self.sftp.rmdir(path)
+                    print(f"Deleted folder: {path}")
+                else:
+                    self.sftp.remove(path)
+                    print(f"Deleted file: {path}")
+            except FileNotFoundError:
+                print(f"[Info] '{path}' does not exist.")
+            except Exception as e:
+                print(f"[Error] Failed to delete '{path}': {e}")
+
+        _recursive_delete(target_path)
