@@ -1,7 +1,12 @@
+# pi_helper.py
+
 import os
 import paramiko
 import requests
+import threading
+
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -57,23 +62,98 @@ class PiSSHClient:
         if self.ssh: self.ssh.close()
         del self.ssh, self.sftp
 
-    def list_files(self):
-        command = f"ls -lh {self.remote_dir}"
+    def _progress_callback(self, total_size):
+        """Return a callback function that updates tqdm progress bar."""
+        pbar = tqdm(total=total_size, unit='B', unit_scale=True, desc="Transferring", dynamic_ncols=True)
+        lock = threading.Lock()
+
+        def callback(transferred, _):
+            with lock:
+                pbar.n = transferred
+                pbar.refresh()
+                if transferred >= total_size:
+                    pbar.close()
+
+        return callback
+
+    def list_files(self, remote_folder=None):
+        target_dir = os.path.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
+        command = f"ls -lh {target_dir}"
         stdin, stdout, stderr = self.ssh.exec_command(command)
         out, err = stdout.read().decode(), stderr.read().decode()
-        if out: print(out)
-        if err: print(f"Error:\n{err}")
+        if out:
+            print(out)
+        if err:
+            print(f"Error:\n{err}")
 
-    def upload_file(self, local_path, remote_filename=None):
+    def _ensure_remote_dirs(self, path):
+        """Recursively create directories on the remote Pi if they don't exist."""
+        dirs = []
+        while path not in ('', '/'):
+            dirs.insert(0, os.path.basename(path))
+            path = os.path.dirname(path)
+
+        current_path = '/'
+        for d in dirs:
+            current_path = os.path.join(current_path, d)
+            try:
+                self.sftp.stat(current_path)
+            except FileNotFoundError:
+                self.sftp.mkdir(current_path)
+
+    def upload_file(self, local_path, remote_filename=None, remote_folder=None, overwrite=False):
         if not remote_filename:
             remote_filename = os.path.basename(local_path)
-        remote_path = os.path.join(self.remote_dir, remote_filename)
-        self.sftp.put(local_path, remote_path)
-        print(f"Uploaded: {local_path} → {remote_path}")
 
-    def download_file(self, remote_filename, local_path=None):
-        remote_path = os.path.join(self.remote_dir, remote_filename)
+        # Build full remote path: remote_dir + optional remote_folder + filename
+        if remote_folder:
+            full_remote_dir = os.path.join(self.remote_dir, remote_folder)
+        else:
+            full_remote_dir = self.remote_dir
+
+        remote_full_path = os.path.join(full_remote_dir, remote_filename)
+
+        # Ensure remote folders exist
+        self._ensure_remote_dirs(full_remote_dir)
+
+        try:
+            self.sftp.stat(remote_full_path)  # check if file exists
+            if not overwrite:
+                raise FileExistsError(
+                    f"Remote file '{remote_filename}' already exists. Set `overwrite=True` to replace it.")
+        except FileNotFoundError:
+            pass  # file doesn't exist, proceed
+
+        file_size = os.path.getsize(local_path)
+        self.sftp.put(local_path, remote_full_path, callback=self._progress_callback(file_size))
+
+        print(f"Uploaded: {local_path} → {remote_full_path}")
+
+    def download_file(self, remote_filename, local_path=None, remote_folder=None, overwrite=False):
+        # Build remote path from optional subfolder
+        if remote_folder:
+            full_remote_dir = os.path.join(self.remote_dir, remote_folder)
+        else:
+            full_remote_dir = self.remote_dir
+
+        remote_path = os.path.join(full_remote_dir, remote_filename)
+
         if not local_path:
             local_path = remote_filename
-        self.sftp.get(remote_path, local_path)
+
+        # Check if remote file exists
+        try:
+            self.sftp.stat(remote_path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Remote file '{remote_path}' does not exist.")
+
+        # Check if local file exists
+        if os.path.exists(local_path) and not overwrite:
+            raise FileExistsError(
+                f"Local file '{local_path}' already exists. Use `overwrite=True` to replace it.")
+
+        attr = self.sftp.stat(remote_path)
+        file_size = attr.st_size
+        self.sftp.get(remote_path, local_path, callback=self._progress_callback(file_size))
+
         print(f"Downloaded: {remote_path} → {local_path}")
