@@ -85,13 +85,13 @@ class PiSSHClient:
 
         if err:
             if "No such file or directory" in err:
-                print(f"[Info] Remote folder '{target_dir}' does not exist.")
+                return {"status": "not_found", "message": f"Remote folder '{target_dir}' does not exist."}
             else:
-                print(f"[Error] Failed to list files in '{target_dir}':\n{err}")
+                return {"status": "error", "message": err}
         elif out:
-            print(f"[Contents of '{target_dir}']:\n{out}")
+            return {"status": "ok", "folder": target_dir, "contents": out.splitlines()}
         else:
-            print(f"[Info] Folder '{target_dir}' is empty.")
+            return {"status": "ok", "folder": target_dir, "contents": []}
 
     def _ensure_remote_dirs(self, path):
         """Recursively create directories on the remote Pi if they don't exist."""
