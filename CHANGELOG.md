@@ -1,4 +1,4 @@
-# Changelog
+_# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SCiO API test scripts for `/models`, `/modelexecutionservice/models`, and `/simulation`, using `.env` configuration and structured output.
+- FastAPI app for testing pidrive integration.
+- New test helpers and API utilities to standardise response handling for pidrive.
+- IPCC dashboard link added to frontend for external reference.
+
+### Changed
+- Helper functions improved and refactored for better reuse and structure.
+- `.env.sample` updated with new variables for pidrive.
+- General project clean-up, including consolidation of main branch changes.
+
+### Fixed
+- Upload and download behaviour for Pi client testing corrected and made robust.
+
+### Removed
+- Deleted previously committed `.deb` file from repository.
+- `.deb` files added to `.gitignore` to avoid future accidental commits.
 
 ---
 
@@ -35,5 +51,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed simulation call to FSKX server.
 - Location handling bug fixed.
-- Crop fetching logic handled more robustly.
+- Crop fetching logic handled more robustly._
 
