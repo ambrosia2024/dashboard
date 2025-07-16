@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse
 from pathlib import Path
 
 from .pi_helper import PiSSHClient
-from .schemas import DeleteRequest
 
 router = APIRouter()
 
