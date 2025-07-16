@@ -1,4 +1,4 @@
-# pi_helper.py
+# pidrive/pi_helper.py
 
 import os
 import paramiko

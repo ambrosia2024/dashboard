@@ -1,9 +1,10 @@
 # pidrive/routes.py
 
+import json
 import shutil
 import tempfile
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 
 from .pi_helper import PiSSHClient
 from .schemas import UploadRequest, DownloadRequest, DeleteRequest, ListFilesRequest
@@ -11,18 +12,27 @@ from .schemas import UploadRequest, DownloadRequest, DeleteRequest, ListFilesReq
 router = APIRouter()
 
 @router.post("/upload")
-async def upload_file(req: UploadRequest, file: UploadFile = File(...)):
+async def upload_file(
+    remote_folder: str = Form(..., description="Target subfolder on the Pi"),
+    remote_filename: str = Form("", description="Filename to save as on the Pi (optional)"),
+    overwrite: bool = Form(False, description="Overwrite file if it already exists"),
+    file: UploadFile = File(..., description="The file to upload"),
+):
+
+    # Save file temporarily
     temp_path = tempfile.mktemp()
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Upload using SSH
     with PiSSHClient() as client:
         client.upload_file(
             local_path=temp_path,
-            remote_filename=req.remote_filename or file.filename,
-            remote_folder=req.remote_folder,
-            overwrite=req.overwrite
+            remote_filename=remote_filename or file.filename,
+            remote_folder=remote_folder,
+            overwrite=overwrite
         )
+
     return {"status": "uploaded", "filename": file.filename}
 
 
