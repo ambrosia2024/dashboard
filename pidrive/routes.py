@@ -1,6 +1,7 @@
 # pidrive/routes.py
 
 import os
+import posixpath
 import shutil
 import stat
 import tempfile
@@ -70,7 +71,7 @@ async def download_file(
         with PiSSHClient() as client:
             client.download_file(
                 remote_filename=remote_filename,
-                local_path=final_path,
+                local_path=str(final_path),
                 remote_folder=remote_folder,
                 overwrite=overwrite
             )
@@ -99,8 +100,8 @@ async def delete_file(
 ):
     try:
         with PiSSHClient() as client:
-            base_dir = client.remote_dir if not remote_folder else os.path.join(client.remote_dir, remote_folder)
-            target_path = os.path.join(base_dir, target)
+            base_dir = client.remote_dir if not remote_folder else posixpath.join(client.remote_dir, remote_folder)
+            target_path = posixpath.join(base_dir, target)
 
             try:
                 mode = client.sftp.stat(target_path).st_mode

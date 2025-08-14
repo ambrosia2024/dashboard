@@ -2,7 +2,9 @@
 
 import os
 import paramiko
+import posixpath
 import requests
+import shlex
 import threading
 
 from dotenv import load_dotenv
@@ -46,14 +48,21 @@ class PiSSHClient:
 
     def __enter__(self):
         self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
         self.ssh.connect(
             hostname=self.hostname,
             port=self.port,
             username=self.username,
             password=self.password,
-            timeout=10
+            timeout=10,
+            banner_timeout=10,
+            allow_agent=False
         )
+
+        # Keep the TCP session alive through ngrok/NAT so idle sessions don’t drop
+        self.ssh.get_transport().set_keepalive(30)
+
         self.sftp = self.ssh.open_sftp()
         return self
 
@@ -71,14 +80,16 @@ class PiSSHClient:
             with lock:
                 pbar.n = transferred
                 pbar.refresh()
-                if transferred >= total_size:
+                if transferred >= total_size and not pbar.disable:
                     pbar.close()
 
         return callback
 
     def list_files(self, remote_folder=None):
-        target_dir = os.path.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
-        command = f"ls -lh {target_dir}"
+        target_dir = posixpath.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
+
+        command = f"ls -lh {shlex.quote(target_dir)}"
+        # command = f"ls -lh {target_dir}"
         stdin, stdout, stderr = self.ssh.exec_command(command)
         out = stdout.read().decode().strip()
         err = stderr.read().decode().strip()
@@ -97,16 +108,24 @@ class PiSSHClient:
         """Recursively create directories on the remote Pi if they don't exist."""
         dirs = []
         while path not in ('', '/'):
-            dirs.insert(0, os.path.basename(path))
-            path = os.path.dirname(path)
+            dirs.insert(0, posixpath.basename(path))
+            path = posixpath.dirname(path)
 
         current_path = '/'
         for d in dirs:
-            current_path = os.path.join(current_path, d)
+            current_path = posixpath.join(current_path, d)
             try:
                 self.sftp.stat(current_path)
             except FileNotFoundError:
-                self.sftp.mkdir(current_path)
+                try:
+                    self.sftp.mkdir(current_path)
+                except IOError as e:
+                    # Some SFTP servers throw generic IOError if exists/permissions,
+                    # re-stat to confirm existence or raise.
+                    try:
+                        self.sftp.stat(current_path)
+                    except Exception:
+                        raise
 
     def upload_file(self, local_path, remote_filename=None, remote_folder=None, overwrite=False):
         if not remote_filename:
@@ -114,11 +133,11 @@ class PiSSHClient:
 
         # Build full remote path: remote_dir + optional remote_folder + filename
         if remote_folder:
-            full_remote_dir = os.path.join(self.remote_dir, remote_folder)
+            full_remote_dir = posixpath.join(self.remote_dir, remote_folder)
         else:
             full_remote_dir = self.remote_dir
 
-        remote_full_path = os.path.join(full_remote_dir, remote_filename)
+        remote_full_path = posixpath.join(full_remote_dir, remote_filename)
 
         # Ensure remote folders exist
         self._ensure_remote_dirs(full_remote_dir)
@@ -139,11 +158,11 @@ class PiSSHClient:
     def download_file(self, remote_filename, local_path=None, remote_folder=None, overwrite=False):
         # Build remote path from optional subfolder
         if remote_folder:
-            full_remote_dir = os.path.join(self.remote_dir, remote_folder)
+            full_remote_dir = posixpath.join(self.remote_dir, remote_folder)
         else:
             full_remote_dir = self.remote_dir
 
-        remote_path = os.path.join(full_remote_dir, remote_filename)
+        remote_path = posixpath.join(full_remote_dir, remote_filename)
 
         if not local_path:
             local_path = remote_filename
@@ -161,6 +180,11 @@ class PiSSHClient:
 
         attr = self.sftp.stat(remote_path)
         file_size = attr.st_size
+
+        local_dir = os.path.dirname(os.path.abspath(local_path))
+        if local_dir and not os.path.exists(local_dir):
+            os.makedirs(local_dir, exist_ok=True)
+
         self.sftp.get(remote_path, local_path, callback=self._progress_callback(file_size))
 
         print(f"Downloaded: {remote_path} → {local_path}")
@@ -168,19 +192,16 @@ class PiSSHClient:
     def delete_file_or_folder(self, target, remote_folder=None):
         import stat
 
-        if remote_folder:
-            base_dir = os.path.join(self.remote_dir, remote_folder)
-        else:
-            base_dir = self.remote_dir
+        base_dir = posixpath.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
 
-        target_path = os.path.join(base_dir, target)
+        target_path = posixpath.join(base_dir, target)
 
         def _recursive_delete(path):
             try:
                 mode = self.sftp.stat(path).st_mode
                 if stat.S_ISDIR(mode):
                     for item in self.sftp.listdir(path):
-                        _recursive_delete(os.path.join(path, item))
+                        _recursive_delete(posixpath.join(path, item))
                     self.sftp.rmdir(path)
                     print(f"Deleted folder: {path}")
                 else:
