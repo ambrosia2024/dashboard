@@ -29,3 +29,8 @@ synda/
 /*.nc
 
 *.deb
+*.csv
+*.json
+*.xlsx
+*.xls
+*.txt
