@@ -32,8 +32,9 @@ services:
       - ambrosia_network
 
   ambrosia_dashboard:
-    build: .
+    image: ghcr.io/ambrosia2024/ambrosia-dashboard:latest
     container_name: ambrosia_dashboard
+    build: .
     restart: unless-stopped
     entrypoint: /app/entrypoint.sh
     env_file:
@@ -50,6 +51,16 @@ services:
       - ambrosia_static_volume:/app/staticfiles
     networks:
       - ambrosia_network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/status" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   ambrosia_nginx:
     image: nginx:latest
