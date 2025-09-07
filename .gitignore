@@ -25,6 +25,7 @@ __pycache__/
 assets/
 data/
 synda/
+testing/
 
 /*.nc
 

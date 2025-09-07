@@ -216,3 +216,82 @@ async def system_info():
         return JSONResponse(status_code=200, content={"status": "ok", "data": data})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+# @router.post("/transload")
+# async def transload_file(
+#     url: str = Form(..., description="Direct HTTP(S) URL to fetch from"),
+#     remote_folder: str = Form("", description="Pool subfolder (balanced) or absolute directory on the Pi"),
+#     remote_filename: str = Form("", description="Optional filename; otherwise inferred from URL"),
+#     overwrite: bool = Form(False, description="Overwrite if destination file already exists"),
+#     timeout_seconds: int = Form(0, description="Optional hard timeout in seconds for the remote fetch (0 = no wrapper timeout)"),
+# ):
+#     try:
+#         with PiSSHClient() as client:
+#             import logging, pi_helper
+#             logging.getLogger(__name__).warning("pi_helper: %s, has download_direct=%s",
+#                                                 getattr(pi_helper, "__file__", None),
+#                                                 hasattr(PiSSHClient, "download_direct"))
+#
+#             # 1. If no remote_folder, use default "transload"
+#             if not remote_folder.strip():
+#                 # Always place inside the pool root (relative under "transload")
+#                 subpath = "transload"
+#                 branches = client.detect_mergerfs_branches()
+#                 if not branches:
+#                     return JSONResponse(status_code=500, content={
+#                         "status": "error",
+#                         "message": "No mergerfs branches detected on the storage server."
+#                     })
+#                 client.ensure_pool_dirs(subpath=subpath, branches=branches)
+#                 pool_root = client.remote_dir or "/mnt/storage"
+#                 target_dir = posixpath.join(pool_root, subpath)
+#
+#             elif remote_folder.startswith("/"):
+#                 # 2. Absolute path
+#                 target_dir = remote_folder.rstrip("/")
+#                 # Let download_direct do mkdir -p
+#
+#             else:
+#                 # 3. Pool write with subfolder
+#                 raw = remote_folder.strip().strip("/")
+#                 subpath = posixpath.join("uploads", raw)
+#                 if subpath.startswith("/") or ".." in subpath:
+#                     return JSONResponse(status_code=400, content={
+#                         "status": "error",
+#                         "message": "Invalid subpath"
+#                     })
+#                 branches = client.detect_mergerfs_branches()
+#                 if not branches:
+#                     return JSONResponse(status_code=500, content={
+#                         "status": "error",
+#                         "message": "No mergerfs branches detected on the storage server."
+#                     })
+#                 client.ensure_pool_dirs(subpath=subpath, branches=branches)
+#                 pool_root = client.remote_dir or "/mnt/storage"
+#                 target_dir = posixpath.join(pool_root, subpath)
+#
+#             # Perform the remote download
+#             summary = client.download_direct(
+#                 url=url,
+#                 target_dir=target_dir,
+#                 remote_filename=remote_filename,
+#                 overwrite=overwrite,
+#                 timeout=timeout_seconds
+#             )
+#
+#             return JSONResponse(status_code=201, content={
+#                 "status": "transloaded",
+#                 "url": url,
+#                 "target_dir": target_dir,
+#                 "path": summary["path"],
+#                 "bytes": summary["bytes"]
+#             })
+#
+#     except FileExistsError as fe:
+#         return JSONResponse(status_code=409, content={"status": "exists", "message": str(fe)})
+#     except ValueError as ve:
+#         return JSONResponse(status_code=400, content={"status": "error", "message": str(ve)})
+#     except Exception as e:
+#         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+

@@ -35,5 +35,6 @@ Dockerfile~
 media/
 data/
 synda/
+testing/
 
 /*.nc
