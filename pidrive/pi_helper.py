@@ -92,6 +92,99 @@ class PiSSHClient:
         if self.ssh: self.ssh.close()
         del self.ssh, self.sftp
 
+    # def _guess_filename_from_url(self, url: str) -> str:
+    #     """
+    #     Best-effort name from URL path. Falls back to 'download.bin' when empty.
+    #     Server-provided names via Content-Disposition are not available here
+    #     because we fetch remotely with curl/wget.
+    #     """
+    #     try:
+    #         path = urlparse(url).path
+    #         name = os.path.basename(path.rstrip("/"))
+    #         return name or "download.bin"
+    #     except Exception:
+    #         return "download.bin"
+
+    # def download_direct(self, *, url: str, target_dir: str, remote_filename: str = "", overwrite: bool = False,
+    #                     timeout: int = 0):
+    #     """
+    #     Ask the Pi to fetch a URL directly into target_dir using curl (falls back to wget).
+    #     Creates target_dir if needed. Writes to a .part then mv for atomicity.
+    #
+    #     :param url: http(s) URL
+    #     :param target_dir: absolute path where the file should land
+    #     :param remote_filename: optional final filename; will be guessed from URL if not provided
+    #     :param overwrite: whether to overwrite existing file
+    #     :param timeout: optional overall shell timeout in seconds (0 = let curl decide)
+    #     """
+    #     if not url.lower().startswith(("http://", "https://")):
+    #         raise ValueError("Only http(s) URLs are allowed.")
+    #
+    #     # Ensure target_dir exists (mkdir -p) and is owned by pi:storageusers if that matches policy
+    #     mkdir_cmd = f"mkdir -p {shlex.quote(target_dir)}"
+    #     self._exec(mkdir_cmd, timeout=10)
+    #
+    #     # Pick filename
+    #     final_name = remote_filename or guess_filename_from_url(url)
+    #     final_path = posixpath.join(target_dir, final_name)
+    #     temp_path = final_path + ".part"
+    #
+    #     # Existence check
+    #     try:
+    #         self.sftp.stat(final_path)
+    #         if not overwrite:
+    #             raise FileExistsError(
+    #                 f"Remote file '{final_path}' already exists. Use overwrite=True to replace it.")
+    #     except FileNotFoundError:
+    #         pass  # ok
+    #
+    #     # Build a safe curl command.
+    #     # -L        : follow redirects
+    #     # --fail    : non-zero on HTTP >= 400
+    #     # --retry 2 : a tiny bit of resilience
+    #     # --speed-time/limit: abort if stuck (optional safety)
+    #     curl_cmd = (
+    #         f"curl -L --fail --retry 2 "
+    #         f"--speed-time 30 --speed-limit 1024 "
+    #         f"-o {shlex.quote(temp_path)} {shlex.quote(url)}"
+    #     )
+    #
+    #     # If curl is absent, try wget
+    #     curl_test, _, rc = self._exec("command -v curl", timeout=5)
+    #     if rc != 0:
+    #         curl_cmd = (
+    #             f"wget -O {shlex.quote(temp_path)} --tries=3 --timeout=60 {shlex.quote(url)}"
+    #         )
+    #
+    #     # Optional: enforce a hard timeout from our side
+    #     if timeout and timeout > 0:
+    #         curl_cmd = f"timeout {int(timeout)}s {curl_cmd}"
+    #
+    #     # Download
+    #     out, err, rc = self._exec(curl_cmd, timeout=max(timeout, 120) if timeout else 0)
+    #     if rc != 0:
+    #         # Clean up partial file if present
+    #         try:
+    #             self.sftp.remove(temp_path)
+    #         except Exception:
+    #             pass
+    #         raise RuntimeError(f"Download failed (rc={rc}). stderr: {err or out}")
+    #
+    #     # Move into place atomically
+    #     mv_cmd = f"mv -f {shlex.quote(temp_path)} {shlex.quote(final_path)}"
+    #     _, err, rc = self._exec(mv_cmd, timeout=10)
+    #     if rc != 0:
+    #         # try to remove the .part if mv failed
+    #         try:
+    #             self.sftp.remove(temp_path)
+    #         except Exception:
+    #             pass
+    #         raise RuntimeError(f"Failed to finalise file move: {err}")
+    #
+    #     # Return a small summary including size
+    #     st = self.sftp.stat(final_path)
+    #     return {"path": final_path, "bytes": st.st_size}
+
     def _progress_callback(self, total_size):
         """Return a callback function that updates tqdm progress bar."""
         pbar = tqdm(total=total_size, unit='B', unit_scale=True, desc="Transferring", dynamic_ncols=True)
@@ -233,13 +326,19 @@ class PiSSHClient:
         return canonical
 
 
-    def delete_file_or_folder(self, target, remote_folder=None):
+    def delete_file_or_folder(self, target: str | bytes, remote_folder: str | bytes | None = None) -> None:
         """
         Secure delete: normalises paths, blocks deleting protected roots (base, uploads),
         prevents escapes via '..' or symlinks, and re-checks on every recursive step.
         """
 
         import stat
+        from typing import cast
+
+        if isinstance(target, (bytes, bytearray)):
+            target = target.decode("utf-8")
+        if remote_folder is not None and isinstance(remote_folder, (bytes, bytearray)):
+            remote_folder = remote_folder.decode("utf-8")
 
         # Build and normalise the base dir first
         base_dir = posixpath.join(self.remote_dir, remote_folder) if remote_folder else self.remote_dir
@@ -247,9 +346,8 @@ class PiSSHClient:
 
         # Build raw target and run through guard (may raise PermissionError)
         raw_target_path = posixpath.join(base_dir, target)
+        raw_target_path = cast(str, raw_target_path)
         target_path = self._safe_target(raw_target_path)
-
-        # target_path = posixpath.join(base_dir, target)
 
         def _recursive_delete(path):
             try:
@@ -308,7 +406,6 @@ class PiSSHClient:
 
         return []
 
-
     def ensure_pool_dirs(self, subpath: str, branches: list[str]):
         """
         Ensure the same subpath exists on all pool branches so epmfs can balance.
@@ -322,7 +419,7 @@ class PiSSHClient:
         cmd = " && ".join(parts)
         self._exec(cmd, timeout=10)
 
-
+    # Run a shell command on the remote Pi and capture stdout/err/return code
     def _exec(self, cmd: str, timeout: int = 15):
         """
         Run a shell command on the Pi via SSH and return (stdout, stderr, exit_status).
