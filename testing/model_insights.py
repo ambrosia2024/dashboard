@@ -1,5 +1,3 @@
-# api_test/scio/model_insights.py
-
 import django
 import os
 import pandas as pd
