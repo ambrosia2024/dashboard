@@ -9,6 +9,7 @@ import threading
 
 from dotenv import load_dotenv
 from tqdm import tqdm
+from pidrive.temp.utils import guess_filename_from_url, ensure_remote_dirs
 
 load_dotenv()
 
@@ -55,8 +56,9 @@ class PiSSHClient:
             port=self.port,
             username=self.username,
             password=self.password,
-            timeout=10,
-            banner_timeout=10,
+            timeout=30,
+            banner_timeout=30,
+            auth_timeout=30,
             allow_agent=False
         )
 
@@ -64,12 +66,133 @@ class PiSSHClient:
         self.ssh.get_transport().set_keepalive(30)
 
         self.sftp = self.ssh.open_sftp()
+
+        # Canonicalise the configured base directory on the remote (resolves .. and symlinks)
+        self.remote_dir = self.sftp.normalize(self.remote_dir)
+
+        # Protect the uploads root
+        self.uploads_dir = self.sftp.normalize(posixpath.join(self.remote_dir, "uploads"))
+
+        # Paths we will NEVER delete as a whole (contents can still be deleted)
+        self._protected_paths = {self.remote_dir, self.uploads_dir}
+
+        # Optional: prepare a trash directory for future soft-delete use
+        self.trash_dir = self.sftp.normalize(posixpath.join(self.uploads_dir, ".trash"))
+        try:
+            self.sftp.stat(self.trash_dir)
+        except FileNotFoundError:
+            try:
+                self.sftp.mkdir(self.trash_dir)
+            except Exception:
+                # Not fatal if we cannot create it
+                pass
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.sftp: self.sftp.close()
         if self.ssh: self.ssh.close()
         del self.ssh, self.sftp
+
+    # Run a shell command on the remote Pi and capture stdout/err/return code
+    def _exec(self, cmd, timeout=60):
+        # We use exec_command so it respects keepalive and existing SSH session.
+        stdin, stdout, stderr = self.ssh.exec_command(cmd, timeout=timeout)
+        out = stdout.read().decode(errors="replace")
+        err = stderr.read().decode(errors="replace")
+        rc = stdout.channel.recv_exit_status()
+        return out, err, rc
+
+    # def _guess_filename_from_url(self, url: str) -> str:
+    #     """
+    #     Best-effort name from URL path. Falls back to 'download.bin' when empty.
+    #     Server-provided names via Content-Disposition are not available here
+    #     because we fetch remotely with curl/wget.
+    #     """
+    #     try:
+    #         path = urlparse(url).path
+    #         name = os.path.basename(path.rstrip("/"))
+    #         return name or "download.bin"
+    #     except Exception:
+    #         return "download.bin"
+
+    def download_direct(self, *, url: str, target_dir: str, remote_filename: str = "", overwrite: bool = False,
+                        timeout: int = 0):
+        """
+        Ask the Pi to fetch a URL directly into target_dir using curl (falls back to wget).
+        Creates target_dir if needed. Writes to a .part then mv for atomicity.
+
+        :param url: http(s) URL
+        :param target_dir: absolute path where the file should land
+        :param remote_filename: optional final filename; will be guessed from URL if not provided
+        :param overwrite: whether to overwrite existing file
+        :param timeout: optional overall shell timeout in seconds (0 = let curl decide)
+        """
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError("Only http(s) URLs are allowed.")
+
+        # Ensure target_dir exists (mkdir -p) and is owned by pi:storageusers if that matches policy
+        mkdir_cmd = f"mkdir -p {shlex.quote(target_dir)}"
+        self._exec(mkdir_cmd, timeout=10)
+
+        # Pick filename
+        final_name = remote_filename or guess_filename_from_url(url)
+        final_path = posixpath.join(target_dir, final_name)
+        temp_path = final_path + ".part"
+
+        # Existence check
+        try:
+            self.sftp.stat(final_path)
+            if not overwrite:
+                raise FileExistsError(f"Remote file '{final_path}' already exists. Use overwrite=True to replace it.")
+        except FileNotFoundError:
+            pass  # ok
+
+        # Build a safe curl command.
+        # -L        : follow redirects
+        # --fail    : non-zero on HTTP >= 400
+        # --retry 2 : a tiny bit of resilience
+        # --speed-time/limit: abort if stuck (optional safety)
+        curl_cmd = (
+            f"curl -L --fail --retry 2 "
+            f"--speed-time 30 --speed-limit 1024 "
+            f"-o {shlex.quote(temp_path)} {shlex.quote(url)}"
+        )
+
+        # If curl is absent, try wget
+        curl_test, _, rc = self._exec("command -v curl", timeout=5)
+        if rc != 0:
+            curl_cmd = (
+                f"wget -O {shlex.quote(temp_path)} --tries=3 --timeout=60 {shlex.quote(url)}"
+            )
+
+        # Optional: enforce a hard timeout from our side
+        if timeout and timeout > 0:
+            curl_cmd = f"timeout {int(timeout)}s {curl_cmd}"
+
+        # Download
+        out, err, rc = self._exec(curl_cmd, timeout=max(timeout, 120) if timeout else 0)
+        if rc != 0:
+            # Clean up partial file if present
+            try:
+                self.sftp.remove(temp_path)
+            except Exception:
+                pass
+            raise RuntimeError(f"Download failed (rc={rc}). stderr: {err or out}")
+
+        # Move into place atomically
+        mv_cmd = f"mv -f {shlex.quote(temp_path)} {shlex.quote(final_path)}"
+        _, err, rc = self._exec(mv_cmd, timeout=10)
+        if rc != 0:
+            # try to remove the .part if mv failed
+            try:
+                self.sftp.remove(temp_path)
+            except Exception:
+                pass
+            raise RuntimeError(f"Failed to finalise file move: {err}")
+
+        # Return a small summary including size
+        st = self.sftp.stat(final_path)
+        return {"path": final_path, "bytes": st.st_size}
 
     def _progress_callback(self, total_size):
         """Return a callback function that updates tqdm progress bar."""
@@ -110,28 +233,28 @@ class PiSSHClient:
             print(msg)
             return {"status": "ok", "path": target_dir, "items": []}
 
-    def _ensure_remote_dirs(self, path):
-        """Recursively create directories on the remote Pi if they don't exist."""
-        dirs = []
-        while path not in ('', '/'):
-            dirs.insert(0, posixpath.basename(path))
-            path = posixpath.dirname(path)
-
-        current_path = '/'
-        for d in dirs:
-            current_path = posixpath.join(current_path, d)
-            try:
-                self.sftp.stat(current_path)
-            except FileNotFoundError:
-                try:
-                    self.sftp.mkdir(current_path)
-                except IOError as e:
-                    # Some SFTP servers throw generic IOError if exists/permissions,
-                    # re-stat to confirm existence or raise.
-                    try:
-                        self.sftp.stat(current_path)
-                    except Exception:
-                        raise
+    # def _ensure_remote_dirs(self, path):
+    #     """Recursively create directories on the remote Pi if they don't exist."""
+    #     dirs = []
+    #     while path not in ('', '/'):
+    #         dirs.insert(0, posixpath.basename(path))
+    #         path = posixpath.dirname(path)
+    #
+    #     current_path = '/'
+    #     for d in dirs:
+    #         current_path = posixpath.join(current_path, d)
+    #         try:
+    #             self.sftp.stat(current_path)
+    #         except FileNotFoundError:
+    #             try:
+    #                 self.sftp.mkdir(current_path)
+    #             except IOError as e:
+    #                 # Some SFTP servers throw generic IOError if exists/permissions,
+    #                 # re-stat to confirm existence or raise.
+    #                 try:
+    #                     self.sftp.stat(current_path)
+    #                 except Exception:
+    #                     raise
 
     def upload_file(self, local_path, remote_filename=None, remote_folder=None, overwrite=False):
         if not remote_filename:
@@ -146,7 +269,7 @@ class PiSSHClient:
         remote_full_path = posixpath.join(full_remote_dir, remote_filename)
 
         # Ensure remote folders exist
-        self._ensure_remote_dirs(full_remote_dir)
+        ensure_remote_dirs(full_remote_dir)
 
         try:
             self.sftp.stat(remote_full_path)  # check if file exists
