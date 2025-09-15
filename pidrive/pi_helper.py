@@ -13,6 +13,9 @@ from tqdm import tqdm
 from urllib.parse import urlparse, unquote
 from uuid import uuid4
 
+from dotenv import load_dotenv
+from tqdm import tqdm
+
 load_dotenv()
 
 
@@ -778,6 +781,7 @@ class PiSSHClient:
         Run a shell command on the Pi via SSH and return (stdout, stderr, exit_status).
         Keeping it here avoids repeating the exec/read boilerplate everywhere.
         """
+
         # Paramiko: timeout=None => no timeout; timeout=0 => immediate timeout (bad)
         if isinstance(timeout, (int, float)) and timeout <= 0:
             timeout = None
