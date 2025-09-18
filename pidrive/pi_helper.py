@@ -13,9 +13,6 @@ from tqdm import tqdm
 from urllib.parse import urlparse, unquote
 from uuid import uuid4
 
-from dotenv import load_dotenv
-from tqdm import tqdm
-
 load_dotenv()
 
 
