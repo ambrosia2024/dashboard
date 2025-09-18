@@ -2,7 +2,7 @@ import pandas as pd
 
 df = pd.read_csv("all_models.csv")
 
-keywords = ["Salmonella", "lettuce", "growth", "temperature", "prediction"]
+keywords = ["Listeria", "monocytogenes", "growth", "iceberg", "lettuce"]
 
 def keyword_score(name, keywords):
     if pd.isna(name):
