@@ -20,10 +20,20 @@ RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not RUNNING_IN_DOCKER  # Debug True in local, False in Docker
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "dashboard.ambrosia-project.eu"]
 
 if RUNNING_IN_DOCKER:
     ALLOWED_HOSTS.append(os.getenv("ALLOWED_HOST", "*"))  # Allow all in prod
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://dashboard.ambrosia-project.eu", "http://localhost:8000"
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # Application definition
 INSTALLED_APPS = [
