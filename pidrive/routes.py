@@ -228,7 +228,8 @@ async def transload_file(
     ):
     try:
         with PiSSHClient() as client:
-            import logging, pi_helper
+            import logging
+            from testing import pi_helper
             logging.getLogger(__name__).warning("pi_helper: %s, has download_direct=%s",
                                                 getattr(pi_helper, "__file__", None),
                                                 hasattr(PiSSHClient, "download_direct"))
