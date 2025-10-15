@@ -42,13 +42,6 @@ class BaseModel(models.Model):
 
 
 class CropMaster(BaseModel):
-    ontology_id = models.CharField(max_length=10, unique=True, verbose_name="Ontology ID",
-                                   validators=[RegexValidator(
-                                       regex=r"^CO_\d{3}$",
-                                       message="Ontology ID must be in the format 'CO_XXX' where XXX is a 3-digit number.",
-                                       code="invalid_ontology_id"
-                                   )
-                                   ])
     crop_name = models.CharField(max_length=255, verbose_name="Crop Name",
                                  validators=[
                                      RegexValidator(
@@ -57,10 +50,15 @@ class CropMaster(BaseModel):
                                          code="invalid_crop_name"
                                      )
                                  ])
-    agrovoc_uri = models.URLField(null=True, blank=True, unique=True, verbose_name="AGROVOC URI")
-    agrovoc_notation = models.CharField(
-        max_length=32, null=True, blank=True, unique=True,
-        help_text="AGROVOC local ID like c_12151"
+
+    uri = models.URLField(unique=True, null=True, blank=True, help_text="SKOS Concept URI from TTL")
+    scheme = models.CharField(max_length=64, null=True, blank=True, help_text="ConceptScheme label (e.g., fruit, herb)")
+    notation = models.CharField(max_length=64, null=True, blank=True, help_text="skos:notation if present")
+
+    # Single-parent tree (0..1 parent)
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children',
+        help_text="Parent crop (from skos:broader)"
     )
 
     class Meta:
@@ -74,7 +72,7 @@ class CropMaster(BaseModel):
             raise ValidationError({"crop_name": "A crop with this name already exists."})
 
     def __str__(self):
-        return f"{self.crop_name} ({self.ontology_id})"
+        return self.crop_name
 
 
 class ClimateData(BaseModel):

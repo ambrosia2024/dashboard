@@ -17,28 +17,21 @@ class CropMasterAdmin(admin.ModelAdmin):
     """
 
     # ----- List / Search / Filters -----
-    list_display = ("crop_name", "ontology_id", "status_badge", "created_at", "updated_at")
+    list_display = ("crop_name", "status_badge", "created_at", "updated_at")
     list_display_links = ("crop_name",)
     ordering = ("crop_name",)
-    search_fields = ("crop_name", "ontology_id")
+    search_fields = ("crop_name",)
     list_filter = ("status", "created_at", "updated_at")
     date_hierarchy = "created_at"
     list_per_page = 50
 
     # ----- Form layout -----
     fieldsets = (
-        ("Crop", {"fields": ("crop_name", "ontology_id")}),
+        ("Crop", {"fields": ("crop_name",)}),
         ("Lifecycle", {"fields": ("status", "deleted_at", "created_at", "updated_at")}),
     )
     # System fields are read-only; deleted_at is set via soft delete
     readonly_fields = ("deleted_at", "created_at", "updated_at")
-
-    # Make ontology_id editable on create but read-only on edit (safer for a unique external ID)
-    def get_readonly_fields(self, request, obj=None):
-        ro = list(super().get_readonly_fields(request, obj))
-        if obj:  # editing existing object
-            ro.append("ontology_id")
-        return ro
 
     # ----- Pretty status badge -----
     @admin.display(description="Status")
@@ -77,7 +70,7 @@ class CropMasterAdmin(admin.ModelAdmin):
     @admin.action(description="Export selected to CSV")
     def export_as_csv(self, request, queryset):
         """
-        Minimal CSV export (crop_name, ontology_id, status, created_at, updated_at).
+        Minimal CSV export (crop_name, status, created_at, updated_at).
         Returns an HTTP response so the browser downloads the file immediately.
         """
         import csv
@@ -86,9 +79,9 @@ class CropMasterAdmin(admin.ModelAdmin):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="crops_export.csv"'
         writer = csv.writer(response)
-        writer.writerow(["crop_name", "ontology_id", "status", "created_at", "updated_at"])
+        writer.writerow(["crop_name", "status", "created_at", "updated_at"])
         for obj in queryset:
-            writer.writerow([obj.crop_name, obj.ontology_id, obj.status, obj.created_at, obj.updated_at])
+            writer.writerow([obj.crop_name, obj.status, obj.created_at, obj.updated_at])
         return response
 
     # Remove the default hard delete (dangerous) — nudges admins to use soft delete instead

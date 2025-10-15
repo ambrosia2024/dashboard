@@ -41,8 +41,4 @@ api_test/
 utils/
 pidrive/
 
-pi_connect.py
-pi_helper.py
-pi_test.py
-
 /*.nc

@@ -40,6 +40,35 @@
             color: #1c84ee;
             stroke: #1c84ee;
         }
+
+        /* Make the top bar tall enough and centre contents */
+        #page-topbar {
+          --topbar-h: 80px;                    /* try 72–88px to taste */
+          min-height: var(--topbar-h);
+        }
+        .navbar-header,
+        .navbar-brand-box {
+          min-height: var(--topbar-h);
+          height: var(--topbar-h);
+          display: flex;
+          align-items: center;
+        }
+        .navbar-brand-box { padding: 0 3rem; }
+
+        .navbar-brand .brand-logo {
+          display: block;
+          height: 56px !important;             /* ← pick 48–64px; it will scale proportionally */
+          width: auto !important;
+          opacity: 1 !important;
+          filter: none !important;
+          mix-blend-mode: normal;
+        }
+
+        /* Some admin themes hard-cap logo height; neutralise those */
+        .navbar-brand img, .logo-lg img {
+          max-height: none !important;
+        }
+        .logo-lg { display: inline-flex !important; }
     </style>
     {% endblock css %}
 
