@@ -1,0 +1,19 @@
+{# templates/lumenix/risk_charts.html #}
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Risk Charts{% endblock title %}
+
+{% block extra_css %}
+    {# Leaflet CSS stays here since the map needs it #}
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+  {% include 'lumenix/partials/_risk_charts_grid.html' %}
+  {% include 'lumenix/partials/_risk_map.html' %}
+{% endblock content %}
+
+{% block extra_js %}
+  {% include 'lumenix/partials/_risk_scripts.html' %}
+{% endblock extra_js %}

@@ -1,0 +1,178 @@
+{# templates/lumenix/risk_charts.html #}
+
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Risk Charts{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+          integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="row mt-3">
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Toxin concentration vs time</h4>
+                <div id="toxinsChart" style="height: 360px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Pathogen concentration vs time</h4>
+                <div id="pathogenConcChart" style="height: 360px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Probability of illness vs time</h4>
+                <div id="probChart" style="height: 360px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Cases per 100k vs time</h4>
+                <div id="casesChart" style="height: 360px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Seasonal heatmap (× baseline)</h4>
+                <div id="seasonalHeatmap" style="height: 360px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+            <h4 class="mb-sm-0">Geographic Risk Heatmap</h4>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-2 mb-2">
+  <!-- Row 1: core selectors -->
+  <div class="col-sm-3">
+    <label class="form-label">Crop</label>
+    <select id="rm-crop" class="form-select">
+      <option>Lettuce</option>
+      <option>Iceberg</option>
+    </select>
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">Pathogen</label>
+    <select id="rm-pathogen" class="form-select">
+      <option>Listeria</option>
+      <option>Salmonella</option>
+    </select>
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">Risk parameter</label>
+    <select id="rm-metric" class="form-select">
+      <option value="risk_multiplier">× baseline</option>
+      <option value="prob_illness_pct">Probability (%)</option>
+      <option value="toxin_level_ug_per_kg">Toxin (μg/kg)</option>
+      <option value="cases_per_100k">Cases /100k</option>
+    </select>
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">Timescale</label>
+    <select id="rm-scale" class="form-select">
+      <option value="days">Days</option>
+      <option value="weeks">Weeks</option>
+      <option value="months" selected>Months</option>
+      <option value="years">Years</option>
+      <option value="decades">Decades</option>
+    </select>
+  </div>
+</div>
+
+<div class="row g-2 mb-2">
+  <!-- Row 2: time window + quick pickers -->
+  <div class="col-sm-3">
+    <label class="form-label">Start date</label>
+    <input id="rm-start" type="date" class="form-control" value="2023-01-01">
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">End date</label>
+    <input id="rm-end" type="date" class="form-control" value="2023-12-31">
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">Month</label>
+    <div class="d-flex align-items-center gap-2">
+      <input id="rm-month" type="range" min="1" max="12" value="6" class="form-range" list="rm-month-ticks" style="width: 100%;">
+      <span id="rm-month-label" class="text-muted" style="min-width: 3ch;">Jun</span>
+    </div>
+    <datalist id="rm-month-ticks">
+      <option value="1" label="Jan"></option>
+      <option value="4" label="Apr"></option>
+      <option value="7" label="Jul"></option>
+      <option value="10" label="Oct"></option>
+    </datalist>
+  </div>
+
+  <div class="col-sm-3">
+    <label class="form-label">Year</label>
+    <select id="rm-year" class="form-select">
+      <option>2021</option>
+      <option>2022</option>
+      <option selected>2023</option>
+    </select>
+  </div>
+</div>
+
+        <div id="riskMap" style="height: 520px;"></div>
+        <small class="text-muted d-block mt-2" id="rm-caption"></small>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/config.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/dummy_data.js' %}"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/charts/toxin_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/pathogen_conc_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/prob_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/cases_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/seasonal_heatmap.js' %}"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/init.js' %}"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+        integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- Map data then map initialiser (order matters) -->
+<script src="{% static 'js/pages/dashboard/risk/charts/dummy_geojson.js' %}"></script>
+
+<!-- NUTS loader builds window.RISK_GEOJSON asynchronously -->
+<script src="{% static 'js/pages/dashboard/risk/charts/load_nuts_geojson.js' %}"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/charts/map_init.js' %}"></script>
+{% endblock extra_js %}

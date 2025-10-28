@@ -24,6 +24,8 @@ __pycache__/
 
 assets/
 data/
+!static/data/
+!static/data/**
 synda/
 testing/
 
