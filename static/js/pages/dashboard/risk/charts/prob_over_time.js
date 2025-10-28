@@ -1,6 +1,21 @@
 // static/js/pages/dashboard/risk/charts/prob_over_time.js
 
 window.renderProbChart = function (domId, rows, pairLabel = "") {
+    function applyPinnedMarker(idx) {
+        // We draw a vertical dashed line at the pinned x (date).
+        const x = rows.map(r => r.date);
+        const markLine =
+            (typeof idx === 'number') ? [{ xAxis: x[idx], lineStyle: { type: 'dashed', color: '#888', width: 1 }, label: { formatter: x[idx], position: 'insideEndTop' }}]
+        : [];
+        const opt = chart.getOption();
+
+        // Ensure series[0] exists
+        if (opt.series && opt.series[0]) {
+            opt.series[0].markLine = { symbol: 'none', data: markLine };
+            chart.setOption(opt, false, true);
+        }
+    }
+
     const el = document.getElementById(domId);
     const chart = echarts.init(el);
     const baseline = rows.length ? rows[0].prob_illness_pct : null;
@@ -57,4 +72,46 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
             { name: 'Baseline',    type: 'line', encode: { x: 0, y: 3 }, showSymbol: false, lineStyle: { width: 1, type: 'dashed' } }
         ]
     });
+
+    chart.off('updateAxisPointer');
+    chart.on('updateAxisPointer', (e) => {
+        // Only update hover index if nothing is pinned
+        if (typeof window.__probPinnedIndex === 'number') return;
+        const i = e?.dataIndex ?? e?.axesInfo?.[0]?.value ?? null;
+        if (typeof i === 'number') window.__probLastIndex = i;
+    });
+
+    chart.off('click');
+    chart.on('click', (p) => {
+        if (typeof p?.dataIndex === 'number') {
+            window.__probPinnedIndex = p.dataIndex;
+            applyPinnedMarker(window.__probPinnedIndex);
+
+            // Show interpretation immediately:
+            if (window.showProbPointInterpretation) {
+                window.showProbPointInterpretation(rows, window.__probPinnedIndex);
+            }
+        }
+    });
+
+    // Double-click anywhere to unpin
+    chart.off('dblclick');
+    chart.on('dblclick', () => {
+        window.__probPinnedIndex = null;
+        applyPinnedMarker(null);
+    });
+
+    // Global Esc unpins
+    document.removeEventListener('keydown', window.__probEscHandler || (()=>{}));
+    window.__probEscHandler = (ev) => {
+        if (ev.key === 'Escape') {
+            window.__probPinnedIndex = null;
+            applyPinnedMarker(null);
+        }
+    };
+
+    document.addEventListener('keydown', window.__probEscHandler);
+
+    // If there was a previously pinned index, re-apply marker on rerender
+    applyPinnedMarker(window.__probPinnedIndex);
 };

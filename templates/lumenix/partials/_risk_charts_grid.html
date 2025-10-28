@@ -1,11 +1,27 @@
 {# templates/lumenix/partials/_risk_charts_grid.html #}
 
+<div id="risk-context" class="alert alert-light border d-flex flex-wrap align-items-center gap-3">
+    <span><strong>Crop–Pathogen:</strong> <span id="ctx-pair">Lettuce — Salmonella</span></span>
+    <span class="vr mx-1"></span>
+    <span><strong>Location:</strong> <span id="ctx-location">Netherlands (aggregate)</span></span>
+    <span class="vr mx-1"></span>
+    <span><strong>Period:</strong> <span id="ctx-period">Jan–Dec 2023</span></span>
+    <span class="vr mx-1"></span>
+    <span><strong>Timescale:</strong> <span id="ctx-scale">Months</span></span>
+    <span class="vr mx-1"></span>
+    <span><strong>Baseline:</strong> <span id="ctx-baseline">Start of period (Jan)</span></span>
+    <span class="vr mx-1"></span>
+    <span><strong>Toxin limit:</strong> <span id="ctx-limit">12 μg/kg (prototype)</span></span>
+    <span class="ms-auto text-muted small">Data: simulated seasonal pattern</span>
+</div>
+
 <div class="row mt-3">
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
                 <h4>Toxin concentration vs time</h4>
                 <div id="toxinsChart" style="height: 360px;"></div>
+                <div id="toxinsExplain" class="mt-3 small text-muted"></div>
             </div>
         </div>
     </div>
@@ -15,6 +31,7 @@
             <div class="card-body">
                 <h4>Pathogen concentration vs time</h4>
                 <div id="pathogenConcChart" style="height: 360px;"></div>
+                <div id="pathogenExplain" class="mt-3 small text-muted"></div>
             </div>
         </div>
     </div>
@@ -24,6 +41,10 @@
             <div class="card-body">
                 <h4>Probability of illness vs time</h4>
                 <div id="probChart" style="height: 360px;"></div>
+                <button id="probExplainBtn" type="button" class="btn btn-outline-secondary btn-sm mt-2">
+                    Explain this point
+                </button>
+                <div id="probExplain" class="mt-3 small text-muted"></div>
             </div>
         </div>
     </div>
@@ -35,6 +56,7 @@
             <div class="card-body">
                 <h4>Cases per 100k vs time</h4>
                 <div id="casesChart" style="height: 360px;"></div>
+                <div id="casesExplain" class="mt-3 small text-muted"></div>
             </div>
         </div>
     </div>
@@ -44,6 +66,27 @@
             <div class="card-body">
                 <h4>Seasonal heatmap (× baseline)</h4>
                 <div id="seasonalHeatmap" style="height: 360px;"></div>
+                <div id="heatmapExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for probability interpretation -->
+<div class="modal fade" id="probExplainModal" tabindex="-1" aria-labelledby="probExplainLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="probExplainLabel">Probability interpretation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body" id="probExplainModalBody">
+                <!-- filled dynamically -->
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
