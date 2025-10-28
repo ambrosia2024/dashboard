@@ -1,0 +1,110 @@
+{# templates/lumenix/partials/_risk_map.html #}
+{# selection controls + map container #}
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+            <h4 class="mb-sm-0">Geographic Risk Heatmap</h4>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+    {# Row 1: core selectors #}
+        <div class="row g-2 mb-2">
+            <div class="col-sm-3">
+                <label class="form-label">Country</label>
+                <select id="rm-country" class="form-select">
+                    <option value="NL" selected>Netherlands</option>
+                    <option value="DE">Germany</option>
+                    <option value="EL">Greece</option>
+                    <option value="FR">France</option>
+                    <option value="IT">Italy</option>
+                </select>
+            </div>
+
+
+            <div class="col-sm-3">
+                <label class="form-label">Crop</label>
+                <select id="rm-crop" class="form-select">
+                    <option>Lettuce</option>
+                    <option>Iceberg</option>
+                </select>
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">Pathogen</label>
+                <select id="rm-pathogen" class="form-select">
+                    <option>Listeria</option>
+                    <option>Salmonella</option>
+                </select>
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">Risk parameter</label>
+                <select id="rm-metric" class="form-select">
+                    <option value="risk_multiplier">× baseline</option>
+                    <option value="prob_illness_pct">Probability (%)</option>
+                    <option value="toxin_level_ug_per_kg">Toxin (μg/kg)</option>
+                    <option value="cases_per_100k">Cases /100k</option>
+                </select>
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">Timescale</label>
+                <select id="rm-scale" class="form-select">
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months" selected>Months</option>
+                    <option value="years">Years</option>
+                    <option value="decades">Decades</option>
+            </select>
+            </div>
+        </div>
+
+        {# Row 2: time window + quick pickers #}
+        <div class="row g-2 mb-2">
+            <div class="col-sm-3">
+                <label class="form-label">Start date</label>
+                <input id="rm-start" type="date" class="form-control" value="2023-01-01">
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">End date</label>
+                <input id="rm-end" type="date" class="form-control" value="2023-12-31">
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">Month</label>
+                <div class="d-flex align-items-center gap-2">
+                    <input id="rm-month" type="range" min="1" max="12" value="6"
+                    class="form-range" list="rm-month-ticks" style="width: 100%;">
+                    <span id="rm-month-label" class="text-muted" style="min-width: 3ch;">Jun</span>
+                </div>
+                <datalist id="rm-month-ticks">
+                    <option value="1" label="Jan"></option>
+                    <option value="4" label="Apr"></option>
+                    <option value="7" label="Jul"></option>
+                    <option value="10" label="Oct"></option>
+                </datalist>
+            </div>
+
+            <div class="col-sm-3">
+                <label class="form-label">Year</label>
+                <select id="rm-year" class="form-select">
+                    <option>2021</option>
+                    <option>2022</option>
+                    <option selected>2023</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="riskMap" style="height: 520px;"></div>
+        <small class="text-muted d-block mt-2" id="rm-caption"></small>
+
+        Timescale, date, month, and year controls are all included for future compatibility.
+        - Currently only the month/year slider affects the dummy GeoJSON map.
+        - Start/end and timescale will be linked to backend model outputs later.
+    </div>
+</div>

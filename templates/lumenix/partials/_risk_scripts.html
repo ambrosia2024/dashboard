@@ -1,0 +1,24 @@
+{% load static %}
+
+{# 1) Libraries #}
+<script src="{% static 'vendor/echarts/5.5.0/echarts.min.js' %}"></script>
+<script src="{% static 'vendor/leaflet/1.9.4/leaflet.js' %}"></script>
+
+{# 2) App config + data generators (must come before chart modules) #}
+<script src="{% static 'js/pages/dashboard/risk/config.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/dummy_data.js' %}"></script>
+
+{# 3) Chart modules #}
+<script src="{% static 'js/pages/dashboard/risk/charts/toxin_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/pathogen_conc_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/prob_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/cases_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/seasonal_heatmap.js' %}"></script>
+
+{# 4) Page initialiser for charts #}
+<script src="{% static 'js/pages/dashboard/risk/init.js' %}"></script>
+
+{# 5) Map data and initialiser (order matters) #}
+<script src="{% static 'js/pages/dashboard/risk/charts/dummy_geojson.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/load_nuts_geojson.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/map_init.js' %}"></script>

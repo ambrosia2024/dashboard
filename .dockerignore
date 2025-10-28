@@ -34,6 +34,8 @@ Dockerfile~
 
 media/
 data/
+!static/data/
+!static/data/**
 synda/
 testing/
 #fskx/

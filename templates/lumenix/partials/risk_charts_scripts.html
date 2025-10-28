@@ -1,0 +1,18 @@
+{# templates/lumenix/partials/risk_charts_scripts.html #}
+
+{% load static %}
+
+{# 1) ECharts CDN (keep once per page) #}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+{# 2) Risk bundle (order matters) #}
+<script src="{% static 'js/pages/dashboard/risk/config.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/dummy_data.js' %}"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/charts/toxin_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/pathogen_conc_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/prob_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/cases_over_time.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/risk/charts/seasonal_heatmap.js' %}"></script>
+
+<script src="{% static 'js/pages/dashboard/risk/init.js' %}"></script>
