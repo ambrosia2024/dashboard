@@ -41,38 +41,124 @@ class BaseModel(models.Model):
         self.save()
 
 
-class CropMaster(BaseModel):
-    crop_name = models.CharField(max_length=255, verbose_name="Crop Name",
-                                 validators=[
-                                     RegexValidator(
-                                         regex=r"^[A-Za-z\s\-]+$",
-                                         message="Crop name must only contain letters, spaces, and hyphens.",
-                                         code="invalid_crop_name"
-                                     )
-                                 ])
-
-    uri = models.URLField(unique=True, null=True, blank=True, help_text="SKOS Concept URI from TTL")
-    scheme = models.CharField(max_length=64, null=True, blank=True, help_text="ConceptScheme label (e.g., fruit, herb)")
-    notation = models.CharField(max_length=64, null=True, blank=True, help_text="skos:notation if present")
-
-    # Single-parent tree (0..1 parent)
-    parent = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children',
-        help_text="Parent crop (from skos:broader)"
+class Vocabulary(models.Model):
+    """
+    A top-level vocabulary: e.g. 'plants' or 'pathogens'.
+    Keeping it generic so the same tables serve both vocabs.
+    """
+    VOCAB_IDS = (
+        ("plants", "Plants"),
+        ("pathogens", "Pathogens"),
     )
+    id = models.CharField(primary_key=True, max_length=32, choices=VOCAB_IDS)  # 'plants' / 'pathogens'
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "crop_master"
-        verbose_name = "Crop Master"
-        verbose_name_plural = "Crops Master"
-
-    def clean(self):
-        self.crop_name = self.crop_name.strip().title()  # Capitalize first letter
-        if CropMaster.objects.filter(crop_name__iexact=self.crop_name).exclude(id=self.id).exists():
-            raise ValidationError({"crop_name": "A crop with this name already exists."})
+        db_table = "vocabulary"
 
     def __str__(self):
-        return self.crop_name
+        return self.id
+
+
+class Scheme(models.Model):
+    """
+    A SKOS ConceptScheme entry as returned by the API.
+    """
+    vocabulary = models.ForeignKey(Vocabulary, on_delete=models.CASCADE, related_name="schemes")
+    uri = models.URLField(unique=True, help_text="ConceptScheme @id, e.g. https://.../vocab/scheme/cereal")
+    title = models.JSONField(default=dict, blank=True)        # { "en": "Cereal Vocabulary", ... }
+    description = models.JSONField(default=dict, blank=True)  # { "en": "..." }
+
+    class Meta:
+        db_table = "vocabulary_scheme"
+        indexes = [models.Index(fields=["vocabulary"])]
+
+    def __str__(self):
+        return self.title.get("en") or self.uri
+
+
+class Concept(models.Model):
+    """
+    A SKOS Concept. We key by 'uri' which is globally unique in your feed.
+    """
+    vocabulary = models.ForeignKey(Vocabulary, on_delete=models.CASCADE, related_name="concepts")
+    scheme = models.ForeignKey(Scheme, on_delete=models.SET_NULL, null=True, blank=True, related_name="concepts")
+
+    uri = models.URLField(unique=True, help_text="Concept @id, e.g. https://.../vocab/concept/cereal/barley")
+
+    # Labels & definitions are multilingual JSON blobs as in the API
+    pref_label = models.JSONField(default=dict, blank=True)
+    alt_label = models.JSONField(default=dict, blank=True)
+    definition = models.JSONField(default=dict, blank=True)
+    notation   = models.JSONField(default=dict, blank=True)
+
+    # Relationship lists are URIs: keep as JSON array(s) to avoid cross-row integrity headaches
+    broader     = models.JSONField(default=list, blank=True)
+    narrower    = models.JSONField(default=list, blank=True)
+    exact_match = models.JSONField(default=list, blank=True)
+    close_match = models.JSONField(default=list, blank=True)
+    related     = models.JSONField(default=list, blank=True)
+    in_scheme   = models.JSONField(default=list, blank=True)
+
+    # Normalised fingerprint of the fields; lets us detect substantive change efficiently
+    content_hash = models.CharField(max_length=64, db_index=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "vocabulary_concept"
+        indexes = [
+            models.Index(fields=["vocabulary"]),
+            models.Index(fields=["scheme"]),
+            models.Index(fields=["content_hash"]),
+        ]
+
+    def __str__(self):
+        return self.pref_label.get("en") or self.uri
+
+
+class PlantConceptManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(vocabulary_id="plants")
+
+
+class PathogenConceptManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(vocabulary_id="pathogens")
+
+
+class PlantConcept(Concept):
+    objects = PlantConceptManager()
+    class Meta:
+        proxy = True
+        verbose_name = "Plant Concept"
+        verbose_name_plural = "Plant Concepts"
+
+
+class PathogenConcept(Concept):
+    objects = PathogenConceptManager()
+    class Meta:
+        proxy = True
+        verbose_name = "Pathogen Concept"
+        verbose_name_plural = "Pathogen Concepts"
+
+
+class ConceptHistory(models.Model):
+    """
+    Append-only snapshot of a Concept whenever it changes.
+    Stores the full JSON payload (+ hash) so we can diff later.
+    """
+    concept = models.ForeignKey(Concept, on_delete=models.CASCADE, related_name="history")
+    change_type = models.CharField(max_length=16, choices=(("created","created"),("updated","updated")))
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    content_hash = models.CharField(max_length=64)
+    snapshot = models.JSONField()  # full concept dict as we persisted it
+
+    class Meta:
+        db_table = "vocabulary_concept_history"
+        indexes = [models.Index(fields=["concept", "changed_at"])]
 
 
 class ClimateData(BaseModel):

@@ -38,7 +38,6 @@ data/
 !static/data/**
 synda/
 testing/
-#fskx/
 api_test/
 utils/
 pidrive/

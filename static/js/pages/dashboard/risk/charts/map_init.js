@@ -24,7 +24,7 @@
 
     function colour(v, metric) {
         if (metric === 'risk_multiplier') {
-            // reuse your risk bands
+            // reuse risk bands
             if (v >= 5) return '#d62728';
             if (v >= 2) return '#ff7f0e';
             return '#2ca02c';

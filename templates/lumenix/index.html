@@ -1,5 +1,6 @@
 {% extends 'lumenix/base/base.html' %}
 {% load static %}
+{% load json_extras %}
 
 {% block title %}Forms{% endblock title %}
 
@@ -78,9 +79,6 @@
                 <h5 class="card-title">Select Your Location</h5>
                 <form id="locationForm">
                     <div class="mb-2">
-{#                        <label for="searchAddress" class="form-label">#}
-{#                            Enter address, city, province, postcode, or <span class="fw-semibold">coordinates (lat, lon)</span>#}
-{#                        </label>#}
                         <div class="input-group">
                             <input type="text" id="searchAddress" class="form-control"
                                    placeholder='Examples: "Amsterdam" · "Bavaria" · "1012 AB" · "50.8514, 5.6910"'
@@ -138,7 +136,23 @@
                     <select id="crop_list" class="form-control">
                         <option value="">-- Select a Crop --</option>
                         {% for crop in crops %}
-                            <option value="{{ crop.id }}">{{ crop.crop_name }}</option>
+                        <option value="{{ crop.id }}">{{ crop.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Select your pathogen</h5>
+                <div class="mb-2">
+                    <select id="pathogen_list" class="form-control">
+                        <option value="">-- Select a Pathogen --</option>
+                        {% for pathogen in pathogens %}
+                        <option value="{{ pathogen.id }}">{{ pathogen.label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -204,22 +218,6 @@
         </div>
     </div>
 </div>
-
-{#<div class="row">#}
-{#    <div class="col-12">#}
-{#        <h4 class="mb-sm-0 font-size-18">Lambert Projection - European Climate Data</h4>#}
-{#    </div>#}
-{#</div>#}
-{#<!-- Climate Data Map -->#}
-{#<div class="row">#}
-{#    <div class="col-sm-12">#}
-{#        <div class="card">#}
-{#            <div class="card-body">#}
-{#                <div id="climateMap" style="height: 500px;"></div>#}
-{#            </div>#}
-{#        </div>#}
-{#    </div>#}
-{#</div>#}
 
 <!-- end page title -->
 {% endblock content %}
