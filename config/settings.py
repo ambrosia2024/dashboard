@@ -8,6 +8,8 @@ from pathlib import Path
 load_dotenv()
 from decouple import config, UndefinedValueError
 
+from celery.schedules import crontab
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -46,8 +48,6 @@ INSTALLED_APPS = [
 
     # Dashboard app
     'lumenix',
-
-    'fskx',
 
     # Django REST Framework
     'rest_framework',
@@ -158,27 +158,24 @@ else:
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-FSKX_USERNAME = config('FSKX_USERNAME')
-FSKX_PASSWORD = config('FSKX_PASSWORD')
+SCIO_VOCAB_API_BASE = os.getenv("SCIO_VOCAB_API_BASE", "https://dev.api.ambrosia.scio.services/api/vocabulary")
 
-FSKX_SETTINGS = {
-    'API': {
-        'BASE_URL': config(f'FSKX_BASE_URL', default='https://fskx-api-gateway-service.risk-ai-cloud.com'),
-        'AUTH_ENDPOINT': config('FSKX_AUTH_ENDPOINT', default='/auth-service/generateToken'),
-        'REFRESH_ENDPOINT': config('FSKX_AUTH_ENDPOINT', default='/auth-service/refreshToken'),
-        'GET_MODEL_ENDPOINT': config('FSKX_GET_MODEL_ENDPOINT', default='/model-execution-service/models/{model_id}'),
-        'RUN_SIMULATION_ENDPOINT': config('FSKX_RUN_SIMULATION_ENDPOINT', default='/model-execution-service/simulations'),
-        'GET_SIMULATION_ENDPOINT': config('FSKX_GET_SIMULATION_ENDPOINT', default='/model-execution-service/simulations/{simulation_id}'),
-        'GET_PARAMS_ENDPOINT': config('FSKX_GET_PARAMS_ENDPOINT', default='/model-execution-service/parameters'),
-        'GET_RESULTS_ENDPOINT': config('FSKX_GET_RESULTS_ENDPOINT', default='/model-execution-service/results'),
-    },
-    'CREDENTIALS':{
-        'USERNAME': config(f'FSKX_USERNAME'),
-        'PASSWORD': config(f'FSKX_PASSWORD')
-    },
-    'MODELS': {
-        'SIMPLE_QMRA_ID': config("FSKX_SIMPLE_QMRA_ID", default='c42738eb-d6d6-449b-a313-6051432f536f'),
-        'FSKX_SIMPLE_KOSEKI_ID': config("FSKX_SIMPLE_KOSEKI_ID", default='ac398182-01ab-48f0-b25c-ca432631b018'),
-    },
-    'TESTING_JSON_RISK_PATH': config("FSKX_TESTING_JSON_RISK_PATH", default='fskx/testing_data/risk_index.json'),
-}
+# Broker/result (Redis example)
+# CELERY_BROKER_URL = "redis://localhost:6379/0"
+# CELERY_RESULT_BACKEND = "redis://localhost:6379/1"
+# CELERY_TIMEZONE = "Europe/Amsterdam"
+# CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+#
+# # Run every 5 minutes
+# CELERY_BEAT_SCHEDULE = {
+#     "sync-plants-hourly": {
+#         "task": "lumenix.tasks.sync_vocabulary_task",
+#         "schedule": crontab(minute="5", hour="*"),
+#         "args": ("plants",),
+#     },
+#     "sync-pathogens-hourly": {
+#         "task": "lumenix.tasks.sync_vocabulary_task",
+#         "schedule": crontab(minute="10", hour="*"),
+#         "args": ("pathogens",),
+#     },
+# }

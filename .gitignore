@@ -37,3 +37,6 @@ testing/
 *.xlsx
 *.xls
 *.txt
+
+celerybeat-schedule
+data/celery/

@@ -1,8 +1,9 @@
 # lumenix/views/dashboardV.py
 
+from django.utils.translation import get_language
 from django.views.generic import TemplateView
 
-from lumenix.models import CropMaster
+from lumenix.models import PlantConcept, PathogenConcept
 
 
 class DashboardView(TemplateView):
@@ -10,7 +11,20 @@ class DashboardView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["crops"] = CropMaster.active_objects.values()
-        context["climate_data_api"] = "/api/climate-data/"
+
+        lang = get_language() or "en"
+
+        def pick_label(d):
+            # d is the JSONField dict of labels; pick lang -> en -> any
+            if isinstance(d, dict):
+                return d.get(lang) or d.get("en") or next(iter(d.values()), "")
+            return ""
+
+        crops_qs = PlantConcept.objects.only("id", "pref_label")
+        paths_qs = PathogenConcept.objects.only("id", "pref_label")
+
+        context["crops"] = [{"id": c.id, "label": pick_label(c.pref_label)} for c in crops_qs]
+        context["pathogens"] = [{"id": p.id, "label": pick_label(p.pref_label)} for p in paths_qs]
+
         return context
 

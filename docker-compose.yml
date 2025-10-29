@@ -76,9 +76,82 @@ services:
     networks:
       - ambrosia_network
 
+#  ambrosia_redis:
+#    image: redis:7-alpine
+#    container_name: ambrosia_redis
+#    restart: unless-stopped
+#    ports:
+#      - "6379:6379"
+#    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+#    volumes:
+#      - ambrosia_redis_data:/data
+#    networks:
+#      - ambrosia_network
+#
+#  ambrosia_celery_worker:
+#    build: .
+#    container_name: ambrosia_celery_worker
+#    restart: unless-stopped
+#    command: celery -A config worker -l info
+#    env_file:
+#      - .env
+#    environment:
+#      - RUNNING_IN_DOCKER=true
+#    depends_on:
+#      ambrosia_postgres:
+#        condition: service_healthy
+#      ambrosia_redis:
+#        condition: service_started
+#    volumes:
+#      - .:/app
+#    networks:
+#      - ambrosia_network
+#
+#  ambrosia_celery_beat:
+#      build: .
+#      container_name: ambrosia_celery_beat
+#      restart: unless-stopped
+##      command: celery -A config beat -l info
+##      command: celery -A dashboard beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+#      command: >
+#        celery -A config beat -l info
+#        --scheduler celery.beat:PersistentScheduler
+#        --schedule /var/lib/celery/celerybeat-schedule
+#      env_file:
+#        - .env
+#      environment:
+#        - RUNNING_IN_DOCKER=true
+#      depends_on:
+#        - ambrosia_celery_worker
+#        - ambrosia_redis
+#      working_dir: /var/lib/celery
+#      volumes:
+#        - .:/app
+#        - ./data/celery:/var/lib/celery
+#      networks:
+#        - ambrosia_network
+
+#  ambrosia_flower:
+#    image: mher/flower:2.0
+#    container_name: ambrosia_flower
+#    restart: unless-stopped
+#    command: >
+#      flower --broker=redis://ambrosia_redis:6379/0
+#             --port=5555
+#             --url_prefix=/flower
+#      ports:
+#    ports:
+#      - "5555:5555"
+#    depends_on:
+#      - ambrosia_redis
+#      - ambrosia_celery_worker
+#    networks:
+#      - ambrosia_network
+
 volumes:
   ambrosia_static_volume:
   ambrosia_pg_db_data:
+#  ambrosia_redis_data:
 
 networks:
   ambrosia_network:
