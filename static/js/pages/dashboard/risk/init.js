@@ -199,7 +199,12 @@ function explainHeatmap(rows) {
 
     // We passed risk_multiplier = local multiplier vs start-of-period
     const period = `${rows[0].year}–${rows[rows.length-1].year}`;
-    const vals = rows.map(r => r.risk_multiplier);
+    // derive multipliers if missing to avoid NaN when callers pass plain rows
+    const base = rows[0]?.prob_illness_pct ?? 0;
+    const vals = rows.map(r => {
+        if (Number.isFinite(r.risk_multiplier)) return r.risk_multiplier;
+        return base > 0 ? (r.prob_illness_pct / base) : 0;
+    });
     const max = Math.max(...vals), min = Math.min(...vals), avg = mean(vals);
 
     return `
@@ -224,7 +229,7 @@ function explainHeatmap(rows) {
 }
 
 // Safely write summary HTML into the page
-function renderExplanations(toxinRows, pathogenRows) {
+function renderExplanations(toxinRows, pathogenRows, heatRows = toxinRows) {
     const toxEl = document.getElementById("toxinsExplain");
     const patEl = document.getElementById("pathogenExplain");
     const probEl = document.getElementById("probExplain");
@@ -235,7 +240,7 @@ function renderExplanations(toxinRows, pathogenRows) {
     if (patEl) patEl.innerHTML = explainPathogens(pathogenRows);
     if (probEl) probEl.innerHTML = explainProbability(toxinRows);
     if (casesEl) casesEl.innerHTML = explainCases(toxinRows);
-    if (heatEl) heatEl.innerHTML = explainHeatmap(toxinRows);
+    if (heatEl) heatEl.innerHTML = explainHeatmap(heatRows);
 }
 
 // ---- Probability interpretation helpers ----
@@ -295,9 +300,6 @@ function buildProbInterpretationHTML(rows, idx) {
         </p>
     `;
 }
-
-// Global state for the last point a user clicked/hovered
-window.__probLastIndex = null;
 
 // Open the modal with interpretation for index idx (or last / latest if absent)
 window.showProbPointInterpretation = function(rows, idx) {
@@ -367,7 +369,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }));
     window.renderSeasonalHeatmap("seasonalHeatmap", hmRowsFull, "risk_multiplier", pairLabel);
 
-    renderExplanations(rows, rows);
+    renderExplanations(rows, rows, hmRowsFull);
 
     // Button: show interpretation for the last clicked point, else the latest point
     const btn = document.getElementById('probExplainBtn');
@@ -393,7 +395,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // window.renderSeasonalHeatmap("seasonalHeatmap", inRange, "risk_multiplier", pairLabel);
 
-    renderExplanations(inRange, inRange);
+    renderExplanations(inRange, inRange, hmRows);
 
     ['rm-start','rm-end','rm-scale'].forEach(id => {
         const el = document.getElementById(id);
@@ -414,7 +416,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // window.renderSeasonalHeatmap("seasonalHeatmap", rerows, "risk_multiplier", pairLabel);
 
-            renderExplanations(rerows, rerows);
+            renderExplanations(rerows, rerows, hmR);
         });
     });
 
@@ -424,10 +426,18 @@ document.addEventListener("DOMContentLoaded", function () {
         const newRows = window.buildDummyRiskSeries({ ...next, events });
         const label = `${next.crop || "Crop"} — ${next.pathogen || "Pathogen"}`;
 
+        const b0 = newRows.length ? newRows[0].prob_illness_pct : 0;
+        const hmRows = newRows.map(r => ({
+            ...r,
+            risk_multiplier: b0 > 0 ? +(r.prob_illness_pct / b0).toFixed(2) : 0
+        }));
+
         window.renderToxinChart("toxinsChart", newRows, label);
         window.renderProbChart("probChart", newRows, label);
         window.renderCasesChart("casesChart", newRows, label);
-        window.renderSeasonalHeatmap("seasonalHeatmap", newRows, "risk_multiplier", label);
+
+        window.renderSeasonalHeatmap("seasonalHeatmap", hmRows, "risk_multiplier", label);
+        renderExplanations(newRows, newRows, hmRows);
     };
 });
 
