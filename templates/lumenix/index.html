@@ -6,8 +6,9 @@
 
 {% block extra_css %}
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" integrity="sha512-gc3xjCmIy673V6MyOAZhIW93xhM9ei1I+gLbmFjUHIjocENRsLX/QUE1htk5q1XV2D/iie/VQ8DXI6Vu8bexvQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}" />
+    <link rel="stylesheet" href="{% static 'vendor/leaflet.draw/1.0.4/leaflet.draw.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/pages/dashboard/search_icons.css' %}" />
 
     <style>
         .card {
@@ -120,9 +121,10 @@
                                 </div>
                                 <!-- right: buttons -->
                                 <div class="ms-2 d-flex gap-2">
-                                    <button type="button" id="searchButton" class="btn btn-primary">🔍</button>
-                                    <button type="button" id="locateMe" class="btn btn-success">📍</button>
-                                    <button type="button" id="clearSearch" class="btn btn-outline-secondary">🧹</button>
+                                    <button type="button" id="searchButton" class="btn btn-outline-secondary btn-icon"><i class="bi bi-search"></i></button>
+                                    <button type="button" id="locateMe" class="btn btn-outline-success btn-icon"><i class="bi bi-geo-alt"></i></button>
+                                    <button type="button" id="clearSearch" class="btn btn-outline-danger btn-icon"><i class="bi bi-x-circle"></i></button>
+                                    <button type="button" id="resetSelections" class="btn btn-outline-secondary d-flex align-items-center gap-1 px-3"><i class="bi bi-arrow-clockwise"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -229,22 +231,24 @@
 
 {% block extra_js %}
     <!-- Leaflet JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" integrity="sha512-ozq8xQKq6urvuU6jNgkfqAmT7jKN2XumbrX1JiB3TnF7tI48DPI4Gy1GXKD/V3EExgAs1V+pRO7vwtS1LHg0Gw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+    <script src="{% static 'vendor/leaflet/1.9.4/leaflet.js' %}"></script>
+    <script src="{% static 'vendor/leaflet.draw/1.0.4/leaflet.draw.js' %}"></script>
+    <script src="{% static 'vendor/Turf.js/6.5.0/turf.min.js' %}"></script>
 
     <!-- Add Proj4.js (Required for Lambert Projection) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <script src="{% static 'vendor/proj4js/2.9.0/proj4.js' %}"></script>
 
     <!-- Add Proj4Leaflet.js (Allows Leaflet to Use Lambert Projection) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
+    <script src="{% static 'vendor/proj4leaflet/1.0.2/proj4leaflet.min.js' %}"></script>
 {#    <script src="{% static 'js/pages/dashboard/lambert_conic.js' %}"></script>#}
 
     <!-- Load D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="{% static 'vendor/d3.v7.min.js' %}"></script>
 
     <!-- script for location search and showing NUTS region -->
     <script src="{% static 'js/pages/dashboard/locate_nuts_region.js' %}"></script>
+
+    <script src="{% static 'js/pages/dashboard/keep_location_crop_hazard_in_cookies.js' %}"></script>
 
     <!-- script for showing food safety hazard dummy figure -->
     <script src="{% static 'js/pages/dashboard/food_safety_hazard_dummy.js' %}"></script>
