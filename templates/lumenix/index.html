@@ -78,57 +78,62 @@
             <div class="card-body">
                 <h5 class="card-title">Select Your Location</h5>
                 <form id="locationForm">
-                    <div class="mb-2">
-                        <div class="input-group">
-                            <input type="text" id="searchAddress" class="form-control"
-                                   placeholder='Examples: "Amsterdam" · "Bavaria" · "1012 AB" · "50.8514, 5.6910"'
-                                   autocomplete="off" spellcheck="false" aria-describedby="coordsHelp" />
+                    <div class="flex-grow-1 me-2" style="min-width: 280px;">
+                        <div class="mb-2">
+                            <div class="input-group">
+                                <input type="text" id="searchAddress" class="form-control"
+                                       placeholder='Examples: "Amsterdam" · "Bavaria" · "1012 AB" · "50.8514, 5.6910"'
+                                       autocomplete="off" spellcheck="false" aria-describedby="coordsHelp" />
 
-                            <span class="input-group-text bg-white border-start-0 cursor-pointer" id="coordsHelp"
-                                  title="Click for more information" data-bs-toggle="modal"
-                                  data-bs-target="#locationHelpModal" role="button" tabindex="0" aria-label="Help">
-                                <i class="bi bi-info-circle" aria-hidden="true"></i>
-                                <span class="visually-hidden">Help</span>
-                            </span>
-                            <!-- Location input help modal -->
-                            <div class="modal fade" id="locationHelpModal" tabindex="-1" aria-labelledby="locationHelpLabel" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered modal-lg">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="locationHelpLabel">What can I enter?</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body" style="font-size:0.95rem; line-height:1.35;">
-                                            <ul class="mb-2 ps-3">
-                                                <li><strong>City / town / village</strong> — e.g. <code>Maastricht</code>, <code>Bilbao</code></li>
-                                                <li><strong>Province / region / country</strong> — e.g. <code>Limburg</code>, <code>Bavaria</code>, <code>Netherlands</code></li>
-                                                <li><strong>Postcode</strong> — e.g. <code>1012 AB</code> (add city/country if needed)</li>
-                                                <li><strong>Address or POI</strong> — e.g. <code>Markt 1 Maastricht</code>, <code>UM Sport</code></li>
-                                                <li><strong>Coordinates (lat, lon)</strong> — latitude first, no auto-swap:
-                                                    <ul class="mb-0 ps-3">
-                                                        <li>Decimal: <code>50.8514, 5.6910</code> or <code>50.8514 5.6910</code></li>
-                                                        <li>With N/S/E/W: <code>50.8514 N, 5.6910 E</code></li>
-                                                        <li>DMS: <code>50°51'5&quot; N, 5°41'28&quot; E</code></li>
-                                                        <li>EU decimal commas: <code>50,8514; 5,6910</code></li>
-                                                    </ul>
-                                                </li>
-                                            </ul>
+                                <span class="input-group-text bg-white border-start-0 cursor-pointer" id="coordsHelp"
+                                      title="Click for more information" data-bs-toggle="modal"
+                                      data-bs-target="#locationHelpModal" role="button" tabindex="0" aria-label="Help">
+                                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Help</span>
+                                </span>
+                                <!-- Location input help modal -->
+                                <div class="modal fade" id="locationHelpModal" tabindex="-1" aria-labelledby="locationHelpLabel" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="locationHelpLabel">What can I enter?</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body" style="font-size:0.95rem; line-height:1.35;">
+                                                <ul class="mb-2 ps-3">
+                                                    <li><strong>City / town / village</strong> — e.g. <code>Maastricht</code>, <code>Bilbao</code></li>
+                                                    <li><strong>Province / region / country</strong> — e.g. <code>Limburg</code>, <code>Bavaria</code>, <code>Netherlands</code></li>
+                                                    <li><strong>Postcode</strong> — e.g. <code>1012 AB</code> (add city/country if needed)</li>
+                                                    <li><strong>Address or POI</strong> — e.g. <code>Markt 1 Maastricht</code>, <code>UM Sport</code></li>
+                                                    <li><strong>Coordinates (lat, lon)</strong> — latitude first, no auto-swap:
+                                                        <ul class="mb-0 ps-3">
+                                                            <li>Decimal: <code>50.8514, 5.6910</code> or <code>50.8514 5.6910</code></li>
+                                                            <li>With N/S/E/W: <code>50.8514 N, 5.6910 E</code></li>
+                                                            <li>DMS: <code>50°51'5&quot; N, 5°41'28&quot; E</code></li>
+                                                            <li>EU decimal commas: <code>50,8514; 5,6910</code></li>
+                                                        </ul>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </div>
+                                </div>
+                                <!-- right: buttons -->
+                                <div class="ms-2 d-flex gap-2">
+                                    <button type="button" id="searchButton" class="btn btn-primary">🔍</button>
+                                    <button type="button" id="locateMe" class="btn btn-success">📍</button>
+                                    <button type="button" id="clearSearch" class="btn btn-outline-secondary">🧹</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button type="button" id="searchButton" class="btn btn-primary">🔍 Search</button>
-                    <button type="button" id="locateMe" class="btn btn-success ms-2">📍 Locate Me</button>
-                    <button type="button" id="clearSearch" class="btn btn-outline-secondary ms-2">🧹 Clear</button>
                 </form>
                 <p id="loadingMessage" style="display: none; color: red; font-weight: bold;">Please wait... Searching for location.</p>
                 <ul id="locationResults" class="list-group mt-2" style="display:none;"></ul>
             </div>
         </div>
     </div>
-    <div class="col-sm-6">
+    <div class="col-sm-3">
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Select your crop</h5>
@@ -144,13 +149,13 @@
         </div>
     </div>
 
-    <div class="col-sm-6">
+    <div class="col-sm-3">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Select your pathogen</h5>
+                <h5 class="card-title">Select your hazard</h5>
                 <div class="mb-2">
                     <select id="pathogen_list" class="form-control">
-                        <option value="">-- Select a Pathogen --</option>
+                        <option value="">-- Select a hazard --</option>
                         {% for pathogen in pathogens %}
                         <option value="{{ pathogen.id }}">{{ pathogen.label }}</option>
                         {% endfor %}
@@ -162,20 +167,20 @@
 </div>
 
 <div class="row">
-    <div class="col-sm-6">
+    <div class="col-sm-12">
         <div class="card">
             <div class="card-body">
                 <div id="farms_by_locations" data-colors='["#33c38e"]' style="height: 500px"></div>
             </div>
         </div>
     </div>
-    <div class="col-sm-6">
-        <div class="card">
-            <div class="card-body">
-                <div id="chart" style="height: 500px;"></div>
-            </div>
-        </div>
-    </div>
+{#    <div class="col-sm-6">#}
+{#        <div class="card">#}
+{#            <div class="card-body">#}
+{#                <div id="chart" style="height: 500px;"></div>#}
+{#            </div>#}
+{#        </div>#}
+{#    </div>#}
 </div>
 
 <div class="mb-3">
@@ -208,16 +213,16 @@
 </div>
 
 <!-- Climate Risk Index (Interpolated) -->
-<div class="row">
-    <div class="col-sm-6">
-        <div class="card">
-            <div class="card-body">
-                <h4>Climate Risk Index (Interpolated)</h4>
-                <div id="risk_index_chart"></div>
-            </div>
-        </div>
-    </div>
-</div>
+{#<div class="row">#}
+{#    <div class="col-sm-6">#}
+{#        <div class="card">#}
+{#            <div class="card-body">#}
+{#                <h4>Climate Risk Index (Interpolated)</h4>#}
+{#                <div id="risk_index_chart"></div>#}
+{#            </div>#}
+{#        </div>#}
+{#    </div>#}
+{#</div>#}
 
 <!-- end page title -->
 {% endblock content %}
