@@ -7,6 +7,7 @@
 {# 2) App config + data generators (must come before chart modules) #}
 <script src="{% static 'js/pages/dashboard/risk/config.js' %}"></script>
 <script src="{% static 'js/pages/dashboard/risk/dummy_data.js' %}"></script>
+<script src="{% static 'js/pages/dashboard/sticky_scrollbar.js' %}"></script>
 
 {# 3) Chart modules #}
 <script src="{% static 'js/pages/dashboard/risk/charts/toxin_over_time.js' %}"></script>
@@ -22,3 +23,6 @@
 <script src="{% static 'js/pages/dashboard/risk/charts/dummy_geojson.js' %}"></script>
 <script src="{% static 'js/pages/dashboard/risk/charts/load_nuts_geojson.js' %}"></script>
 <script src="{% static 'js/pages/dashboard/risk/charts/map_init.js' %}"></script>
+
+{# 6) Climate model script #}
+<script src="{% static 'js/pages/dashboard/risk/climate_scenarios.js' %}"></script>

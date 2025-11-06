@@ -335,7 +335,15 @@ function _probSelectIndex() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    const pair = { crop: "Lettuce", pathogen: "Salmonella" }; // current dummy default
+    // 1) try to read what the homepage stored
+    const storedCropLabel    = localStorage.getItem("lx_selected_crop_label");
+    const storedPathogenLabel = localStorage.getItem("lx_selected_pathogen_label");
+
+    // 2) fallback to old static values
+    const pair = {
+        crop: storedCropLabel    || "Lettuce",
+        pathogen: storedPathogenLabel || "Salmonella"
+    };
     const pairLabel = `${pair.crop} — ${pair.pathogen}`;
 
     // Example events: short spikes around specified months

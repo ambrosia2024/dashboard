@@ -2,6 +2,8 @@
 const LS_KEY_LOCATION = "lx_selected_location";
 const LS_KEY_CROP     = "lx_selected_crop";
 const LS_KEY_PATHOGEN = "lx_selected_pathogen";
+const LS_KEY_CROP_LABEL     = "lx_selected_crop_label";
+const LS_KEY_PATHOGEN_LABEL = "lx_selected_pathogen_label";
 
 // 1) restore on load
 document.addEventListener("DOMContentLoaded", function () {
@@ -36,10 +38,24 @@ document.addEventListener("change", function (ev) {
         localStorage.setItem(LS_KEY_LOCATION, target.value);
     }
     if (target.id === "crop_list") {
+        // store ID
         localStorage.setItem(LS_KEY_CROP, target.value);
+
+        // store label/text
+        const opt = target.options[target.selectedIndex];
+        if (opt) {
+            localStorage.setItem(LS_KEY_CROP_LABEL, opt.textContent.trim());
+        }
     }
     if (target.id === "pathogen_list") {
+        // store ID
         localStorage.setItem(LS_KEY_PATHOGEN, target.value);
+
+        // store label/text
+        const opt = target.options[target.selectedIndex];
+        if (opt) {
+            localStorage.setItem(LS_KEY_PATHOGEN_LABEL, opt.textContent.trim());
+        }
     }
 });
 
@@ -57,6 +73,8 @@ document.getElementById("resetSelections")?.addEventListener("click", function (
     localStorage.removeItem("lx_selected_location");
     localStorage.removeItem("lx_selected_crop");
     localStorage.removeItem("lx_selected_pathogen");
+    localStorage.removeItem("lx_selected_crop_label");
+    localStorage.removeItem("lx_selected_pathogen_label");
 
     // also clear UI
     const loc = document.getElementById("searchAddress");

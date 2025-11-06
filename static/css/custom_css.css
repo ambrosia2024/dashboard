@@ -11,7 +11,6 @@
 
 /* unify focus style so the addon doesn't show a blue outline */
 .input-group-text:focus { outline: 0; box-shadow: none; }
-/* Make tooltip content left-aligned and a bit tidier */
 
 
 /* Left align + compact for the click popover */
@@ -22,7 +21,7 @@
     line-height: 1.25;
     font-size: 0.85rem;
 }
-/* Avoid Bootstrap’s pink code colour inside this help */
+
 .popover.tt-left .popover-body code,
 .tooltip.tt-left .tooltip-inner code {
      color: inherit;
@@ -35,7 +34,7 @@
     font-size: 0.85rem;
 }
 .tooltip.tt-left .tooltip-inner code {
-    font-size: 0.85em;       /* slightly smaller code samples */
+    font-size: 0.85em;
     color: #f8f9fa;
 }
 .tooltip.tt-left .tooltip-inner ul { margin-bottom: 0.25rem; }
