@@ -20,8 +20,18 @@ class DashboardView(TemplateView):
                 return d.get(lang) or d.get("en") or next(iter(d.values()), "")
             return ""
 
-        crops_qs = PlantConcept.objects.only("id", "pref_label")
-        paths_qs = PathogenConcept.objects.only("id", "pref_label")
+        crops_qs = (
+            PlantConcept.objects
+            .filter(ambrosia_supported=True)
+            .only("id", "pref_label")
+            .order_by("id")
+        )
+        paths_qs = (
+            PathogenConcept.objects
+            .filter(ambrosia_supported=True)
+            .only("id", "pref_label")
+            .order_by("id")
+        )
 
         context["crops"] = [{"id": c.id, "label": pick_label(c.pref_label)} for c in crops_qs]
         context["pathogens"] = [{"id": p.id, "label": pick_label(p.pref_label)} for p in paths_qs]

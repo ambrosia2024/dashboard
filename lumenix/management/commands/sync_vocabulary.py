@@ -9,12 +9,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--vocab", choices=["plants", "pathogens", "all"], default="all")
+        parser.add_argument("--reset", action="store_true",
+                            help="Delete existing concepts/schemes for this vocab before syncing.")
 
     def handle(self, *args, **opts):
         targets = ["plants", "pathogens"] if opts["vocab"] == "all" else [opts["vocab"]]
         totals = {"created": 0, "updated": 0, "unchanged": 0}
         for v in targets:
-            res = sync_vocabulary(v)
+            res = sync_vocabulary(v, reset=opts["reset"])
             self.stdout.write(self.style.SUCCESS(f"{v}: {res}"))
             for k in totals:
                 totals[k] += res[k]

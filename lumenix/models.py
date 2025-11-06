@@ -92,6 +92,8 @@ class Concept(models.Model):
     definition = models.JSONField(default=dict, blank=True)
     notation   = models.JSONField(default=dict, blank=True)
 
+    ambrosia_supported = models.BooleanField(default=False)
+
     # Relationship lists are URIs: keep as JSON array(s) to avoid cross-row integrity headaches
     broader     = models.JSONField(default=list, blank=True)
     narrower    = models.JSONField(default=list, blank=True)
@@ -163,14 +165,6 @@ class ConceptHistory(models.Model):
 
 class ClimateData(BaseModel):
     timestamp = models.DateTimeField(verbose_name="Timestamp")
-    # latitude = models.FloatField(
-    #     verbose_name="Latitude",
-    #     validators=[MinValueValidator(-90), MaxValueValidator(90)]
-    # )
-    # longitude = models.FloatField(
-    #     verbose_name="Longitude",
-    #     validators=[MinValueValidator(-180), MaxValueValidator(180)]
-    # )
     location = gis_models.PointField(geography=True, null=True, blank=True)
     temperature_2m = models.FloatField(verbose_name="2m Temperature (°C)", default=0.0)
     sea_surface_temperature = models.FloatField(
