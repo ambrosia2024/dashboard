@@ -8,50 +8,10 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/leaflet.draw/1.0.4/leaflet.draw.css' %}" />
+
     <link rel="stylesheet" href="{% static 'css/pages/dashboard/search_icons.css' %}" />
 
-    <style>
-        .card {
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-
-        .cursor-pointer { cursor: pointer; }
-
-        /* unify focus style so the addon doesn't show a blue outline */
-        .input-group-text:focus { outline: 0; box-shadow: none; }
-        /* Make tooltip content left-aligned and a bit tidier */
-
-
-        /* Left align + compact for the click popover */
-        .popover.tt-left .popover-body {
-            text-align: left;
-            max-width: 30rem;
-            white-space: normal;
-            line-height: 1.25;
-            font-size: 0.85rem;
-        }
-        /* Avoid Bootstrap’s pink code colour inside this help */
-        .popover.tt-left .popover-body code,
-        .tooltip.tt-left .tooltip-inner code {
-             color: inherit;
-        }
-        .tooltip.tt-left .tooltip-inner {
-            text-align: left;
-            max-width: 30rem;
-            white-space: normal;
-            line-height: 1.25;
-            font-size: 0.85rem;
-        }
-        .tooltip.tt-left .tooltip-inner code {
-            font-size: 0.85em;       /* slightly smaller code samples */
-            color: #f8f9fa;
-        }
-        .tooltip.tt-left .tooltip-inner ul { margin-bottom: 0.25rem; }
-        .tooltip.tt-left .tooltip-inner ul ul { margin-top: 0.25rem; }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/custom_css.css' %}" />
 {% endblock extra_css %}
 
 {% block content %}
