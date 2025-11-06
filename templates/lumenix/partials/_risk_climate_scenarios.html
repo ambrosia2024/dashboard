@@ -1,0 +1,86 @@
+{# templates/lumenix/partials/_risk_climate_scenarios.html #}
+
+<div class="row mt-3">
+    <div class="col-sm-12">
+        <div class="card h-100">
+            <div class="card-body">
+                <!-- header row -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0 d-flex align-items-center gap-2">Climate-adjusted scenarios vs time
+                        <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                                data-bs-target="#climateAssumptionsModal" aria-label="Show scenario assumptions"
+                                title="Show scenario assumptions">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </h4>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="rc-scenario-select" class="form-label mb-0 small text-muted">Scenario:</label>
+                        <select id="rc-scenario-select" class="form-select form-select-sm" style="width: 180px;">
+                            <option value="optimistic">Optimistic (best)</option>
+                            <option value="central" selected>Central (average)</option>
+                            <option value="pessimistic">Pessimistic (worst)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="rc-climate-chart" style="height: 360px;"></div>
+
+                <div id="rc-climateExplain" class="mt-3 small text-muted"></div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for climate scenario assumptions -->
+<div class="modal fade" id="climateAssumptionsModal" tabindex="-1" aria-labelledby="climateAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="climateAssumptionsLabel">Data assumptions – climate-adjusted scenarios</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- 1) Data assumptions -->
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> for the crop–pathogen pair currently selected (labels taken from local storage if present, otherwise Lettuce — Salmonella).</li>
+                    <li>The period is fixed to <strong>monthly 2025-01 → 2035-12</strong> to show a medium-term climate signal.</li>
+                    <li>Each scenario applies a different warming slope:
+                        <ul>
+                            <li><strong>Optimistic</strong>: low warming, mapped to RCP4.5.</li>
+                            <li><strong>Central</strong>: moderate warming, also RCP4.5.</li>
+                            <li><strong>Pessimistic</strong>: higher warming, mapped to RCP8.5.</li>
+                        </ul>
+                    </li>
+                    <li>Monthly temperature anomaly (Δ °C) is used as the main “climate driver”.</li>
+                    <li>Probability of illness (%) is then nudged upwards over time in the same direction as the warming — this is to <em>illustrate</em> sensitivity, not to predict cases.</li>
+                    <li>No real climate model output is read here; values are for demo/exploration only.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    Read this as “if the area warmed like this, the modelled risk could move like this”, not as an actual forecast.
+                </p>
+            </div>
+
+            <!-- 2) How this chart is built -->
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> (month) is used on the X-axis.</li>
+                    <li><code>temp_anomaly_c</code> (Δ °C) is drawn as the main solid line on the left Y-axis.</li>
+                    <li><code>prob_illness_pct</code> (%) is drawn as a dashed line on the right Y-axis so the two scales don’t clash.</li>
+                    <li>The scenario dropdown only changes the slope/size of these two lines.</li>
+                    <li>Tooltips show the date, anomaly and probability for that month.</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+

@@ -79,7 +79,7 @@ class Scheme(models.Model):
 
 class Concept(models.Model):
     """
-    A SKOS Concept. We key by 'uri' which is globally unique in your feed.
+    A SKOS Concept. We key by 'uri' which is globally unique.
     """
     vocabulary = models.ForeignKey(Vocabulary, on_delete=models.CASCADE, related_name="concepts")
     scheme = models.ForeignKey(Scheme, on_delete=models.SET_NULL, null=True, blank=True, related_name="concepts")
