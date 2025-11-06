@@ -260,7 +260,7 @@ $(document).ready(function () {
 
 
     function resetSearchButton() {
-        $("#searchButton").prop("disabled", false).text("🔍 Search");
+        $("#searchButton").prop("disabled", false).text("🔍");
         $("#loadingMessage").hide();
     }
 

@@ -14,12 +14,21 @@
 {#    <span><strong>Toxin limit:</strong> <span id="ctx-limit">12 μg/kg (prototype)</span></span>#}
 {#    <span class="ms-auto text-muted small">Data: simulated seasonal pattern</span>#}
 {#</div>#}
+<button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal" data-bs-target="#dataDictionaryModal">
+    <i class="bi bi-info-circle"></i> Data dictionary
+</button>
 
 <div class="row mt-3">
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4>Toxin concentration vs time</h4>
+                <h4 class="d-flex align-items-center gap-2">Toxin concentration vs time
+                    <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                            data-bs-target="#toxinAssumptionsModal" aria-label="Show data assumptions"
+                            title="Show data assumptions">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </h4>
                 <div id="toxinsChart" style="height: 360px;"></div>
                 <div id="toxinsExplain" class="mt-3 small text-muted"></div>
             </div>
@@ -29,7 +38,13 @@
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4>Pathogen concentration vs time</h4>
+                <h4 class="d-flex align-items-center gap-2"> Pathogen concentration vs time
+                    <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                            data-bs-target="#pathogenAssumptionsModal" aria-label="Show pathogen data assumptions"
+                            title="Show data assumptions">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </h4>
                 <div id="pathogenConcChart" style="height: 360px;"></div>
                 <div id="pathogenExplain" class="mt-3 small text-muted"></div>
             </div>
@@ -39,7 +54,14 @@
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4>Probability of illness vs time</h4>
+                <h4 class="d-flex align-items-center gap-2"> Probability of illness vs time
+                    <button
+                        type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                        data-bs-target="#probAssumptionsModal" aria-label="Show probability data assumptions"
+                        title="Show data assumptions">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </h4>
                 <div id="probChart" style="height: 360px;"></div>
                 <button id="probExplainBtn" type="button" class="btn btn-outline-secondary btn-sm mt-2">
                     Explain this point
@@ -54,7 +76,13 @@
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4>Cases per 100k vs time</h4>
+                <h4 class="d-flex align-items-center gap-2">Cases per 100k vs time
+                    <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                            data-bs-target="#casesAssumptionsModal" aria-label="Show cases data assumptions"
+                            title="Show data assumptions">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </h4>
                 <div id="casesChart" style="height: 360px;"></div>
                 <div id="casesExplain" class="mt-3 small text-muted"></div>
             </div>
@@ -64,7 +92,13 @@
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4>Seasonal heatmap (× baseline)</h4>
+                <h4 class="d-flex align-items-center gap-2">Seasonal heatmap (× baseline)
+                    <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
+                            data-bs-target="#seasonalAssumptionsModal" aria-label="Show seasonal heatmap assumptions"
+                            title="Show data assumptions">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </h4>
                 <div id="seasonalHeatmap" style="height: 360px;"></div>
                 <div id="heatmapExplain" class="mt-3 small text-muted"></div>
             </div>
@@ -87,6 +121,256 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for toxin data assumptions -->
+<div class="modal fade" id="toxinAssumptionsModal" tabindex="-1" aria-labelledby="toxinAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="toxinAssumptionsLabel">Data assumptions – toxin chart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> for one crop–pathogen pair for the chosen period.</li>
+                    <li>We start from a base toxin level of <strong>8 μg/kg</strong>.</li>
+                    <li>Summer and early autumn are made higher with a simple seasonal curve.</li>
+                    <li>Each month gets a bit of random change to look more realistic.</li>
+                    <li>Some months can get an extra spike if we mark an event (e.g. heavy rain).</li>
+                    <li>We show one test/action limit of <strong>12 μg/kg</strong> for every month.</li>
+                    <li>Temperature and humidity in the tooltip are also simulated.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    This chart is only to show how toxin levels could change over months in a demo setup.
+                </p>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> is used on the X-axis.</li>
+                    <li><code>toxin_level_ug_per_kg</code> (μg/kg) is drawn as the main line.</li>
+                    <li><code>toxin_limit_ug_per_kg</code> (μg/kg) is shown as a horizontal “limit” line. If it is missing, the chart uses <strong>12 μg/kg</strong>.</li>
+                    <li>The tooltip also shows <code>temperature_c</code>, <code>humidity_pct</code>, and <code>event</code> (if present) to explain spikes.</li>
+                    <li>The Y-axis is sized so the limit is always visible.</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for pathogen data assumptions -->
+<div class="modal fade" id="pathogenAssumptionsModal" tabindex="-1" aria-labelledby="pathogenAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pathogenAssumptionsLabel">Data assumptions – pathogen chart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> for the same crop–pathogen pair and dates as the toxin chart.</li>
+                    <li>Pathogen values are shown as generic <strong>units/g</strong> – not lab values.</li>
+                    <li>We make late summer / autumn a bit higher to show seasonality.</li>
+                    <li>Some months can get extra growth if an event is present.</li>
+                    <li>The first month in the series is used as the <strong>baseline</strong>.</li>
+                    <li>Point colours come from how much a month is above that baseline (small, moderate, large, significant). This is just to spot higher months quickly.</li>
+                    <li>Other values shown with it are also simulated to match the story.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    Use this chart to compare months with each other, not as exact measurements.
+                </p>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> is used on the X-axis.</li>
+                    <li><code>pathogen_conc_units_per_g</code> (units/g, demo) is plotted as a line.</li>
+                    <li>The first point in the series is treated as the <strong>baseline</strong>.</li>
+                    <li>For every other point, the chart works out how far it is above that baseline and colours the point (small, moderate, large, significant).</li>
+                    <li>The tooltip shows the current value, the baseline value, and the % change vs baseline.</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for probability data assumptions -->
+<div class="modal fade" id="probAssumptionsModal" tabindex="-1" aria-labelledby="probAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="probAssumptionsLabel">Data assumptions – probability of illness</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> from the same time series used for toxins and pathogens.</li>
+                    <li>We treat the first month as the <strong>starting (baseline) probability</strong>.</li>
+                    <li>Later months are shown above or below this starting value.</li>
+                    <li>Probabilities come from the demo model logic (e.g. higher toxin → higher chance), not from clinical data.</li>
+                    <li>We add small random changes so the line is not perfectly flat.</li>
+                    <li>The colour bands are based on “how many times above baseline” and are only for quick reading.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    This chart shows the shape of change over time, not real case risk.
+                </p>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> is used on the X-axis.</li>
+                    <li><code>prob_illness_pct</code> (%) is the main line.</li>
+                    <li><code>baseline_prob_illness_pct</code> (%) is drawn as a dashed line if it is available; otherwise the chart uses the first point as the baseline.</li>
+                    <li>A colour scale (<code>visualMap</code>) uses <code>risk_multiplier</code> to show when a month is clearly above baseline.</li>
+                    <li>The tooltip shows: date, current probability, baseline, × baseline, and % difference.</li>
+                    <li>Clicking on a point can pin it and show an explanation for that exact month.</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for cases data assumptions -->
+<div class="modal fade" id="casesAssumptionsModal" tabindex="-1" aria-labelledby="casesAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="casesAssumptionsLabel">Data assumptions – cases per 100k</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> from the same monthly series as above.</li>
+                    <li>Cases per 100k are <strong>calculated</strong>, not reported.</li>
+                    <li>We assume about <strong>40,000 people exposed per 100,000</strong> in a month.</li>
+                    <li>So: <code>cases_per_100k ≈ (probability % / 100) × 40,000</code>, then rounded.</li>
+                    <li>We also show a short rolling average to smooth jumps between months.</li>
+                    <li>This is to show trends in the demo data, not real surveillance numbers.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    Read this chart as “if this model were true, this is the size of the bump”.
+                </p>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> is used on the X-axis.</li>
+                    <li><code>cases_per_100k</code> is shown as bars.</li>
+                    <li>A rolling mean is computed in JS using <code>window.RISK_CONFIG.rollingWindow</code> and drawn as a line.</li>
+                    <li><code>cases_per_100k</code> itself comes from the modelled probability (it is derived, not observed).</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 modal for seasonal heatmap assumptions -->
+<div class="modal fade" id="seasonalAssumptionsModal" tabindex="-1" aria-labelledby="seasonalAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="seasonalAssumptionsLabel">Data assumptions – seasonal heatmap</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>The heatmap uses the <strong>same simulated monthly rows</strong> as the other charts.</li>
+                    <li>Each cell is one month in one year (e.g. May 2023).</li>
+                    <li>By default we colour by the <strong>risk multiplier</strong> (current ÷ baseline).</li>
+                    <li>A value around 1 means “like baseline”; higher than 1 means “above baseline”.</li>
+                    <li>The colour scale is fixed (green → orange → red) just to make differences clear.</li>
+                    <li>Years shown are only the years present in the data.</li>
+                    <li>All values are demo values, not monitoring data.</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    This view is for spotting seasonal/high months at a glance.
+                </p>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-2"><strong>How this chart is built</strong></p>
+                <ul class="mb-3">
+                    <li>The chart takes the same monthly rows and groups them by <code>month</code> (Jan–Dec) and <code>year</code>.</li>
+                    <li><code>month</code> is shown on the X-axis, <code>year</code> is shown on the Y-axis.</li>
+                    <li>By default the value in each cell is <code>risk_multiplier</code> (× baseline).</li>
+                    <li>If the mode is set to <code>"prob_illness_pct"</code>, the value becomes the probability (%) instead.</li>
+                    <li>A fixed colour scale (green → orange → red) is used so different years can be compared easily.</li>
+                    <li>The tooltip shows the month/year and the exact value for that cell.</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shared modal: data dictionary / units -->
+<div class="modal fade" id="dataDictionaryModal" tabindex="-1" aria-labelledby="dataDictionaryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dataDictionaryLabel">Data dictionary (synthetic series)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Units summary (quick reference)</strong></p>
+                <ul class="mb-3">
+                    <li><code>date</code> – ISO date</li>
+                    <li><code>year</code> – number (e.g. 2023)</li>
+                    <li><code>month</code> – 1–12</li>
+                    <li><code>temperature_c</code> – °C</li>
+                    <li><code>humidity_pct</code> – %</li>
+                    <li><code>toxin_level_ug_per_kg</code> – μg/kg</li>
+                    <li><code>toxin_limit_ug_per_kg</code> – μg/kg</li>
+                    <li><code>pathogen_conc_units_per_g</code> – units/g (demo)</li>
+                    <li><code>prob_illness_pct</code> – %</li>
+                    <li><code>baseline_prob_illness_pct</code> – %</li>
+                    <li><code>risk_multiplier</code> – × (dimensionless ratio)</li>
+                    <li><code>cases_per_100k</code> – cases / 100,000 people</li>
+                    <li><code>event</code> – string label</li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    These fields are generated once per month for the selected crop–pathogen pair and then reused by all charts.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
