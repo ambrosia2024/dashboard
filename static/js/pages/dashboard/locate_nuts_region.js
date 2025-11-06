@@ -112,7 +112,8 @@ $(document).ready(function () {
         }
 
         // Fallback: treat as text → Nominatim
-        $("#searchButton").prop("disabled", true).text("Searching...");
+        $("#searchButton").prop("disabled", true)
+            .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
         $("#loadingMessage").show();
 
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1`;
@@ -260,7 +261,7 @@ $(document).ready(function () {
 
 
     function resetSearchButton() {
-        $("#searchButton").prop("disabled", false).text("🔍");
+        $("#searchButton").prop("disabled", false).html('<i class="bi bi-search"></i>');
         $("#loadingMessage").hide();
     }
 
