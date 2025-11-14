@@ -1,12 +1,13 @@
 # lumenix/views/dashboardV.py
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.translation import get_language
 from django.views.generic import TemplateView
 
 from lumenix.models import PlantConcept, PathogenConcept
 
 
-class DashboardView(TemplateView):
+class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "lumenix/index.html"
 
     def get_context_data(self, **kwargs):
