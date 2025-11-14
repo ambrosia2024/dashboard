@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Email verification</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
+</head>
+<body>
+<div class="page">
+    <div class="card">
+        <h1 class="card-title">Verify your email</h1>
+        <p class="card-text">
+            We have sent a confirmation link to your email address.
+            Please click the link in that email to activate your account.
+        </p>
+        <p class="small">
+            If you don't see it, check your spam or junk folder.
+        </p>
+
+        <a href="/accounts/login/" class="button-back">Back to sign in</a>
+    </div>
+</div>
+</body>
+</html>

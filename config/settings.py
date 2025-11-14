@@ -1,3 +1,5 @@
+# config/settings.py
+
 import os
 import sys
 
@@ -18,6 +20,9 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # Detect if running inside Docker
 RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
+
+# Feature flag: turn email verification on/off
+EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "false").lower() == "true"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not RUNNING_IN_DOCKER  # Debug True in local, False in Docker
@@ -102,8 +107,25 @@ SITE_ID = 1  # Required for django-allauth
 # Allauth Settings
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+
+# If EMAIL_VERIFICATION_ENABLED is False:
+#   - no verification emails are sent
+#   - users (incl. superusers) can log in without confirming email
+ACCOUNT_EMAIL_VERIFICATION = "mandatory" if EMAIL_VERIFICATION_ENABLED else "none"
+
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
+LOGIN_URL = "/accounts/login/"      # allauth login URL
+LOGIN_REDIRECT_URL = "/"            # where to send user after login
+# ACCOUNT_ADAPTER = "lumenix.account_adapter.NoSignupAccountAdapter"
+
+# How long a “remembered” login should last (14 days)
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
+
+# How allauth treats the remember checkbox:
+# - None (default): use the checkbox value
+# - True: always remember (checkbox ignored)
+# - False: never remember (checkbox ignored)
+ACCOUNT_SESSION_REMEMBER = None
 
 # Database
 # PostgreSQL Configuration

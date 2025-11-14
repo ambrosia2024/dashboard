@@ -1,0 +1,174 @@
+/* --- Basic reset --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f3f4f6;
+    color: #376EB5; /* primary blue from logo */
+}
+
+/* --- Full-page centring --- */
+.page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+/* --- Card --- */
+.card {
+    width: 100%;
+    max-width: 380px;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+    padding: 2.25rem 2rem 2rem;
+}
+
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    text-align: center;
+    color: #376EB5;
+}
+
+label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #376EB5;
+}
+
+/* --- Form --- */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+input[type="email"],
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    background-color: #f9fafb;
+}
+
+input[type="email"]:focus,
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+    background-color: #ffffff;
+}
+
+.errorlist {
+    list-style: none;
+    font-size: 0.8rem;
+    color: #b91c1c;
+    margin-top: 0.15rem;
+}
+
+.non-field-errors {
+    margin-bottom: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.85rem;
+}
+
+.actions {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+button[type="submit"] {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border-radius: 9999px;
+    border: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+
+    /* Logo + soft overlay */
+    background-image:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.96)),
+        url("/static/images/ambrosia-logo.png");
+    background-repeat: no-repeat, no-repeat;
+    background-position: center, center;
+    background-size: 150% auto, contain;
+
+    color: #376EB5;          /* text in logo blue */
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
+
+    box-shadow: 0 10px 20px rgba(55, 110, 181, 0.35);
+    transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+button[type="submit"]:hover {
+    filter: brightness(1.03);
+    box-shadow: 0 12px 24px rgba(55, 110, 181, 0.45);
+    transform: translateY(-1px);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(55, 110, 181, 0.35);
+}
+
+.secondary-links {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.secondary-links a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.secondary-links a:hover {
+    text-decoration: underline;
+}
+
+.remember-me {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: #376EB5;
+}
+
+.remember-me input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
