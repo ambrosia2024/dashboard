@@ -39,3 +39,13 @@
 }
 .tooltip.tt-left .tooltip-inner ul { margin-bottom: 0.25rem; }
 .tooltip.tt-left .tooltip-inner ul ul { margin-top: 0.25rem; }
+
+.logout-item {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+}
+
+.logout-item-icon {
+    font-size: 0.95rem;
+    line-height: 1;
+}

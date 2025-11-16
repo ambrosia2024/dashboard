@@ -28,8 +28,16 @@
                     <i class="mdi mdi-chevron-down d-none d-xl-inline-block"></i>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
-                    <!-- item-->
                     <div class="dropdown-divider"></div>
+
+                    <form method="post" action="{% url 'account_logout' %}" class="px-2">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="dropdown-item text-danger d-flex align-items-center gap-2 logout-item">
+                            <i class="bi bi-box-arrow-right logout-item-icon"></i>
+                            <span>Logout</span>
+                        </button>
+                    </form>
 
                 </div>
             </div>

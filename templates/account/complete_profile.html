@@ -1,0 +1,59 @@
+{% load static %}
+
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Complete your profile</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}">
+    </head>
+    <body>
+        <div class="page">
+            <div class="card">
+                <h1 class="card-title">Complete your profile</h1>
+                <p class="card-text">
+                    Please tell us your first and last name before continuing.
+                </p>
+
+                {% if form.non_field_errors %}
+                    <div class="non-field-errors">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label for="{{ form.first_name.id_for_label }}">First name</label>
+                        {{ form.first_name }}
+                        {{ form.first_name.errors }}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.last_name.id_for_label }}">Last name</label>
+                        {{ form.last_name }}
+                        {{ form.last_name.errors }}
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit">Save and continue</button>
+
+                        <div class="secondary-links">
+                            <form method="post"
+                                  action="{% url 'account_logout' %}"
+                                  class="logout-form">
+                                {% csrf_token %}
+                                <button type="submit" class="link-button">
+                                    Log out
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

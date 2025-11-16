@@ -1,0 +1,83 @@
+{% load static %}
+
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Sign up</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
+    </head>
+    <body>
+        <div class="page">
+            <div class="card">
+                <h1 class="card-title">Create your account</h1>
+
+                {% if form.non_field_errors %}
+                    <div class="non-field-errors">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'account_signup' %}">
+                    {% csrf_token %}
+
+                    {# EMAIL #}
+                    <div class="form-group">
+                        <label for="{{ form.email.id_for_label }}">Email</label>
+                        {{ form.email }}
+                        {{ form.email.errors }}
+                    </div>
+
+                    {# ROLE (dropdown from DB) #}
+{#                    <div class="form-group">#}
+{#                        <label for="{{ form.role.id_for_label }}">Role</label>#}
+{#                        {{ form.role }}#}
+{#                        {{ form.role.errors }}#}
+{#                    </div>#}
+
+                    {# PASSWORD 1 #}
+                    <div class="form-group">
+                        <label for="{{ form.password1.id_for_label }}">Password</label>
+                        {{ form.password1 }}
+                        {{ form.password1.errors }}
+                    </div>
+
+                    {# PASSWORD 2 #}
+                    <div class="form-group">
+                        <label for="{{ form.password2.id_for_label }}">Confirm password</label>
+                        {{ form.password2 }}
+                        {{ form.password2.errors }}
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit">Sign up</button>
+
+                        <div class="secondary-links">
+                            Already have an account?
+                            <a href="{% url 'account_login' %}">Sign in</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            (function () {
+                const form = document.querySelector("form");
+                if (!form) return;
+                form.addEventListener("submit", function (e) {
+                    const btn = form.querySelector("button[type='submit']");
+                    if (!btn) return;
+                    if (btn.dataset.submitted === "1") {
+                        e.preventDefault();
+                        return;
+                    }
+                    btn.dataset.submitted = "1";
+                });
+            })();
+        </script>
+    </body>
+</html>

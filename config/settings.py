@@ -75,6 +75,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
     'allauth.account.middleware.AccountMiddleware',
+
+    'lumenix.middleware.EnforceProfileCompletionMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -113,10 +115,18 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 #   - users (incl. superusers) can log in without confirming email
 ACCOUNT_EMAIL_VERIFICATION = "mandatory" if EMAIL_VERIFICATION_ENABLED else "none"
 
-ACCOUNT_LOGOUT_REDIRECT_URL = "/"
+# ACCOUNT_LOGOUT_REDIRECT_URL = "/"
+ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
+ACCOUNT_LOGOUT_ON_GET = False
+
 LOGIN_URL = "/accounts/login/"      # allauth login URL
 LOGIN_REDIRECT_URL = "/"            # where to send user after login
 # ACCOUNT_ADAPTER = "lumenix.account_adapter.NoSignupAccountAdapter"
+
+# ACCOUNT_FORMS = {
+#     "signup": "lumenix.forms.CustomSignupForm",
+#     "login": "lumenix.forms.CustomLoginForm",
+# }
 
 # How long a “remembered” login should last (14 days)
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14

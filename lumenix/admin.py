@@ -1,3 +1,5 @@
+# lumenix/admin.py
+
 from django.contrib import admin, messages
 # from django.utils.html import format_html
 # from django.utils import timezone
@@ -126,6 +128,19 @@ class ConceptHistoryAdmin(admin.ModelAdmin):
 #     def get_queryset(self, request):
 #         qs = super().get_queryset(request)
 #         return qs
+
+
+# @admin.register(RoleMaster)
+# class RoleMasterAdmin(admin.ModelAdmin):
+#     list_display = ("name",)
+#     search_fields = ("name",)
+#
+#
+# @admin.register(UserProfile)
+# class UserProfileAdmin(admin.ModelAdmin):
+#     list_display = ("user", "role")
+#     search_fields = ("user__username", "user__email", "role__name")
+#     autocomplete_fields = ("user", "role")
 
 admin.site.site_header = "Ambrosia Dashboard Admin"
 admin.site.site_title = "Ambrosia Admin"

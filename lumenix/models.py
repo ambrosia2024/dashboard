@@ -1,8 +1,9 @@
-# models.py
+# lumenix/models.py
 
 import hashlib
 import json
 
+from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.db.models import Index as GISIndex
 from django.core.exceptions import ValidationError
@@ -328,3 +329,37 @@ class SimulationResult(models.Model):
 
     def __str__(self):
         return f"{self.job.job_id}#{self.idx}: ({self.x}, {self.y})"
+
+
+# class RoleMaster(models.Model):
+#     """
+#     User role (Farmer, Policy advisor, Distributor, ...)
+#     """
+#     name = models.CharField(max_length=100, unique=True)
+#
+#     class Meta:
+#         db_table = "user_roles"
+#         verbose_name = "Role Master"
+#         verbose_name_plural = "Roles Master"
+#
+#     def __str__(self):
+#         return self.name
+#
+#
+# class UserProfile(models.Model):
+#     """
+#     One-to-one extension of the Django user storing the selected role.
+#     """
+#     user = models.OneToOneField(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.CASCADE,
+#         related_name="profile",
+#     )
+#     role = models.ForeignKey(RoleMaster, on_delete=models.PROTECT, related_name="users")
+#
+#     class Meta:
+#         db_table = "user_profiles"
+#
+#     def __str__(self):
+#         return f"{self.user} ({self.role})"
+
