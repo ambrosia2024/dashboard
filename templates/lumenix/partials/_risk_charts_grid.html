@@ -36,14 +36,23 @@
     <div class="col-sm-6">
         <div class="card">
             <div class="card-body">
-                <h4 class="d-flex align-items-center gap-2">Toxin concentration vs time
+                <h4 class="d-flex align-items-center gap-2">
+                    <span>Toxin concentration vs time</span>
                     <button type="button" class="btn btn-link p-0 text-muted" data-bs-toggle="modal"
                             data-bs-target="#toxinAssumptionsModal" aria-label="Show data assumptions"
                             title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
+
+                    <button type="button" id="downloadToxinChartBtn" class="btn btn-link p-0 text-muted ms-auto"
+                        aria-label="Download chart as image" title="Download chart as image">
+                    <i class="bi bi-download"></i>
+                </button>
                 </h4>
                 <div id="toxinsChart" style="height: 360px;"></div>
+
+                <div id="toxinsChart3D" style="height: 480px; margin-top: 1rem; max-width: 100%;"></div>
+
                 <div id="toxinsExplain" class="mt-3 small text-muted"></div>
             </div>
         </div>
