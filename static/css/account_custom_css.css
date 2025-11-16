@@ -67,7 +67,8 @@ label {
 
 input[type="email"],
 input[type="text"],
-input[type="password"] {
+input[type="password"],
+select {
     width: 100%;
     padding: 0.55rem 0.7rem;
     border-radius: 0.5rem;
@@ -78,13 +79,16 @@ input[type="password"] {
     background-color: #f9fafb;
 }
 
+
 input[type="email"]:focus,
 input[type="text"]:focus,
-input[type="password"]:focus {
+input[type="password"]:focus,
+select:focus {
     border-color: #2563eb;
     box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
     background-color: #ffffff;
 }
+
 
 .errorlist {
     list-style: none;
@@ -113,7 +117,7 @@ button[type="submit"] {
     width: 100%;
     padding: 0.6rem 0.75rem;
     border-radius: 9999px;
-    border: none;
+    border: 1px solid #c3d4ff;
     font-weight: 600;
     font-size: 0.95rem;
     cursor: pointer;
@@ -129,29 +133,36 @@ button[type="submit"] {
     color: #376EB5;          /* text in logo blue */
     text-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
 
-    box-shadow: 0 10px 20px rgba(55, 110, 181, 0.35);
     transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
 }
 
-button[type="submit"]:hover {
+button[type="submit"]:hover,
+button[type="submit"]:focus-visible {
     filter: brightness(1.03);
-    box-shadow: 0 12px 24px rgba(55, 110, 181, 0.45);
+    border-color: #376EB5;
     transform: translateY(-1px);
 }
 
+
 button[type="submit"]:active {
     transform: translateY(0);
-    box-shadow: 0 6px 12px rgba(55, 110, 181, 0.35);
 }
 
 .secondary-links {
     text-align: center;
     font-size: 0.8rem;
-    color: #6b7280;
+    color: #376EB5;
+
+    margin-top: 0.9rem;
+    line-height: 1.4;
+
+    padding-top: 0.4rem;
+    border-top: 1px solid #edf0f7;
 }
 
-.secondary-links a {
-    color: #2563eb;
+.secondary-links a,
+.secondary-links a:visited {
+    color: inherit;
     text-decoration: none;
 }
 
@@ -172,3 +183,47 @@ button[type="submit"]:active {
     height: 1rem;
     cursor: pointer;
 }
+
+.demo-box {
+    margin: 0.75rem 0 1.25rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #f1f5ff;
+    border: 1px dashed #c3d4ff;
+    font-size: 0.85rem;
+    color: #26457a;
+}
+
+.demo-box code {
+    font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85em;
+}
+
+.card-text {
+    margin-top: 0.35rem;
+    margin-bottom: 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #4b5563;
+    text-align: center;
+}
+
+.logout-form {
+    margin-top: 0.4rem;
+}
+
+.logout-form .link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: #376EB5;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.logout-form .link-button:hover {
+    text-decoration: underline;
+}
+
