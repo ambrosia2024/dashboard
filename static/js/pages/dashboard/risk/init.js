@@ -390,6 +390,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const inRange = filterByPeriod(rows);
     window.renderToxinChart("toxinsChart", inRange, pairLabel);
+    window.renderToxinChart3D("toxinsChart3D", inRange, pairLabel);
     window.renderProbChart("probChart", inRange, pairLabel);
     window.renderCasesChart("casesChart", inRange, pairLabel);
     window.renderPathogenConcChart("pathogenConcChart", inRange, pairLabel);
@@ -405,11 +406,46 @@ document.addEventListener("DOMContentLoaded", function () {
 
     renderExplanations(inRange, inRange, hmRows);
 
+    // ---- Download toxin chart as PNG ----
+    const downloadBtn = document.getElementById('downloadToxinChartBtn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            const chart = window.__toxinsChartInstance;
+            if (!chart) return;
+
+            const dataURL = chart.getDataURL({
+                type: 'png',
+                pixelRatio: 2,          // higher-res export
+                backgroundColor: '#ffffff'
+            });
+
+            const a = document.createElement('a');
+            const cropSafe = (pair.crop || 'crop').replace(/\s+/g, '_');
+            const pathSafe = (pair.pathogen || 'pathogen').replace(/\s+/g, '_');
+
+            // build a compact timestamp: YYYYMMDDTHHMMSS (safe for filenames)
+            const now = new Date();
+            const ts = now.toISOString()
+                .replace(/[-:]/g, '')
+                .replace(/\.\d+Z$/, 'Z')
+                .replace('Z', '');
+
+            a.href = dataURL;
+            a.download = `toxin_${cropSafe}_${pathSafe}_${ts}.png`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }
+    // ---- Download toxin chart as PNG ----
+
     ['rm-start','rm-end','rm-scale'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', () => {
             const rerows = filterByPeriod(rows);
             window.renderToxinChart("toxinsChart", rerows, pairLabel);
+            window.renderToxinChart3D("toxinsChart3D", rerows, pairLabel);
             window.renderProbChart("probChart", rerows, pairLabel);
             window.renderCasesChart("casesChart", rerows, pairLabel);
             window.renderPathogenConcChart("pathogenConcChart", rerows, pairLabel);
@@ -441,6 +477,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }));
 
         window.renderToxinChart("toxinsChart", newRows, label);
+        window.renderToxinChart3D("toxinsChart3D", newRows, label);
         window.renderProbChart("probChart", newRows, label);
         window.renderCasesChart("casesChart", newRows, label);
 
