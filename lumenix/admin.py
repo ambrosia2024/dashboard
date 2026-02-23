@@ -1,38 +1,44 @@
 # lumenix/admin.py
 
 from django.contrib import admin, messages
+from django.db.models import JSONField
+from django_json_widget.widgets import JSONEditorWidget
 # from django.utils.html import format_html
 # from django.utils import timezone
 
-from .models import Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory
+from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
+                     DashboardViewChart, DashboardViewMode)
 
 
-@admin.register(Vocabulary)
+# Hidden from admin panel (temporarily)
+# @admin.register(Vocabulary)
 class VocabularyAdmin(admin.ModelAdmin):
     list_display = ("id", "created_at")
 
-@admin.register(Scheme)
+# Hidden from admin panel (temporarily)
+# @admin.register(Scheme)
 class SchemeAdmin(admin.ModelAdmin):
     list_display = ("uri", "vocabulary")
     search_fields = ("uri", "title__en")
     list_filter = ("vocabulary",)
 
-@admin.register(Concept)
+# Hidden from admin panel (temporarily)
+# @admin.register(Concept)
 class ConceptAdmin(admin.ModelAdmin):
     list_display = ("uri", "vocabulary", "scheme", "updated_at")
     search_fields = ("uri", "pref_label__en")
     list_filter = ("vocabulary",)
 
-# Proxies for convenience
-@admin.register(PlantConcept)
+# Proxies for convenience - Hidden from admin panel (temporarily)
+# @admin.register(PlantConcept)
 class PlantConceptAdmin(ConceptAdmin):
     pass
 
-@admin.register(PathogenConcept)
+# @admin.register(PathogenConcept)
 class PathogenConceptAdmin(ConceptAdmin):
     pass
 
-@admin.register(ConceptHistory)
+# @admin.register(ConceptHistory)
 class ConceptHistoryAdmin(admin.ModelAdmin):
     list_display = ("concept", "change_type", "changed_at")
     list_filter = ("change_type",)
@@ -117,7 +123,7 @@ class ConceptHistoryAdmin(admin.ModelAdmin):
 #             writer.writerow([obj.crop_name, obj.status, obj.created_at, obj.updated_at])
 #         return response
 #
-#     # Remove the default hard delete (dangerous) — nudges admins to use soft delete instead
+#     # Remove the default hard delete (dangerous) - nudges admins to use soft delete instead
 #     def get_actions(self, request):
 #         actions = super().get_actions(request)
 #         if "delete_selected" in actions:
@@ -141,6 +147,36 @@ class ConceptHistoryAdmin(admin.ModelAdmin):
 #     list_display = ("user", "role")
 #     search_fields = ("user__username", "user__email", "role__name")
 #     autocomplete_fields = ("user", "role")
+
+@admin.register(DashboardViewMode)
+class DashboardViewModeAdmin(admin.ModelAdmin):
+    list_display = ("label", "code", "is_default", "status", "created_at")
+    list_filter = ("status", "is_default")
+    search_fields = ("label", "code")
+
+
+@admin.register(DashboardChart)
+class DashboardChartAdmin(admin.ModelAdmin):
+    list_display = ("label", "identifier", "template_name", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = ("label", "identifier", "template_name")
+
+    formfield_overrides = {
+        JSONField: {"widget": JSONEditorWidget(width="100%", height="300px")},
+    }
+
+
+@admin.register(DashboardViewChart)
+class DashboardViewChartAdmin(admin.ModelAdmin):
+    list_display = ("mode", "chart", "order", "status")
+    list_filter = ("mode", "chart", "status")
+    search_fields = ("mode__label", "chart__label")
+    ordering = ("mode", "order")
+
+    formfield_overrides = {
+        JSONField: {"widget": JSONEditorWidget(width="100%", height="300px")},
+    }
+
 
 admin.site.site_header = "Ambrosia Dashboard Admin"
 admin.site.site_title = "Ambrosia Admin"

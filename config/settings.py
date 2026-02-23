@@ -33,7 +33,7 @@ if RUNNING_IN_DOCKER:
     ALLOWED_HOSTS.append(os.getenv("ALLOWED_HOST", "*"))  # Allow all in prod
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://dashboard.ambrosia-project.eu", "http://localhost:8000"
+    "https://dashboard.ambrosia-project.eu", "http://localhost:8000", "https://dev.dashboard.ambrosia-project.eu"
 ]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_json_widget',
 
     # Dashboard app
     'lumenix',

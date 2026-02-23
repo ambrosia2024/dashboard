@@ -21,12 +21,24 @@
                     </a>
                 </li>
 
-                <li class="{% if request.resolver_match.url_name == 'risk-charts' %}mm-active{% endif %}">
-                    <a href="{% url 'risk-charts' %}">
-                        <i data-feather="grid"></i>
-                        <span data-key="risk_charts">Risk Charts</span>
-                    </a>
+                {% with urlname=request.resolver_match.url_name %}
+                <li class="{% if urlname in 'risk-charts-all risk-charts-toxin' %}mm-active{% endif %}">
+                  <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                    <i data-feather="grid"></i>
+                    <span data-key="risk_charts">Risk Charts</span>
+                  </a>
+
+                  <ul class="sub-menu mm-collapse" aria-expanded="false">
+                    <li class="{% if urlname == 'risk-charts-all' %}mm-active{% endif %}">
+                      <a href="{% url 'risk-charts-all' %}">All charts</a>
+                    </li>
+
+                    <li class="{% if urlname == 'risk-charts-toxin' %}mm-active{% endif %}">
+                      <a href="{% url 'risk-charts-toxin' %}">Toxin concentration vs time</a>
+                    </li>
+                  </ul>
                 </li>
+                {% endwith %}
             </ul>
         </div>
         <!-- End Sidemenu -->

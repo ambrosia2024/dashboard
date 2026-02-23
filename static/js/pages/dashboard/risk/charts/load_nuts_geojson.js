@@ -8,7 +8,7 @@
 // Notes:
 // - The 'season' variable models annual seasonality (0–1), peaking in late summer/autumn.
 //   Currently used only to generate realistic dummy fluctuations in risk values.
-//   Later, this can drive visual features—e.g., highlighting peak months, adjusting colour
+//   Later, this can drive visual features-e.g., highlighting peak months, adjusting colour
 //   intensity, or dynamically scaling the map's heat layer.
 
 (function () {

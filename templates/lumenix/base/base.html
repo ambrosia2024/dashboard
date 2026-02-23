@@ -112,10 +112,30 @@
         <!-- pace js -->
         <script src="{% static 'libs/pace-js/pace.min.js'%}"></script>
 
+        <script src="{% static 'js/pages/dashboard/keep_dashboard_mode_in_cookies.js' %}"></script>
+
         {% block extra_js %}
         {% endblock extra_js %}
 
         <script src="{% static 'js/app.js'%}"></script>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const btn = document.getElementById("vertical-menu-btn");
+                if (!btn) return;
+
+                btn.addEventListener("click", function (e) {
+                    e.preventDefault();
+
+                    // Common pattern used by these themes:
+                    document.body.classList.toggle("sidebar-enable");
+                    document.body.classList.toggle("vertical-collpsed");
+
+                    const cur = document.body.getAttribute("data-sidebar-size");
+                    document.body.setAttribute("data-sidebar-size", cur === "sm" ? "lg" : "sm");
+                });
+            });
+        </script>
 
         <script>
             document.cookie = "user_timezone=" + Intl.DateTimeFormat().resolvedOptions().timeZone + "; path=/";
