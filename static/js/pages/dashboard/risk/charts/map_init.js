@@ -109,14 +109,14 @@
                 l.on('mouseout',  () => l.setStyle({ weight: 1, color: '#ffffff' }));
                 l.bindPopup(`
                     <strong>${p.region_name} (${p.region_id})</strong><br>
-                    ${p.year}-${String(p.month).padStart(2,'0')} · ${crop} — ${pathogen}<br>
+                    ${p.year}-${String(p.month).padStart(2,'0')} · ${crop} - ${pathogen}<br>
                     ${metric}: <strong>${p[metric]}</strong>
                 `);
             }
         }).addTo(map);
 
         if (!feats.length) {
-            caption.textContent = `${crop} — ${pathogen} · ${MONTHS[month-1]} ${year} · ${metric} — No data for this selection`;
+            caption.textContent = `${crop} - ${pathogen} · ${MONTHS[month-1]} ${year} · ${metric} - No data for this selection`;
             return;
         }
 
@@ -127,7 +127,7 @@
             map.setView([52.1, 5.4], 7);
         }
         setLegend(metric);
-        caption.textContent = `${crop} — ${pathogen} · Month ${month} · Metric: ${metric}`;
+        caption.textContent = `${crop} - ${pathogen} · Month ${month} · Metric: ${metric}`;
     }
 
     // Wait for data, then render; re-render on control changes

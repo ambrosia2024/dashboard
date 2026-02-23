@@ -35,7 +35,7 @@ function renderPastHazards(filterYear) {
         .data(filtered)
         .enter()
         .append("li")
-        .html(d => `${icons[d.category] || ""} <strong>${d.date}</strong> — ${d.hazard} <em>(${d.category})</em>`);
+        .html(d => `${icons[d.category] || ""} <strong>${d.date}</strong> - ${d.hazard} <em>(${d.category})</em>`);
 }
 
 function renderFutureHazards() {

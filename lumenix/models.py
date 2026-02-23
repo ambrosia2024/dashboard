@@ -363,3 +363,88 @@ class SimulationResult(models.Model):
 #     def __str__(self):
 #         return f"{self.user} ({self.role})"
 
+class DashboardViewMode(BaseModel):
+    """
+    A named dashboard mode, e.g. 'Default', 'Farmer View', 'Distributor View'.
+    Not tied to users; the single user can switch between them.
+    """
+    code = models.SlugField(max_length=50, unique=True,
+                            help_text="Stable identifier, e.g. 'default', 'farmer', 'distributor', 'admin'.",)
+    label = models.CharField(max_length=100, help_text="Human-readable label, e.g. 'Farmer View'.",)
+    description = models.TextField(blank=True, help_text="Optional description for this view/mode.",)
+    is_default = models.BooleanField(default=False,
+                                     help_text="If true, this is the fallback mode when none is explicitly chosen.",)
+
+    class Meta:
+        db_table = "dashboard_view_modes"
+
+    def __str__(self):
+        return self.label
+
+    def clean(self):
+        # Only one default mode allowed
+        if self.is_default:
+            qs = DashboardViewMode.objects.filter(is_default=True).exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({"is_default": "Only one dashboard view mode can be default."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # ensures clean() runs
+        super().save(*args, **kwargs)
+
+class DashboardChart(BaseModel):
+    """
+    One chart/widget that can be placed onto the dashboard in one or more modes.
+    """
+    PAGE_CHOICES = [
+        ("landing", "Dashboard landing page"),
+        ("risk", "Risk charts page"),
+    ]
+
+    identifier = models.SlugField(max_length=100, unique=True,
+                                  help_text="Stable key, e.g. 'climate_map', 'disease_risk_timeseries'.",)
+    label = models.CharField(max_length=200, help_text="Name shown in admin, e.g. 'Climate Map (Europe)'.",)
+    template_name = models.CharField(max_length=255,
+                                     help_text="Django template to include for this chart, e.g. 'lumenix/charts/climate_map.html'.",)
+    page_code = models.CharField(max_length=20, choices=PAGE_CHOICES, default="landing",
+                                 help_text="Which high-level page this chart belongs to.",)
+
+    # Open-ended “how”: layout, default filters, chart options, etc.
+    default_config = models.JSONField(default=dict, blank=True,
+                                      help_text="Optional default config (layout, filters, options...) for this chart.",)
+
+    class Meta:
+        db_table = "dashboard_charts"
+
+    def __str__(self):
+        return self.label
+
+
+class DashboardViewChart(BaseModel):
+    """
+    Through model: which charts appear in which mode, with ordering and per-mode config overrides.
+    """
+    mode = models.ForeignKey(DashboardViewMode, on_delete=models.CASCADE, related_name="view_charts",)
+    chart = models.ForeignKey(DashboardChart, on_delete=models.CASCADE, related_name="view_modes",)
+    order = models.PositiveIntegerField(default=0, help_text="Ordering of charts within a mode.",)
+
+    config_override = models.JSONField(default=dict, blank=True,
+                                       help_text="Optional per-mode override of chart config (the 'how').",)
+
+    class Meta:
+        db_table = "dashboard_view_charts"
+        ordering = ["order"]
+        unique_together = [("mode", "chart")]
+
+    def __str__(self):
+        return f"{self.mode} → {self.chart} (#{self.order})"
+
+    @property
+    def effective_config(self) -> dict:
+        """
+        Merge default_config from the chart with any overrides defined here.
+        """
+        base = dict(self.chart.default_config or {})
+        base.update(self.config_override or {})
+        return base
+

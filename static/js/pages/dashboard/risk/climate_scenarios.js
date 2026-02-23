@@ -121,7 +121,7 @@
             <strong>What this shows</strong>
             <ul class="mb-2">
               <li><em>${first.date}</em> → <em>${last.date}</em> for
-                  <strong>${first.crop}</strong> — <strong>${first.pathogen}</strong>.</li>
+                  <strong>${first.crop}</strong> - <strong>${first.pathogen}</strong>.</li>
               <li>Each line represents change in temperature (Δ °C) and probability of illness (%).</li>
             </ul>
             <strong>Key trends</strong>

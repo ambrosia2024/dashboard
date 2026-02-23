@@ -1,0 +1,23 @@
+{# templates/lumenix/risk_charts_new.html #}
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Risk Charts{% endblock title %}
+
+{% block extra_css %}
+    {# Leaflet CSS stays here since the map needs it #}
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+    {# Render ONLY the selected chart template #}
+    {% if selected_chart %}
+        {% include selected_chart.template_name with chart_config=selected_chart.config chart_identifier=selected_chart.identifier %}
+    {% else %}
+        <div class="alert alert-warning">No risk charts are configured for this view.</div>
+    {% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+    {% include 'lumenix/partials/_risk_scripts.html' %}
+{% endblock extra_js %}

@@ -32,8 +32,8 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
             formatter: (p) => {
                 const i = p[0].dataIndex;
                 const v = y[i];
-                const inc = baseline ? (((v - baseline) / baseline) * 100).toFixed(1) : '—';
-                return `<strong>${x[i]}</strong><br>Conc: <strong>${v}</strong><br>Baseline: ${baseline ?? '—'}<br>Δ vs baseline: ${inc}%`;
+                const inc = baseline ? (((v - baseline) / baseline) * 100).toFixed(1) : '-';
+                return `<strong>${x[i]}</strong><br>Conc: <strong>${v}</strong><br>Baseline: ${baseline ?? '-'}<br>Δ vs baseline: ${inc}%`;
             }
         },
         xAxis: { type: 'category', data: x, boundaryGap: false },

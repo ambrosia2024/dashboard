@@ -1,21 +1,40 @@
 // static/js/pages/dashboard/risk/charts/toxin_over_time.js
 
-window.renderToxinChart = function (domId, rows, pairLabel = "") {
+// shallow merge helper for simple overrides
+function merge(base, extra) {
+  return Object.assign({}, base, extra || {});
+}
+
+window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
     const el = document.getElementById(domId);
     const chart = echarts.init(el, null, { renderer: 'canvas' });
     window.addEventListener('resize', () => chart.resize());
 
     const x = rows.map(r => r.date);
     const y = rows.map(r => r.toxin_level_ug_per_kg);
-    const limit = rows[0]?.toxin_limit_ug_per_kg ?? window.RISK_CONFIG.defaultToxinLimit;
+    const limit =
+      cfg?.defaults?.toxin_limit_ug_per_kg
+      ?? rows[0]?.toxin_limit_ug_per_kg
+      ?? window.RISK_CONFIG.defaultToxinLimit;
+
+    const baseTitle = {
+      text: cfg?.title || 'Toxin concentration vs time',
+      subtext: pairLabel || '',
+      left: 'center',
+      top: 10
+    };
+
+    const baseYAxis = {
+      type: 'value',
+      name: cfg?.y_axis_label || 'Toxin (μg/kg)',
+      nameLocation: 'middle',
+      nameGap: 45,
+      nameTextStyle: { fontSize: 12, fontWeight: 'bold' },
+      max: Math.max(Math.ceil(Math.max(...y, limit) + 1), 10)
+    };
 
     chart.setOption({
-        title: {
-            text: 'Toxin concentration vs time',
-            subtext: pairLabel || '',
-            left: 'center',
-            top: 10
-        },
+        title: merge(baseTitle, cfg?.overrides?.title),
         tooltip: {
             trigger: 'axis',
             formatter: (params) => {
@@ -42,17 +61,7 @@ window.renderToxinChart = function (domId, rows, pairLabel = "") {
                 fontWeight: 'bold'
             }
         },
-        yAxis: {
-            type: 'value',
-            name: 'Toxin (μg/kg)',
-            nameLocation: 'middle',
-            nameGap: 45,
-            nameTextStyle: {
-                fontSize: 12,
-                fontWeight: 'bold'
-            },
-            max: Math.max(Math.ceil(Math.max(...y, limit) + 1), 10)
-        },
+        yAxis: merge(baseYAxis, cfg?.overrides?.yAxis),
         series: [{
             name: 'Toxin level',
             type: 'line',

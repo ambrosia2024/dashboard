@@ -8,5 +8,7 @@ urlpatterns = [
     path("api/climate-data/", ClimateDataGeoJSONView.as_view(), name="climate_data_geojson"),
 
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
-    path("risk-charts/", RiskChartsView.as_view(), name="risk-charts"),
+    path("risk-charts/", RiskChartsView.as_view(), name="risk-charts-all"),
+    path("risk-charts/toxin/", RiskChartsView.as_view(), name="risk-charts-toxin"),
+
 ]

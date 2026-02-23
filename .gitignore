@@ -28,6 +28,8 @@ data/
 !static/data/**
 synda/
 testing/
+api_test/
+pidrive/
 
 /*.nc
 

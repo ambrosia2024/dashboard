@@ -36,8 +36,8 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
                 const i = params[0].dataIndex;
                 const r = rows[i];
                 const base = baseline ?? r.baseline_prob_illness_pct ?? r.prob_illness_pct;
-                const pctDelta = base ? ((r.prob_illness_pct - base) / Math.max(0.1, base) * 100).toFixed(1) : '—';
-                const rm = base ? (r.prob_illness_pct / Math.max(0.1, base)).toFixed(2) : '—';
+                const pctDelta = base ? ((r.prob_illness_pct - base) / Math.max(0.1, base) * 100).toFixed(1) : '-';
+                const rm = base ? (r.prob_illness_pct / Math.max(0.1, base)).toFixed(2) : '-';
                 return [
                     `<strong>${r.date}</strong>`,
                     `P(illness): <strong>${r.prob_illness_pct}%</strong>`,

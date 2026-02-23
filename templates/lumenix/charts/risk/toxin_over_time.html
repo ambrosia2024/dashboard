@@ -1,0 +1,32 @@
+{# templates/lumenix/charts/risk/toxin_over_time.html #}
+{% load json_extras %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="d-flex align-items-center gap-2 mb-3">
+                    <span>{{ chart_config.title|default:"Toxin concentration vs time" }}</span>
+                </h4>
+
+                <div id="toxinsChart" style="height: 360px;"></div>
+
+                {# only show 3D container if enabled in config #}
+                {% if chart_config.defaults.enable_3d %}
+                <div id="toxinsChart3D" style="height: 480px; margin-top: 1rem; max-width: 100%;"></div>
+                {% endif %}
+
+                <div id="toxinsExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ chart_config|json_script:"toxinsChartCfg" }}
+
+<script>
+  window.__AMBROSIA_CHART_CONFIGS = window.__AMBROSIA_CHART_CONFIGS || {};
+  window.__AMBROSIA_CHART_CONFIGS["toxinsChart"] =
+    JSON.parse(document.getElementById("toxinsChartCfg").textContent);
+</script>
+
