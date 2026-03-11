@@ -1,6 +1,7 @@
 // static/js/pages/dashboard/risk/charts/prob_over_time.js
 
 window.renderProbChart = function (domId, rows, pairLabel = "") {
+    const BRAND_BLUE = '#376EB5';
     function applyPinnedMarker(idx) {
         // We draw a vertical dashed line at the pinned x (date).
         const x = rows.map(r => r.date);
@@ -17,10 +18,14 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
     }
 
     const el = document.getElementById(domId);
-    const chart = echarts.init(el);
+    if (!el) return;
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el);
     const baseline = rows.length ? rows[0].prob_illness_pct : null;
 
-    window.addEventListener('resize', () => chart.resize());
+    if (!el.dataset.riskResizeBound) {
+        window.addEventListener('resize', () => chart.resize());
+        el.dataset.riskResizeBound = "1";
+    }
 
     // const dataset = rows.map(r => [r.date, r.prob_illness_pct, r.risk_multiplier, r.baseline_prob_illness_pct]);
     const dataset = rows.map(r => {
@@ -29,6 +34,10 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
     });
 
     chart.setOption({
+        animationDuration: 320,
+        animationDurationUpdate: 420,
+        animationEasing: 'cubicOut',
+        animationEasingUpdate: 'cubicInOut',
         title: { text: '', subtext: pairLabel },
         tooltip: {
             trigger: 'axis',
@@ -68,10 +77,26 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
             dimension: 2 // use risk_multiplier column for colour
         },
         series: [
-            { name: 'Probability', type: 'line', encode: { x: 0, y: 1 }, showSymbol: false, lineStyle: { width: 2 } },
-            { name: 'Baseline',    type: 'line', encode: { x: 0, y: 3 }, showSymbol: false, lineStyle: { width: 1, type: 'dashed' } }
+            {
+                name: 'Probability',
+                type: 'line',
+                encode: { x: 0, y: 1 },
+                showSymbol: false,
+                smooth: true,
+                lineStyle: { width: 2, color: BRAND_BLUE },
+                itemStyle: { color: BRAND_BLUE }
+            },
+            {
+                name: 'Baseline',
+                type: 'line',
+                encode: { x: 0, y: 3 },
+                showSymbol: false,
+                smooth: true,
+                lineStyle: { width: 1, type: 'dashed', color: '#8f97a6' },
+                itemStyle: { color: '#8f97a6' }
+            }
         ]
-    });
+    }, { notMerge: false, lazyUpdate: true });
 
     chart.off('updateAxisPointer');
     chart.on('updateAxisPointer', (e) => {
@@ -114,4 +139,7 @@ window.renderProbChart = function (domId, rows, pairLabel = "") {
 
     // If there was a previously pinned index, re-apply marker on rerender
     applyPinnedMarker(window.__probPinnedIndex);
+
+    window.__probChartInstance = chart;
+    window.__probRowsCurrent = rows;
 };

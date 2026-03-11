@@ -23,6 +23,18 @@ RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
 
 # Feature flag: turn email verification on/off
 EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "false").lower() == "true"
+PUBLIC_SIGNUP_ENABLED = os.getenv("PUBLIC_SIGNUP_ENABLED", "false").lower() == "true"
+RECAPTCHA_ENABLED = os.getenv("RECAPTCHA_ENABLED", "false").lower() == "true"
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "")
+LLM_URL = os.getenv("LLM_URL", "").strip()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-30b-a3b-awq").strip()
+LLM_CHAT_ENDPOINT = os.getenv("LLM_CHAT_ENDPOINT", "/v1/chat/completions").strip()
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))
+LLM_MAX_USER_CHARS = int(os.getenv("LLM_MAX_USER_CHARS", "1000"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not RUNNING_IN_DOCKER  # Debug True in local, False in Docker
@@ -41,6 +53,23 @@ USE_X_FORWARDED_HOST = True
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+
+if not RUNNING_IN_DOCKER:
+    # Local runserver is typically plain HTTP on 127.0.0.1:8000.
+    # Secure cookies won't be set over HTTP, which breaks CSRF-protected POSTs.
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+if RUNNING_IN_DOCKER:
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # Application definition
 INSTALLED_APPS = [
@@ -73,6 +102,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'lumenix.middleware.AdminLoginProtectionMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
     'allauth.account.middleware.AccountMiddleware',
@@ -93,6 +123,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'lumenix.context_processors.risk_context_data',
             ],
         },
     },
@@ -115,6 +146,7 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 #   - no verification emails are sent
 #   - users (incl. superusers) can log in without confirming email
 ACCOUNT_EMAIL_VERIFICATION = "mandatory" if EMAIL_VERIFICATION_ENABLED else "none"
+ACCOUNT_PREVENT_ENUMERATION = True
 
 # ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
@@ -122,12 +154,11 @@ ACCOUNT_LOGOUT_ON_GET = False
 
 LOGIN_URL = "/accounts/login/"      # allauth login URL
 LOGIN_REDIRECT_URL = "/"            # where to send user after login
-# ACCOUNT_ADAPTER = "lumenix.account_adapter.NoSignupAccountAdapter"
+ACCOUNT_ADAPTER = "lumenix.account_adapter.NoSignupAccountAdapter"
 
-# ACCOUNT_FORMS = {
-#     "signup": "lumenix.forms.CustomSignupForm",
-#     "login": "lumenix.forms.CustomLoginForm",
-# }
+ACCOUNT_FORMS = {
+    "login": "lumenix.forms.SecureLoginForm",
+}
 
 # How long a “remembered” login should last (14 days)
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
@@ -137,6 +168,19 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
 # - True: always remember (checkbox ignored)
 # - False: never remember (checkbox ignored)
 ACCOUNT_SESSION_REMEMBER = None
+
+# Shared cache used by login anti-bruteforce controls.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": BASE_DIR / "data" / "django_cache",
+        "TIMEOUT": 60 * 30,
+        "OPTIONS": {"MAX_ENTRIES": 50000},
+    }
+}
+
+# Login protection thresholds
+LOGIN_BURST_LIMIT_PER_MINUTE = int(os.getenv("LOGIN_BURST_LIMIT_PER_MINUTE", "20"))
 
 # Database
 # PostgreSQL Configuration
@@ -192,6 +236,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 SCIO_VOCAB_API_BASE = os.getenv("SCIO_VOCAB_API_BASE", "https://dev.api.ambrosia.scio.services/api/vocabulary")
+SCIO_NUTS_API_BASE = os.getenv("SCIO_NUTS_API_BASE", "https://dev.api.ambrosia.scio.services/api/nuts")
+SCIO_MODELS_API_URL = os.getenv("SCIO_MODELS_API_URL", "https://dev.api.ambrosia.scio.services/api/models")
 
 # Broker/result (Redis example)
 # CELERY_BROKER_URL = "redis://localhost:6379/0"

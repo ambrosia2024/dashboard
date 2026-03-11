@@ -1,4 +1,4 @@
-_# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -8,22 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- SCiO API test scripts for `/models`, `/modelexecutionservice/models`, and `/simulation`, using `.env` configuration and structured output.
-- FastAPI app for testing pidrive integration.
-- New test helpers and API utilities to standardise response handling for pidrive.
-- IPCC dashboard link added to frontend for external reference.
+- Risk charts module with dedicated pages/routes and chart scripts (`toxin`, `pathogen`, `probability`, `cases`, `seasonal heatmap`) and map support.
+- Chart interpretation/assumption content and chart export flows (image/data).
+- Dashboard view modes and DB-driven chart composition (`DashboardViewMode`, `DashboardChart`, `DashboardViewChart`).
+- Authentication UX and account flow (login templates, password reset, email verification, profile completion).
+- SCiO vocabulary sync pipeline (`Vocabulary`, `Scheme`, `Concept`, history tracking + sync command).
+- PiDrive FastAPI utility app plus transload/upload/download/system-info capabilities.
+- Header alerts center with context/global sections, per-alert read, mark-all-read, filters, pagination, severity styling, and chart navigation.
+- Alerts implementation docs: `docs/alerts_phase1_phase2_plan.md` and `docs/alerts_implementation_log.md`.
+- GPU footprint documentation for Sweden-hosted A40 inference estimation: `docs/gpu_footprint_estimation_sweden.md`.
+- SCiO API helper/testing scripts for model discovery and simulation workflows.
+- IPCC dashboard external link in sidebar.
 
 ### Changed
-- Helper functions improved and refactored for better reuse and structure.
-- `.env.sample` updated with new variables for pidrive.
-- General project clean-up, including consolidation of main branch changes.
+- Transitioned from earlier crop/fetch approach toward SCiO-backed vocabulary usage and filtered supported crop/hazard lists.
+- Refactored and expanded PiDrive helper modules and routing logic across multiple iterations.
+- Updated Docker/runtime setup over time (health/status patterns, dev/prod adjustments, dependency updates).
+- Switched key frontend/vendor usage toward offline/local static bundles where needed.
+- Risk chart UX enhancements across multiple commits (interpretation, heatmap behavior, selector and view-mode wiring).
+- Changelog reconstructed from actual git diff history through `ee60ead` (2026-02-23), not only commit-message summaries.
 
 ### Fixed
-- Upload and download behaviour for Pi client testing corrected and made robust.
+- Upload/download robustness for Pi client workflows.
+- Multiple simulation and API handling paths in iterative updates (error handling and request/response handling improvements).
 
 ### Removed
-- Deleted previously committed `.deb` file from repository.
-- `.deb` files added to `.gitignore` to avoid future accidental commits.
+- Previously committed `.deb` artifact removed and ignored.
+- Legacy `fskx` app/workflow removed in favor of current direction.
+- Older crop-fetch command paths removed during SCiO transition.
 
 ---
 
@@ -51,5 +63,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed simulation call to FSKX server.
 - Location handling bug fixed.
-- Crop fetching logic handled more robustly._
-
+- Crop fetching logic handled more robustly.

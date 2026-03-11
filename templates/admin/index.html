@@ -1,0 +1,127 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<style>
+  .scio-sync-grid {
+    margin-bottom: 16px;
+  }
+  .scio-sync-left .module + .module {
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .sync-cta {
+    white-space: nowrap;
+  }
+</style>
+
+<div class="scio-sync-grid">
+  <div class="scio-sync-left">
+    <div class="app-scio module">
+      <table>
+        <caption>SCiO Sync - Vocabulary</caption>
+        <tbody>
+          <tr class="model-sync-plants">
+            <th scope="row">Sync Plants Vocabulary</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-vocabulary-plants' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync Plants</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-pathogens">
+            <th scope="row">Sync Pathogens Vocabulary</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-vocabulary-pathogens' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync Pathogens</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-all">
+            <th scope="row">Sync All Vocabularies</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-vocabulary-all' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button default sync-cta">Sync All Vocab</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="app-scio module">
+      <table>
+        <caption>SCiO Sync - NUTS</caption>
+        <tbody>
+          <tr class="model-sync-nuts0">
+            <th scope="row">Sync NUTS Level 0</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-nuts-0' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync NUTS L0</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-nuts1">
+            <th scope="row">Sync NUTS Level 1</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-nuts-1' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync NUTS L1</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-nuts2">
+            <th scope="row">Sync NUTS Level 2</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-nuts-2' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync NUTS L2</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-nuts3">
+            <th scope="row">Sync NUTS Level 3</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-nuts-3' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button sync-cta">Sync NUTS L3</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="model-sync-nuts-all">
+            <th scope="row">Sync All NUTS Levels</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-nuts-all' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button default sync-cta">Sync NUTS All</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="app-scio module">
+      <table>
+        <caption>SCiO Sync - Models</caption>
+        <tbody>
+          <tr class="model-sync-models">
+            <th scope="row">Sync API Models</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-models' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button default sync-cta">Sync Models</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

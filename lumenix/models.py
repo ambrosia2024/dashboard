@@ -52,10 +52,14 @@ class Vocabulary(models.Model):
         ("pathogens", "Pathogens"),
     )
     id = models.CharField(primary_key=True, max_length=32, choices=VOCAB_IDS)  # 'plants' / 'pathogens'
+    status = models.SmallIntegerField(default=1, choices=((1, "Active"), (0, "Inactive"), (2, "Deleted")), db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "vocabulary"
+        verbose_name = "Vocabulary"
+        verbose_name_plural = "Vocabularies"
 
     def __str__(self):
         return self.id
@@ -69,10 +73,14 @@ class Scheme(models.Model):
     uri = models.URLField(unique=True, help_text="ConceptScheme @id, e.g. https://.../vocab/scheme/cereal")
     title = models.JSONField(default=dict, blank=True)        # { "en": "Cereal Vocabulary", ... }
     description = models.JSONField(default=dict, blank=True)  # { "en": "..." }
+    status = models.SmallIntegerField(default=1, choices=((1, "Active"), (0, "Inactive"), (2, "Deleted")), db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "vocabulary_scheme"
         indexes = [models.Index(fields=["vocabulary"])]
+        verbose_name = "Schema"
+        verbose_name_plural = "Schemas"
 
     def __str__(self):
         return self.title.get("en") or self.uri
@@ -94,6 +102,8 @@ class Concept(models.Model):
     notation   = models.JSONField(default=dict, blank=True)
 
     ambrosia_supported = models.BooleanField(default=False)
+    status = models.SmallIntegerField(default=1, choices=((1, "Active"), (0, "Inactive"), (2, "Deleted")), db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     # Relationship lists are URIs: keep as JSON array(s) to avoid cross-row integrity headaches
     broader     = models.JSONField(default=list, blank=True)
@@ -117,6 +127,8 @@ class Concept(models.Model):
             models.Index(fields=["scheme"]),
             models.Index(fields=["content_hash"]),
         ]
+        verbose_name = "Concept"
+        verbose_name_plural = "Concepts"
 
     def __str__(self):
         return self.pref_label.get("en") or self.uri
@@ -124,12 +136,12 @@ class Concept(models.Model):
 
 class PlantConceptManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().filter(vocabulary_id="plants")
+        return super().get_queryset().filter(vocabulary_id="plants", status=1)
 
 
 class PathogenConceptManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().filter(vocabulary_id="pathogens")
+        return super().get_queryset().filter(vocabulary_id="pathogens", status=1)
 
 
 class PlantConcept(Concept):
@@ -162,6 +174,73 @@ class ConceptHistory(models.Model):
     class Meta:
         db_table = "vocabulary_concept_history"
         indexes = [models.Index(fields=["concept", "changed_at"])]
+        verbose_name = "Concept History"
+        verbose_name_plural = "Concept History"
+
+
+class NutsRegion(models.Model):
+    """
+    NUTS region entry fetched from /api/nuts/{level}.
+    """
+    iri = models.URLField(unique=True, help_text="NUTS IRI, e.g. http://data.europa.eu/nuts/code/NL42")
+    notation = models.CharField(max_length=16, db_index=True, help_text="NUTS code, e.g. NL42")
+    level = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(3)],
+        db_index=True,
+        help_text="NUTS level: 0, 1, 2, 3",
+    )
+    pref_label = models.CharField(max_length=255, db_index=True, help_text="Primary label from API")
+    alt_labels_en = models.JSONField(default=list, blank=True, help_text="English alternative labels")
+    status = models.SmallIntegerField(default=1, choices=((1, "Active"), (0, "Inactive"), (2, "Deleted")), db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "nuts_regions"
+        indexes = [
+            models.Index(fields=["level", "notation"]),
+            models.Index(fields=["level", "pref_label"]),
+        ]
+        unique_together = [("level", "notation")]
+        verbose_name = "NUTS Region"
+        verbose_name_plural = "NUTS Regions"
+
+    def __str__(self):
+        return f"L{self.level} {self.notation} - {self.pref_label}"
+
+
+class ScioModel(models.Model):
+    """
+    Model registry entry fetched from /api/models.
+    """
+    external_id = models.CharField(max_length=64, unique=True, db_index=True, help_text="Model id from API payload")
+    name = models.CharField(max_length=1024, db_index=True)
+    source_url = models.TextField(help_text="Model download/source URL")
+    image_tag = models.CharField(max_length=512, blank=True, default="")
+    cpu_cores_required = models.FloatField(default=0.0)
+    ram_gb_required = models.FloatField(default=0.0)
+    gpu_count_required = models.PositiveIntegerField(default=0)
+    gpu_memory_gb_required = models.FloatField(default=0.0)
+    min_cuda_version_required = models.CharField(max_length=64, null=True, blank=True)
+    source_timestamp = models.BigIntegerField(null=True, blank=True, help_text="models[n]._id.timestamp")
+    source_date_ms = models.BigIntegerField(null=True, blank=True, help_text="models[n]._id.date")
+    status = models.SmallIntegerField(default=1, choices=((1, "Active"), (0, "Inactive"), (2, "Deleted")), db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "scio_models"
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["updated_at"]),
+        ]
+        verbose_name = "SCiO Model"
+        verbose_name_plural = "SCiO Models"
+
+    def __str__(self):
+        return f"{self.name} ({self.external_id})"
 
 
 class ClimateData(BaseModel):
@@ -448,3 +527,59 @@ class DashboardViewChart(BaseModel):
         base.update(self.config_override or {})
         return base
 
+
+class SidebarChartLink(BaseModel):
+    """
+    Configures dynamic sidebar menus and chart submenus.
+    """
+
+    menu_code = models.SlugField(
+        max_length=50,
+        default="charts",
+        help_text="Stable menu code, e.g. 'charts', 'exposure', 'alerts'.",
+    )
+    menu_label = models.CharField(
+        max_length=100,
+        default="Charts",
+        help_text="Top-level menu label shown in sidebar, e.g. 'Charts'.",
+    )
+    menu_icon = models.CharField(
+        max_length=40,
+        blank=True,
+        default="grid",
+        help_text="Feather icon name for this menu, e.g. 'grid', 'bar-chart-2'.",
+    )
+    chart = models.ForeignKey(
+        DashboardChart,
+        on_delete=models.CASCADE,
+        related_name="sidebar_links",
+        help_text="Chart target for this sidebar entry.",
+    )
+    label_override = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Optional submenu label. If blank, chart label is used.",
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Order of submenu items within the same top-level menu.",
+    )
+
+    class Meta:
+        db_table = "sidebar_chart_links"
+        ordering = ["menu_code", "order", "id"]
+        unique_together = [("menu_code", "chart")]
+        verbose_name = "Sidebar Chart"
+        verbose_name_plural = "Sidebar Charts"
+
+    def __str__(self):
+        return f"{self.menu_label} -> {self.display_label}"
+
+    @property
+    def display_label(self) -> str:
+        return self.label_override or self.chart.label
+
+    def clean(self):
+        reserved = {"dashboard", "ipcc-dashboard", "risk-charts"}
+        if (self.menu_code or "").strip().lower() in reserved:
+            raise ValidationError({"menu_code": "This menu code is reserved by built-in sidebar menus."})

@@ -1,6 +1,6 @@
 {% if available_modes %}
 <div class="d-none d-md-flex align-items-center me-2">
-    <label for="dashboard_mode" class="me-2 mb-0 small text-muted">View</label>
+    <label for="dashboard_mode" class="me-2 mb-0 text-muted" style="font-weight:700; font-size:12px;">View</label>
     <select id="dashboard_mode" class="form-select form-select-sm" style="width: 180px;">
         {% for m in available_modes %}
             <option value="{{ m.code }}" {% if current_mode and m.id == current_mode.id %}selected{% endif %}>
