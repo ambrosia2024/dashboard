@@ -1,37 +1,4 @@
 {# templates/lumenix/partials/_risk_charts_grid.html #}
-
-<!-- sticky controls -->
-<div class="row risk-toolbar">
-    <div class="col-sm-12">
-        <div class="card sticky-top mb-0" style="z-index: 1030;">
-            <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <!-- left: dates -->
-                <div class="d-flex flex-wrap align-items-center gap-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="rm-start" class="form-label mb-0">Start date:</label>
-                        <input id="rm-start" type="date" class="form-control form-control-sm" value="2023-01-01" style="width:auto;">
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="rm-end" class="form-label mb-0">End date:</label>
-                        <input id="rm-end" type="date" class="form-control form-control-sm" value="2023-12-31" style="width:auto;">
-                    </div>
-                </div>
-
-                <!-- right: button -->
-                <div>
-                    <button type="button"
-                            class="btn btn-link p-0 text-muted"
-                            data-bs-toggle="modal"
-                            data-bs-target="#dataDictionaryModal">
-                        <i class="bi bi-info-circle"></i> Data dictionary
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-
 <div class="row mt-3">
     <div class="col-sm-6">
         <div class="card">
@@ -43,11 +10,26 @@
                             title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
-
-                    <button type="button" id="downloadToxinChartBtn" class="btn btn-link p-0 text-muted ms-auto"
-                        aria-label="Download chart as image" title="Download chart as image">
-                    <i class="bi bi-download"></i>
-                </button>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download toxin chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="toxin" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="toxin" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="toxin" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="toxin" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="toxin" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
                 </h4>
                 <div id="toxinsChart" style="height: 360px;"></div>
 
@@ -67,6 +49,26 @@
                             title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download pathogen chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="pathogen" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="pathogen" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="pathogen" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="pathogen" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="pathogen" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
                 </h4>
                 <div id="pathogenConcChart" style="height: 360px;"></div>
                 <div id="pathogenExplain" class="mt-3 small text-muted"></div>
@@ -84,6 +86,26 @@
                         title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download probability chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="probability" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="probability" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="probability" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="probability" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="probability" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
                 </h4>
                 <div id="probChart" style="height: 360px;"></div>
                 <button id="probExplainBtn" type="button" class="btn btn-outline-secondary btn-sm mt-2">
@@ -105,6 +127,26 @@
                             title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download cases chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
                 </h4>
                 <div id="casesChart" style="height: 360px;"></div>
                 <div id="casesExplain" class="mt-3 small text-muted"></div>
@@ -121,6 +163,26 @@
                             title="Show data assumptions">
                         <i class="bi bi-info-circle"></i>
                     </button>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download seasonal heatmap"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
                 </h4>
                 <div id="seasonalHeatmap" style="height: 360px;"></div>
                 <div id="heatmapExplain" class="mt-3 small text-muted"></div>

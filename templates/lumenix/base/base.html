@@ -22,6 +22,7 @@
     <link href="{% static 'css/icons.min.css'%}" rel="stylesheet" type="text/css" />
     <!-- App Css-->
     <link href="{% static 'css/app.min.css'%}" id="app-style" rel="stylesheet" type="text/css" />
+    <link href="{% static 'css/custom_css.css'%}" rel="stylesheet" type="text/css" />
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
@@ -68,7 +69,131 @@
         .navbar-brand img, .logo-lg img {
           max-height: none !important;
         }
-        .logo-lg { display: inline-flex !important; }
+        .logo-lg { display: inline-flex; }
+        .navbar-brand .logo-sm { display: none !important; }
+
+        .navbar-brand .brand-logo-sm {
+          display: block;
+          height: 34px !important;
+          width: auto !important;
+        }
+
+        body[data-sidebar-size=sm] .navbar-brand-box {
+          padding: 0 .5rem !important;
+          justify-content: center;
+        }
+
+        body[data-sidebar-size=sm] .navbar-brand .logo-lg {
+          display: none !important;
+        }
+
+        body[data-sidebar-size=sm] .navbar-brand .logo-sm {
+          display: inline-flex !important;
+        }
+
+        body[data-sidebar-size=sm] .navbar-brand .brand-logo-sm {
+          height: 30px !important;
+        }
+
+        .alerts-dropdown {
+          width: 360px;
+          max-width: calc(100vw - 1rem);
+        }
+
+        .alerts-filter-group .btn {
+          font-size: 12px;
+          line-height: 1.2;
+          padding: 4px 8px;
+        }
+
+        .alerts-filter-group .btn.active {
+          color: #fff !important;
+          background: #376eb5 !important;
+          border-color: #376eb5 !important;
+        }
+
+        .alerts-filter-group .btn.active:hover,
+        .alerts-filter-group .btn.active:focus,
+        .alerts-filter-group .btn.active:active {
+          color: #fff !important;
+          background: #376eb5 !important;
+          border-color: #376eb5 !important;
+          box-shadow: none !important;
+        }
+
+        .alerts-list {
+          max-height: 240px;
+          overflow-y: auto;
+        }
+
+        .alerts-item {
+          border: 1px solid #e9ecef;
+          border-radius: 8px;
+          padding: 8px;
+          margin-bottom: 8px;
+          background: #fff;
+          cursor: pointer;
+        }
+
+        .alerts-item:last-child {
+          margin-bottom: 0;
+        }
+
+        .alerts-item.is-unread {
+          border-left: 4px solid #dc3545;
+        }
+
+        .alerts-item.severity-critical {
+          border-left-color: #a71d2a;
+        }
+
+        .alerts-item.severity-high {
+          border-left-color: #dc3545;
+        }
+
+        .alerts-item.severity-medium {
+          border-left-color: #fd7e14;
+        }
+
+        .alerts-item.severity-low {
+          border-left-color: #198754;
+        }
+
+        .alerts-item-title {
+          font-weight: 600;
+          margin-bottom: 2px;
+        }
+
+        .alerts-item-meta {
+          color: #6c757d;
+          font-size: 12px;
+        }
+
+        .alerts-item-actions .btn-link {
+          font-size: 12px;
+          text-decoration: none;
+        }
+
+        .alerts-item-actions .btn-link + .btn-link {
+          margin-left: 10px;
+        }
+
+        .alerts-trigger-btn {
+          min-width: auto;
+          line-height: 1;
+        }
+
+        .alerts-trigger-btn svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        #alerts-badge {
+          top: 3px !important;
+          right: -3px !important;
+          left: auto !important;
+          transform: none !important;
+        }
     </style>
     {% endblock css %}
 
@@ -97,8 +222,17 @@
                 {% include "lumenix/base/footer.html" %}
             {% endblock footer %}
         </div>
+
     </div>
     <!-- END layout-wrapper -->
+
+    {% include "lumenix/partials/risk_context_bubble.html" %}
+
+    {% if user.is_authenticated %}
+    <form id="idle-logout-form" method="post" action="{% url 'account_logout' %}" style="display:none;">
+        {% csrf_token %}
+    </form>
+    {% endif %}
 
 
     {% block javascript %}
@@ -113,9 +247,15 @@
         <script src="{% static 'libs/pace-js/pace.min.js'%}"></script>
 
         <script src="{% static 'js/pages/dashboard/keep_dashboard_mode_in_cookies.js' %}"></script>
+        <script src="{% static 'js/pages/dashboard/risk_context_bubble.js' %}"></script>
+        <script src="{% static 'js/pages/dashboard/alerts.js' %}"></script>
 
         {% block extra_js %}
         {% endblock extra_js %}
+
+        {% if user.is_authenticated %}
+        <script src="{% static 'js/session_idle_logout.js' %}"></script>
+        {% endif %}
 
         <script src="{% static 'js/app.js'%}"></script>
 

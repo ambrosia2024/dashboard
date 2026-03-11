@@ -1,0 +1,64 @@
+{# templates/lumenix/partials/risk_context_bubble.html #}
+<button id="riskContextFab" type="button" class="btn btn-primary risk-context-fab" aria-label="Open risk context">
+    <i class="bi bi-sliders"></i> Context
+</button>
+
+<div id="riskContextPanel" class="risk-context-panel card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Risk Context</h6>
+            <button id="riskContextClose" type="button" class="btn btn-sm btn-light" aria-label="Close">×</button>
+        </div>
+
+        <div class="mb-2">
+            <label for="ctx-location" class="form-label mb-1">Location</label>
+            <div class="input-group input-group-sm">
+                <input id="ctx-location" type="text" class="form-control"
+                       placeholder="City, region, postcode or coordinates">
+                <button id="ctx-location-search" class="btn btn-outline-secondary" type="button" title="Search location">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+            <div id="ctx-location-loading" class="small text-muted mt-1" style="display:none;">Searching location...</div>
+            <ul id="ctx-location-results" class="list-group mt-2 ctx-location-results" style="display:none;"></ul>
+            <div id="ctx-nuts2" class="small text-muted mt-2">NUTS2: not selected</div>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-6">
+                <label for="ctx-crop" class="form-label mb-1">Crop</label>
+                <select id="ctx-crop" class="form-select form-select-sm">
+                    <option value="">-- Select --</option>
+                    {% for crop in global_risk_crops %}
+                    <option value="{{ crop.id }}">{{ crop.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6">
+                <label for="ctx-hazard" class="form-label mb-1">Hazard</label>
+                <select id="ctx-hazard" class="form-select form-select-sm">
+                    <option value="">-- Select --</option>
+                    {% for hazard in global_risk_hazards %}
+                    <option value="{{ hazard.id }}">{{ hazard.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+            <div class="col-6">
+                <label for="ctx-start" class="form-label mb-1">Start</label>
+                <input id="ctx-start" type="date" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+                <label for="ctx-end" class="form-label mb-1">End</label>
+                <input id="ctx-end" type="date" class="form-control form-control-sm">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button id="riskContextClear" type="button" class="btn btn-sm btn-outline-secondary">Clear</button>
+            <button id="riskContextApply" type="button" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+    </div>
+</div>

@@ -3,7 +3,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 
-from lumenix.models import DashboardViewMode, DashboardViewChart
+from lumenix.models import DashboardViewMode, DashboardViewChart, DashboardChart
 
 
 class RiskChartsView(LoginRequiredMixin, TemplateView):
@@ -12,9 +12,15 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
     def get_template_names(self):
         name = self.request.resolver_match.url_name
 
+        print("url name: ", name)
+
         if name == "risk-charts-all":
             return ["lumenix/risk_charts.html"]
+        if name == "risk-charts-item":
+            return ["lumenix/risk_charts_new.html"]
         if name == "risk-charts-toxin":
+            return ["lumenix/risk_charts_new.html"]
+        if name == "risk-charts-pathogen":
             return ["lumenix/risk_charts_new.html"]
 
         return [self.template_name]
@@ -47,12 +53,42 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
         selected = next((c for c in charts if c["identifier"] == requested), None) if requested else None
         ctx["selected_chart"] = selected or (charts[0] if charts else None)
 
+        # If a specific chart identifier is in path, force that selection.
+        chart_identifier = self.kwargs.get("chart_identifier")
+        if chart_identifier:
+            linked = next((c for c in charts if c["identifier"] == chart_identifier), None)
+            if linked:
+                ctx["selected_chart"] = linked
+            else:
+                # Allow sidebar-driven direct links even when the chart is not in the current mode mapping.
+                standalone = (
+                    DashboardChart.active_objects
+                    .filter(identifier=chart_identifier, page_code="risk")
+                    .first()
+                )
+                if standalone:
+                    ctx["selected_chart"] = {
+                        "identifier": standalone.identifier,
+                        "label": standalone.label,
+                        "template_name": standalone.template_name,
+                        "config": standalone.default_config or {},
+                    }
+
         # If this is the toxin-only page, force it to toxin chart (by identifier)
         if self.request.resolver_match.url_name == "risk-charts-toxin":
             toxin = next(
-                (c for c in charts if c["identifier"] in ("toxins_over_time", "toxin_over_time", "toxinsChart")), None)
+                (c for c in charts if c["identifier"] in ("toxin_over_time")), None)
             if toxin:
                 ctx["selected_chart"] = toxin
+
+        # If this is the pathogen-only page, force it to pathogen chart (by identifier)
+        if self.request.resolver_match.url_name == "risk-charts-pathogen":
+            pathogen = next(
+                (c for c in charts if c["identifier"] in ("pathogen_concentration_over_time")), None)
+            if pathogen:
+                ctx["selected_chart"] = pathogen
+
+            print(pathogen)
 
         return ctx
 
@@ -75,4 +111,3 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
 
         mode = qs.filter(is_default=True).order_by("id").first()
         return mode or qs.order_by("id").first()
-

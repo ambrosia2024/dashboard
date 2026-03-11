@@ -1,9 +1,13 @@
 // Simple line with baseline-relative colouring and optional threshold.
 window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
+    const BRAND_BLUE = '#376EB5';
     const el = document.getElementById(domId);
     if (!el) return;
-    const chart = echarts.init(el);
-    window.addEventListener('resize', () => chart.resize());
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+    if (!el.dataset.riskResizeBound) {
+        window.addEventListener('resize', () => chart.resize());
+        el.dataset.riskResizeBound = "1";
+    }
 
     const x = rows.map(r => r.date);
     const y = rows.map(r => r.pathogen_conc_units_per_g ?? 0);
@@ -26,6 +30,10 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
     const colourFor = band => ({small:'#6cc070',moderate:'#ffbf00',large:'#ff7f0e',significant:'#d62728'})[band];
 
     chart.setOption({
+        animationDuration: 320,
+        animationDurationUpdate: 420,
+        animationEasing: 'cubicOut',
+        animationEasingUpdate: 'cubicInOut',
         title: { text: '', subtext: pairLabel },
         tooltip: {
             trigger: 'axis',
@@ -41,10 +49,15 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
         series: [{
             type: 'line',
             showSymbol: false,
+            smooth: true,
+            lineStyle: { width: 2, color: BRAND_BLUE },
             data: y.map(v => ({
                 value: v,
                 itemStyle: { color: colourFor(classifyBand(v, baseline)) }
             }))
         }]
-    });
+    }, { notMerge: false, lazyUpdate: true });
+
+    window.__pathogenChartInstance = chart;
+    window.__pathogenRowsCurrent = rows;
 };
