@@ -1,11 +1,11 @@
 # lumenix/account_adapter.py
 
 from allauth.account.adapter import DefaultAccountAdapter
+from django.conf import settings
 
 
 class NoSignupAccountAdapter(DefaultAccountAdapter):
-    """Disallow public registration (signup)."""
+    """Allow or block public signup via settings flag."""
 
     def is_open_for_signup(self, request):
-        # Always return False - /accounts/signup/ is effectively disabled
-        return True
+        return bool(getattr(settings, "PUBLIC_SIGNUP_ENABLED", False))

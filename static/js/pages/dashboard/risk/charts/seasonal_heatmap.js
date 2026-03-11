@@ -3,8 +3,12 @@
 window.renderSeasonalHeatmap = function (domId, rows, mode = "risk_multiplier", pairLabel = "") {
     // mode: "risk_multiplier" or "prob_illness_pct"
     const el = document.getElementById(domId);
-    const chart = echarts.init(el);
-    window.addEventListener('resize', () => chart.resize());
+    if (!el) return;
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+    if (!el.dataset.riskResizeBound) {
+        window.addEventListener('resize', () => chart.resize());
+        el.dataset.riskResizeBound = "1";
+    }
 
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const years = Array.from(new Set(rows.map(r => r.year))).sort((a,b)=>a-b);
@@ -13,6 +17,10 @@ window.renderSeasonalHeatmap = function (domId, rows, mode = "risk_multiplier", 
     const data = rows.map(r => [r.month - 1, years.indexOf(r.year), mode === "risk_multiplier" ? r.risk_multiplier : r.prob_illness_pct]);
 
     chart.setOption({
+        animationDuration: 320,
+        animationDurationUpdate: 420,
+        animationEasing: 'cubicOut',
+        animationEasingUpdate: 'cubicInOut',
         title: { text: ``, subtext: pairLabel },
         tooltip: {
             position: 'top',
@@ -32,5 +40,9 @@ window.renderSeasonalHeatmap = function (domId, rows, mode = "risk_multiplier", 
             inRange: { color: ['#2ca02c', '#ff7f0e', '#d62728'] }
         },
         series: [{ type: 'heatmap', data, label: { show: false } }]
-    });
+    }, { notMerge: false, lazyUpdate: true });
+
+    window.__seasonalHeatmapInstance = chart;
+    window.__seasonalRowsCurrent = rows;
+    window.__seasonalModeCurrent = mode;
 };

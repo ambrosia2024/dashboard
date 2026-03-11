@@ -6,9 +6,14 @@ function merge(base, extra) {
 }
 
 window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
+    const BRAND_BLUE = '#376EB5';
     const el = document.getElementById(domId);
-    const chart = echarts.init(el, null, { renderer: 'canvas' });
-    window.addEventListener('resize', () => chart.resize());
+    if (!el) return;
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el, null, { renderer: 'canvas' });
+    if (!el.dataset.riskResizeBound) {
+      window.addEventListener('resize', () => chart.resize());
+      el.dataset.riskResizeBound = "1";
+    }
 
     const x = rows.map(r => r.date);
     const y = rows.map(r => r.toxin_level_ug_per_kg);
@@ -34,6 +39,10 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
     };
 
     chart.setOption({
+        animationDuration: 320,
+        animationDurationUpdate: 420,
+        animationEasing: 'cubicOut',
+        animationEasingUpdate: 'cubicInOut',
         title: merge(baseTitle, cfg?.overrides?.title),
         tooltip: {
             trigger: 'axis',
@@ -67,7 +76,9 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
             type: 'line',
             data: y,
             showSymbol: false,
-            lineStyle: { width: 2 }
+            smooth: true,
+            lineStyle: { width: 2, color: BRAND_BLUE },
+            itemStyle: { color: BRAND_BLUE }
         },
         {
             // horizontal limit line
@@ -79,7 +90,7 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
                 label: { formatter: `Limit: ${limit} μg/kg` }
             }
         }]
-    });
+    }, { notMerge: false, lazyUpdate: true });
 
     window.__toxinsChartInstance = chart;
     window.__toxinsRowsCurrent = rows;
@@ -93,8 +104,11 @@ window.renderToxinChart3D = function (domId, rows, pairLabel = "") {
     if (!el) return;
 
     // initialise chart with WebGL renderer (needed for 3D)
-    const chart = echarts.init(el, null, { renderer: 'canvas' });
-    window.addEventListener('resize', () => chart.resize());
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el, null, { renderer: 'canvas' });
+    if (!el.dataset.riskResizeBound) {
+      window.addEventListener('resize', () => chart.resize());
+      el.dataset.riskResizeBound = "1";
+    }
 
     // build [timeIndex, toxin, temperature] tuples
     const data3D = rows.map((r, idx) => [
@@ -104,6 +118,10 @@ window.renderToxinChart3D = function (domId, rows, pairLabel = "") {
     ]);
 
     chart.setOption({
+        animationDuration: 320,
+        animationDurationUpdate: 420,
+        animationEasing: 'cubicOut',
+        animationEasingUpdate: 'cubicInOut',
         title: {
             text: '',
             subtext: pairLabel ? `${pairLabel} – 3D view (toxin vs temp vs time)` : '3D view: toxin vs temperature vs time',
@@ -170,5 +188,5 @@ window.renderToxinChart3D = function (domId, rows, pairLabel = "") {
             symbolSize: 6,
             smooth: true // make the curve look more organic
         }]
-    });
+    }, { notMerge: false, lazyUpdate: true });
 };

@@ -11,17 +11,71 @@
                     <span class="logo-lg d-inline-flex align-items-center">
                         <img src="{% static 'images/ambrosia-logo.png' %}" alt="Ambrosia" class="brand-logo" />
                     </span>
+                    <span class="logo-sm d-inline-flex align-items-center">
+                        <img src="{% static 'images/ambrosia-logo.png' %}" alt="Ambrosia" class="brand-logo-sm" />
+                    </span>
                 </a>
             </div>
 
             <button type="button" class="btn btn-sm px-3 font-size-16 header-item" id="vertical-menu-btn">
                 <i class="fa fa-fw fa-bars"></i>
             </button>
+            {% if user.is_authenticated %}
+            <span id="idle-timer-badge" class="header-item d-none d-lg-inline-flex align-items-center px-2 text-muted small">
+                Session: 15:00
+            </span>
+            {% endif %}
         </div>
 
         <div class="d-flex">
+            {% with urlname=request.resolver_match.url_name %}
+                {% if urlname == 'risk-charts-all' or urlname == 'risk-charts-item' or urlname == 'risk-charts-toxin' or urlname == 'risk-charts-pathogen' %}
+                    {% include "lumenix/partials/risk_header_filters.html" %}
+                {% endif %}
+            {% endwith %}
 
             {% dashboard_mode_select %}
+
+            <div class="dropdown d-inline-block me-2">
+                <button type="button"
+                        class="btn header-item bg-soft-light border-0 position-relative px-2 py-1 alerts-trigger-btn"
+                        id="page-header-alert-dropdown"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-label="Alerts">
+                    <i data-feather="bell"></i>
+                    <span id="alerts-badge"
+                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+                        0
+                    </span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end p-0 alerts-dropdown" aria-labelledby="page-header-alert-dropdown">
+                    <div class="alerts-dropdown-header d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                        <strong>Alerts</strong>
+                        <button type="button" id="alerts-mark-all-read" class="btn btn-link btn-sm p-0">Mark all read</button>
+                    </div>
+                    <div class="px-3 py-2 border-bottom">
+                        <div class="btn-group btn-group-sm alerts-filter-group" role="group" aria-label="Alert filters">
+                            <button type="button" class="btn btn-outline-secondary active" data-alert-filter="all">All</button>
+                            <button type="button" class="btn btn-outline-secondary" data-alert-filter="current">Current context</button>
+                            <button type="button" class="btn btn-outline-secondary" data-alert-filter="unread">Unread</button>
+                            <button type="button" class="btn btn-outline-secondary" data-alert-filter="high">High+</button>
+                        </div>
+                    </div>
+                    <div class="px-3 py-2 border-bottom">
+                        <div class="small fw-bold mb-1">Current context</div>
+                        <div id="alerts-current-context" class="alerts-list small text-muted"></div>
+                        <button type="button" id="alerts-current-show-more" class="btn btn-link btn-sm p-0 mt-1 d-none">Show more</button>
+                    </div>
+                    <div class="px-3 py-2">
+                        <div class="small fw-bold mb-1">All alerts</div>
+                        <div id="alerts-all" class="alerts-list small text-muted"></div>
+                        <button type="button" id="alerts-all-show-more" class="btn btn-link btn-sm p-0 mt-1 d-none">Show more</button>
+                    </div>
+                </div>
+            </div>
 
             <div class="dropdown d-inline-block">
                 <button type="button" class="btn header-item bg-soft-light border-start border-end" id="page-header-user-dropdown"
