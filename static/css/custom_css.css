@@ -236,6 +236,13 @@
     color: #6b7280 !important;
 }
 
+#c1-chat-thread .c1-chat-service-message {
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-left: 4px solid #f97316;
+    color: #9a3412;
+}
+
 /* Risk charts motion polish */
 .risk-motion-card {
     opacity: 0;
