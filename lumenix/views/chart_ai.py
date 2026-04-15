@@ -9,6 +9,28 @@ from django.views.decorators.http import require_POST
 from lumenix.models import DashboardChart
 
 
+def _friendly_upstream_error_message(status_code: int) -> str:
+    if status_code >= 500:
+        return (
+            "Ambra seems to be down at the moment. "
+            "Please try again after some time."
+        )
+    if status_code in (401, 403):
+        return (
+            "Ambra is temporarily unavailable due to an authentication issue. "
+            "Please try again later."
+        )
+    if status_code == 404:
+        return (
+            "Ambra is temporarily unavailable right now. "
+            "Please try again later."
+        )
+    return (
+        "Ambra could not process this request right now. "
+        "Please try again in a moment."
+    )
+
+
 def _sanitize_scalar(value):
     if value is None:
         return None
@@ -214,8 +236,7 @@ def chart_qa_stream(request, chart_identifier: str):
                 timeout=(10, settings.LLM_TIMEOUT_SECONDS),
             ) as resp:
                 if resp.status_code >= 400:
-                    error_text = resp.text[:500] if resp.text else "Unknown upstream LLM error."
-                    yield f"LLM error ({resp.status_code}): {error_text}"
+                    yield _friendly_upstream_error_message(resp.status_code)
                     return
 
                 for raw in resp.iter_lines(decode_unicode=True):
@@ -244,8 +265,8 @@ def chart_qa_stream(request, chart_identifier: str):
                         yield delta
         except Exception:
             yield (
-                "I could not reach the chart assistant model right now. "
-                "Please try again in a moment."
+                "Ambra seems to be down at the moment. "
+                "Please try again after some time."
             )
 
     return StreamingHttpResponse(token_stream(), content_type="text/plain; charset=utf-8")

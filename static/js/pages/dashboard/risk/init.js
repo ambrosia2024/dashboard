@@ -862,6 +862,14 @@ function initC1ChartChat() {
     return html;
   }
 
+  function isAssistantServiceMessage(text) {
+    const normalized = String(text || "").trim().toLowerCase();
+    return normalized.includes("ambra seems to be down at the moment")
+      || normalized.includes("ambra is temporarily unavailable")
+      || normalized.includes("please try again after some time")
+      || normalized.includes("please try again later");
+  }
+
   function openChatPanel() {
     panel.style.display = "";
     toggleBtn.style.display = "none";
@@ -883,7 +891,12 @@ function initC1ChartChat() {
     box.style.maxWidth = "85%";
 
     const bubble = document.createElement("div");
-    bubble.className = role === "user" ? "p-2 rounded bg-primary text-white" : "p-2 rounded bg-white border";
+    const isServiceMessage = role === "assistant" && isAssistantServiceMessage(text);
+    bubble.className = role === "user"
+      ? "p-2 rounded bg-primary text-white"
+      : isServiceMessage
+      ? "p-2 rounded c1-chat-service-message"
+      : "p-2 rounded bg-white border";
     bubble.style.whiteSpace = "pre-wrap";
     bubble.style.wordBreak = "break-word";
     if (role === "assistant") {
