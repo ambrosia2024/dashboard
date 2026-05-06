@@ -82,6 +82,12 @@
                         <button type="submit">
                             {% trans "Sign in" %}
                         </button>
+
+                        <div class="secondary-links">
+                            <a href="{% url 'account_reset_password' %}">{% trans "Forgot password?" %}</a>
+                            ·
+                            <a href="{% url 'account_signup' %}">{% trans "Create account" %}</a>
+                        </div>
                     </div>
                 </form>
             </div>

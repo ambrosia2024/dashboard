@@ -120,6 +120,23 @@
         </tbody>
       </table>
     </div>
+
+    <div class="app-scio module">
+      <table>
+        <caption>SCiO Sync - Toxin</caption>
+        <tbody>
+          <tr class="model-sync-toxin">
+            <th scope="row">Sync Configured Toxin Datasets</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-toxin' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="button default sync-cta">Sync Toxin</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 

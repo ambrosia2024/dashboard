@@ -1,0 +1,28 @@
+{% load static %}
+
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Sign up unavailable</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
+    </head>
+    <body>
+        <div class="page">
+            <div class="card">
+                <h1 class="card-title">Sign up unavailable</h1>
+                <p class="card-text">
+                    Account registration is currently closed for this dashboard.
+                </p>
+                <p class="small">
+                    If you need access, contact the Ambrosia team or use an invited account.
+                </p>
+
+                <a href="{% url 'account_login' %}" class="button-back">Back to sign in</a>
+            </div>
+        </div>
+    </body>
+</html>

@@ -3,6 +3,7 @@
 from django.urls import path
 from .views import DashboardView, ClimateDataGeoJSONView, RiskChartsView
 from .views.chart_ai import chart_qa_stream
+from .views.toxin_api import toxin_concentration_query
 
 urlpatterns = [
     path('', DashboardView.as_view(), name='dashboard'),
@@ -14,5 +15,6 @@ urlpatterns = [
     path("risk-charts/toxin/", RiskChartsView.as_view(), name="risk-charts-toxin"),
     path("risk-charts/pathogen/", RiskChartsView.as_view(), name="risk-charts-pathogen"),
     path("api/risk-charts/<slug:chart_identifier>/qa-stream/", chart_qa_stream, name="risk-chart-qa-stream"),
+    path("api/risk-charts/toxin-concentration/query/", toxin_concentration_query, name="risk-chart-toxin-query"),
 
 ]

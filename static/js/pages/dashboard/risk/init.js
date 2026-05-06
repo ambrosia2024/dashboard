@@ -47,13 +47,14 @@ function monthLabel(iso) {
 function explainToxins(rows) {
   if (!rows?.length) return "<em>No data in the selected period.</em>";
 
-  const limit =
-    rows[0]?.toxin_limit_ug_per_kg ??
-    window.RISK_CONFIG?.defaultToxinLimit ??
-    0;
+  const source = rows[0]?.source || "dummy";
+  const hasRealLimit = Number.isFinite(rows[0]?.toxin_limit_ug_per_kg);
+  const limit = hasRealLimit ? rows[0].toxin_limit_ug_per_kg : null;
 
   const y = rows.map((r) => r.toxin_level_ug_per_kg);
-  const over = rows.filter((r) => r.toxin_level_ug_per_kg > limit).length;
+  const over = hasRealLimit
+    ? rows.filter((r) => r.toxin_level_ug_per_kg > limit).length
+    : 0;
 
   const max = Math.max(...y);
   const min = Math.min(...y);
@@ -69,19 +70,25 @@ function explainToxins(rows) {
   const period = `${monthLabel(rows[0].date)} → ${monthLabel(
     rows[rows.length - 1].date
   )}`;
-  const overPct = Math.round(pct(over, rows.length));
+  const overPct = hasRealLimit ? Math.round(pct(over, rows.length)) : null;
 
   return `
     <strong>What this shows</strong>
     <ul class="mb-2">
-      <li><em>${period}</em> toxin levels for <strong>${rows[0].crop}</strong> - <strong>${rows[0].pathogen}</strong> (μg/kg), with the action limit at <strong>${limit}</strong>.</li>
+      <li><em>${period}</em> toxin concentrations for <strong>${rows[0].crop}</strong> - <strong>${rows[0].pathogen}</strong>.</li>
+      <li>X axis: <strong>time series / date</strong>.</li>
+      <li>Y axis: <strong>toxin concentration (μg/kg)</strong>.</li>
     </ul>
     <strong>Key numbers</strong>
     <ul class="mb-2">
       <li>Average: <strong>${avg.toFixed(1)}</strong> μg/kg (min <strong>${min.toFixed(
         1
       )}</strong>, max <strong>${max.toFixed(1)}</strong>).</li>
-      <li>Above limit: <strong>${over}</strong> of ${rows.length} points (<strong>${overPct}%</strong>).</li>
+      ${
+        hasRealLimit
+          ? `<li>Above limit: <strong>${over}</strong> of ${rows.length} points (<strong>${overPct}%</strong>).</li>`
+          : ""
+      }
       <li>Trend: <strong>${trend}</strong> ${arrow} (≈ ${slope.toFixed(
         2
       )} μg/kg per month).</li>
@@ -94,14 +101,20 @@ function explainToxins(rows) {
     <strong>Interpretation</strong>
     <p class="mb-2">
       The series is ${trend}. ${
-        over
-          ? `There are occasional exceedances over the ${limit} μg/kg limit; consider investigating those months for heatwaves, rainfall, or handling issues.`
-          : `No exceedances detected in the selected period.`
+        hasRealLimit
+          ? over
+            ? `There are occasional exceedances over the ${limit} μg/kg limit.`
+            : `No exceedances detected in the selected period.`
+          : `No regulatory/action limit is shown here because the current SCiO toxin API response does not provide a toxin limit value.`
       }
     </p>
     <strong>Note</strong>
     <p class="mb-2">
-      Values are illustrative dummy outputs - illustrative only.
+      ${
+        source === "scio_api" || source === "scio_db"
+          ? "Values are fetched from the SCiO toxin concentration query endpoint for the current crop, pathogen, location, and date range. Temperature is stored from the API response, but it is not displayed on the current 2D toxin chart."
+          : "Values are illustrative dummy outputs - illustrative only."
+      }
     </p>
   `;
 }
@@ -727,6 +740,40 @@ function persistRiskDateFilters() {
   window.history.replaceState({}, "", url.toString());
 }
 
+const TOXIN_SCALE_STORAGE_KEY = "risk_toxin_scale";
+const VALID_TOXIN_SCALES = new Set(["daily", "weekly", "monthly", "quarterly", "yearly"]);
+
+function normalizeToxinScale(value) {
+  const scale = (value || "").trim().toLowerCase();
+  return VALID_TOXIN_SCALES.has(scale) ? scale : null;
+}
+
+function hydrateToxinScaleFilter() {
+  const scaleEl = document.getElementById("toxinsScale");
+  if (!scaleEl) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const queryScale = normalizeToxinScale(params.get("toxinsScale"));
+  const storedScale = normalizeToxinScale(localStorage.getItem(TOXIN_SCALE_STORAGE_KEY));
+  const fallbackScale = normalizeToxinScale(scaleEl.value) || "monthly";
+
+  scaleEl.value = queryScale || storedScale || fallbackScale;
+}
+
+function persistToxinScaleFilter() {
+  const scaleEl = document.getElementById("toxinsScale");
+  if (!scaleEl) return;
+
+  const scale = normalizeToxinScale(scaleEl.value);
+  if (!scale) return;
+
+  localStorage.setItem(TOXIN_SCALE_STORAGE_KEY, scale);
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("toxinsScale", scale);
+  window.history.replaceState({}, "", url.toString());
+}
+
 function filterByPeriod(rows) {
   const s = new Date(document.getElementById("rm-start")?.value || "2023-01-01");
   const e = new Date(document.getElementById("rm-end")?.value || "2023-12-31");
@@ -749,6 +796,228 @@ function getCsrfToken() {
   const fromForm = document.querySelector("#c1-chat-form input[name='csrfmiddlewaretoken']")?.value;
   if (fromForm) return fromForm;
   return getCookie("csrftoken");
+}
+
+const TOXIN_DAILY_CACHE = new Map();
+
+function toApiSlug(value, fallback = "") {
+  return (value || fallback)
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+}
+
+function getCurrentRiskPair() {
+  return {
+    crop: localStorage.getItem("lx_selected_crop_label") || "Lettuce",
+    pathogen: localStorage.getItem("lx_selected_pathogen_label") || "Salmonella",
+  };
+}
+
+function getCurrentPairLabel() {
+  const pair = getCurrentRiskPair();
+  return `${pair.crop} - ${pair.pathogen}`;
+}
+
+function getSelectedToxinScale() {
+  const chartScale = document.getElementById("toxinsScale")?.value;
+  if (chartScale) return chartScale;
+
+  const legacyScale = document.getElementById("rm-scale")?.value;
+  switch ((legacyScale || "").toLowerCase()) {
+    case "days":
+      return "daily";
+    case "months":
+      return "monthly";
+    case "years":
+      return "yearly";
+    default:
+      return "monthly";
+  }
+}
+
+function normalizeRequestDate(value, fallback) {
+  const raw = (value || "").trim();
+  if (!raw) return fallback;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month}-${day}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    const yyyy = parsed.getFullYear();
+    const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+    const dd = String(parsed.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return fallback;
+}
+
+function buildToxinQueryPayload() {
+  const pair = getCurrentRiskPair();
+  const startDate = normalizeRequestDate(document.getElementById("rm-start")?.value, "2023-01-01");
+  const endDate = normalizeRequestDate(document.getElementById("rm-end")?.value, "2023-12-31");
+  const nutsCode =
+    localStorage.getItem("lx_selected_nuts2_id")
+    || document.getElementById("rm-country")?.value
+    || "NL";
+
+  return {
+    plant: toApiSlug(pair.crop, "lettuce"),
+    pathogen: toApiSlug(pair.pathogen, "salmonella"),
+    nutsCode,
+    startDate,
+    endDate,
+    timeScale: "daily",
+  };
+}
+
+async function fetchRealToxinRows() {
+  const payload = buildToxinQueryPayload();
+  const cacheKey = JSON.stringify(payload);
+  if (TOXIN_DAILY_CACHE.has(cacheKey)) {
+    return TOXIN_DAILY_CACHE.get(cacheKey);
+  }
+
+  const response = await fetch("/api/risk-charts/toxin-concentration/query/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCsrfToken(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let detail = `Toxin query failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (data?.error) detail = data.error;
+    } catch (_err) {
+      // no-op
+    }
+    throw new Error(detail);
+  }
+
+  const data = await response.json();
+  TOXIN_DAILY_CACHE.set(cacheKey, data);
+  return data;
+}
+
+function aggregateToxinRows(rows, scale) {
+  if (!Array.isArray(rows) || !rows.length || scale === "daily") {
+    return rows || [];
+  }
+
+  const buckets = new Map();
+  rows.forEach((row) => {
+    const date = new Date(row.date || row.time || "");
+    if (Number.isNaN(date.getTime())) return;
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    let key = "";
+    let displayLabel = "";
+    let bucketDate = "";
+
+    if (scale === "weekly") {
+      const bucketStart = new Date(date);
+      const day = bucketStart.getDay();
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+      bucketStart.setDate(bucketStart.getDate() + mondayOffset);
+      const yyyy = bucketStart.getFullYear();
+      const mm = String(bucketStart.getMonth() + 1).padStart(2, "0");
+      const dd = String(bucketStart.getDate()).padStart(2, "0");
+      key = `${yyyy}-W${mm}${dd}`;
+      displayLabel = `Week of ${yyyy}-${mm}-${dd}`;
+      bucketDate = `${yyyy}-${mm}-${dd}`;
+    } else if (scale === "monthly") {
+      key = `${year}-${String(month).padStart(2, "0")}`;
+      displayLabel = key;
+      bucketDate = `${key}-01`;
+    } else if (scale === "quarterly") {
+      const quarter = Math.floor((month - 1) / 3) + 1;
+      const startMonth = (quarter - 1) * 3 + 1;
+      key = `${year}-Q${quarter}`;
+      displayLabel = key;
+      bucketDate = `${year}-${String(startMonth).padStart(2, "0")}-01`;
+    } else if (scale === "yearly") {
+      key = String(year);
+      displayLabel = key;
+      bucketDate = `${year}-01-01`;
+    } else {
+      return;
+    }
+
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key,
+        displayLabel,
+        date: bucketDate,
+        rows: [],
+      });
+    }
+    buckets.get(key).rows.push(row);
+  });
+
+  return Array.from(buckets.values()).map((bucket) => {
+    const sample = bucket.rows[0];
+    const avg = (values) => {
+      const nums = values.filter((v) => Number.isFinite(v));
+      if (!nums.length) return null;
+      return nums.reduce((sum, v) => sum + v, 0) / nums.length;
+    };
+
+    return {
+      ...sample,
+      date: bucket.date,
+      display_label: bucket.displayLabel,
+      time: null,
+      period: bucket.displayLabel,
+      toxin_level_ug_per_kg: avg(bucket.rows.map((r) => r.toxin_level_ug_per_kg)),
+      temperature_c: avg(bucket.rows.map((r) => r.temperature_c)),
+      humidity_pct: avg(bucket.rows.map((r) => r.humidity_pct)),
+      source_scale: scale,
+      outcome: [],
+    };
+  });
+}
+
+async function renderRealToxinChart(fallbackRows) {
+  if (!document.getElementById("toxinsChart")) {
+    return;
+  }
+
+  const cfg = getCfg("toxinsChart");
+  const pairLabel = getCurrentPairLabel();
+  const scale = getSelectedToxinScale();
+
+  try {
+    const data = await fetchRealToxinRows();
+    const dailyRows = Array.isArray(data?.rows) && data.rows.length ? data.rows : fallbackRows;
+    const toxinRows = aggregateToxinRows(dailyRows, scale);
+    window.__toxinsProvenanceCurrent = data?.provenance || null;
+    window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
+    if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
+      window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
+    }
+    const toxEl = document.getElementById("toxinsExplain");
+    if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
+  } catch (_err) {
+    window.__toxinsProvenanceCurrent = null;
+    const toxinRows = aggregateToxinRows(fallbackRows, scale);
+    window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
+    if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
+      window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
+    }
+    const toxEl = document.getElementById("toxinsExplain");
+    if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
+  }
 }
 
 function initC1ChartChat() {
@@ -1200,6 +1469,8 @@ function initC1ChartChat() {
 document.addEventListener("DOMContentLoaded", function () {
   hydrateRiskDateFilters();
   persistRiskDateFilters();
+  hydrateToxinScaleFilter();
+  persistToxinScaleFilter();
   const RISK_CHART_DOM_IDS = [
     "toxinsChart",
     "toxinsChart3D",
@@ -1282,12 +1553,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const doRender = () => {
       // toxins (cfg-aware)
       if (document.getElementById("toxinsChart")) {
-        const cfg = getCfg("toxinsChart");
-        window.renderToxinChart("toxinsChart", rerows, pairLabel, cfg);
-
-        if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
-          window.renderToxinChart3D("toxinsChart3D", rerows, pairLabel);
-        }
+        renderRealToxinChart(rerows);
       }
 
       if (document.getElementById("pathogenConcChart")) {
@@ -1395,6 +1661,14 @@ document.addEventListener("DOMContentLoaded", function () {
       renderAllVisible(filterByPeriod(rows), { withSkeleton: true });
     });
   });
+
+  const toxinScaleEl = document.getElementById("toxinsScale");
+  if (toxinScaleEl) {
+    toxinScaleEl.addEventListener("input", () => {
+      persistToxinScaleFilter();
+      renderAllVisible(filterByPeriod(rows), { withSkeleton: true });
+    });
+  }
 
   // OPTIONAL: expose a hook to re-render when switching crop/pathogen later
   window.renderRiskFor = function (opts) {

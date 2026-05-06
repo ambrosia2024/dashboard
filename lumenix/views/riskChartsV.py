@@ -1,6 +1,7 @@
 # lumenix/views/riskChartsV.py
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
 from django.views.generic import TemplateView
 
 from lumenix.models import DashboardViewMode, DashboardViewChart, DashboardChart
@@ -30,6 +31,7 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
 
         mode = self._get_active_mode()
         ctx["current_mode"] = mode
+        ctx["mode_locked"] = self._is_mode_locked()
         ctx["available_modes"] = DashboardViewMode.active_objects.order_by("id")
 
         view_charts = (
@@ -95,6 +97,12 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
     def _get_active_mode(self):
         qs = DashboardViewMode.active_objects.all()
 
+        profile = self._get_user_profile()
+        if profile and profile.dashboard_mode_id:
+            mode = qs.filter(pk=profile.dashboard_mode_id).first()
+            if mode:
+                return mode
+
         # prefer ?view= over anything else
         code = self.request.GET.get("view") or self.request.GET.get("mode")
         if code:
@@ -111,3 +119,13 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
 
         mode = qs.filter(is_default=True).order_by("id").first()
         return mode or qs.order_by("id").first()
+
+    def _is_mode_locked(self):
+        profile = self._get_user_profile()
+        return bool(profile and profile.dashboard_mode_id)
+
+    def _get_user_profile(self):
+        try:
+            return self.request.user.profile
+        except ObjectDoesNotExist:
+            return None

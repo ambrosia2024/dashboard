@@ -2,6 +2,8 @@
 
 (function () {
     const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const FALLBACK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
     const yearEl   = document.getElementById('rm-year');
     const monthLbl = document.getElementById('rm-month-label');
 
@@ -9,9 +11,30 @@
     if (!mapEl) return;     // page may not have the map section
 
     const map = L.map('riskMap', { scrollWheelZoom: true }).setView([52.1, 5.4], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+    function addBaseLayer() {
+        let switchedToFallback = false;
+        const layer = L.tileLayer(OSM_TILE_URL, {
+            attribution: '&copy; OpenStreetMap contributors',
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
+
+        layer.on('tileerror', () => {
+            if (switchedToFallback) {
+                return;
+            }
+
+            switchedToFallback = true;
+            map.removeLayer(layer);
+            L.tileLayer(FALLBACK_TILE_URL, {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                subdomains: 'abcd'
+            }).addTo(map);
+        });
+
+        layer.addTo(map);
+    }
+
+    addBaseLayer();
 
     const monthEl  = document.getElementById('rm-month');
     const cropEl   = document.getElementById('rm-crop');

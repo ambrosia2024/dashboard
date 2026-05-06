@@ -10,7 +10,17 @@
                     <button id="c1-chat-toggle" type="button" class="btn btn-outline-primary btn-sm ms-2">
                         Ask Ambra
                     </button>
-                    <div class="dropdown ms-auto">
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <label for="toxinsScale" class="mb-0 text-muted small">Timescale</label>
+                        <select id="toxinsScale" class="form-select form-select-sm" style="width: 140px;">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="dropdown">
                         <button class="btn btn-link p-0 text-muted dropdown-toggle"
                                 type="button"
                                 data-bs-toggle="dropdown"

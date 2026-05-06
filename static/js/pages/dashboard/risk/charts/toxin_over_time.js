@@ -15,12 +15,13 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
       el.dataset.riskResizeBound = "1";
     }
 
-    const x = rows.map(r => r.date);
+    const x = rows.map(r => r.display_label || r.date);
     const y = rows.map(r => r.toxin_level_ug_per_kg);
+    const pointCount = y.filter(v => Number.isFinite(v)).length;
     const limit =
       cfg?.defaults?.toxin_limit_ug_per_kg
       ?? rows[0]?.toxin_limit_ug_per_kg
-      ?? window.RISK_CONFIG.defaultToxinLimit;
+      ?? null;
 
     const baseTitle = {
       text: cfg?.title || 'Toxin concentration vs time',
@@ -35,7 +36,7 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
       nameLocation: 'middle',
       nameGap: 45,
       nameTextStyle: { fontSize: 12, fontWeight: 'bold' },
-      max: Math.max(Math.ceil(Math.max(...y, limit) + 1), 10)
+      max: Math.max(Math.ceil(Math.max(...y, limit ?? 0) + 1), 10)
     };
 
     chart.setOption({
@@ -49,11 +50,14 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
             formatter: (params) => {
                 const p = params[0];
                 const r = rows[p.dataIndex];
+                const details = [];
+                if (Number.isFinite(r.temperature_c)) details.push(`Temp: ${r.temperature_c}°C`);
+                if (Number.isFinite(r.humidity_pct)) details.push(`RH: ${r.humidity_pct}%`);
                 return [
-                `<strong>${r.date}</strong>`,
+                `<strong>${r.display_label || r.date}</strong>`,
                 `Toxin: <strong>${r.toxin_level_ug_per_kg} μg/kg</strong>`,
-                `Limit: ${limit} μg/kg`,
-                `Temp: ${r.temperature_c}°C · RH: ${r.humidity_pct}%`,
+                limit != null ? `Limit: ${limit} μg/kg` : null,
+                details.length ? details.join(' · ') : null,
                 r.event !== 'none' ? `Event: ${r.event}` : null
                 ].filter(Boolean).join('<br>');
             }
@@ -75,7 +79,9 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
             name: 'Toxin level',
             type: 'line',
             data: y,
-            showSymbol: false,
+            showSymbol: pointCount <= 1,
+            symbol: 'circle',
+            symbolSize: pointCount <= 1 ? 10 : 6,
             smooth: true,
             lineStyle: { width: 2, color: BRAND_BLUE },
             itemStyle: { color: BRAND_BLUE }
@@ -83,7 +89,7 @@ window.renderToxinChart = function (domId, rows, pairLabel = "", cfg = {}) {
         {
             // horizontal limit line
             type: 'line',
-            markLine: {
+            markLine: limit == null ? undefined : {
                 symbol: 'none',
                 data: [{ yAxis: limit, name: 'Action limit' }],
                 lineStyle: { color: '#d62728', width: 2 },

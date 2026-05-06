@@ -15,4 +15,5 @@ def dashboard_mode_select(context):
     return {
         "available_modes": DashboardViewMode.active_objects.order_by("id"),
         "current_mode": context.get("current_mode"),
+        "mode_locked": context.get("mode_locked", False),
     }
