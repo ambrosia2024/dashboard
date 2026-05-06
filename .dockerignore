@@ -14,7 +14,9 @@ __pycache__/
 *.sqlite3
 
 # Ignore environment and secret files
-#.env
+.env
+.env.local
+.env.docker
 .env.sample
 *.log
 
@@ -31,6 +33,9 @@ Dockerfile~
 .DS_Store
 .git
 .gitignore
+docker-compose.yml
+docker-compose.prod.yml
+nginx/
 
 media/
 data/
@@ -39,7 +44,6 @@ data/
 synda/
 testing/
 api_test/
-utils/
 pidrive/
 
 /*.nc

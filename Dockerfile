@@ -3,6 +3,7 @@ FROM python:3.12-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
@@ -24,22 +25,16 @@ RUN apt-get update && apt-get install -y \
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-# Then pip install GDAL
-RUN pip install --no-cache-dir GDAL==3.6.2
-
 # Copy only requirements first for better caching
 COPY requirements.txt /app/requirements.txt
 
 # Install Python dependencies before copying entire project (Docker caching)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install gunicorn
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy rest of the project files
 COPY . /app/
 
-# Copy entrypoint script and give execute permissions
-COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Expose the application port

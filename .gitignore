@@ -43,3 +43,4 @@ pidrive/
 celerybeat-schedule
 data/celery/
 docs/
+docker-compose.prod.yml
