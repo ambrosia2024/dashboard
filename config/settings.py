@@ -6,20 +6,33 @@ import sys
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load environment variables from .env
-load_dotenv()
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_env_file(path, override=False):
+    if path.exists():
+        load_dotenv(path, override=override)
+
+
+# Load shared defaults first, then environment-specific overrides.
+# Do not let `.env` overwrite process-level environment variables provided by Docker/Compose.
+_load_env_file(BASE_DIR / ".env", override=False)
+
+# Detect if running inside Docker before loading environment-specific overlays.
+RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
+
+if RUNNING_IN_DOCKER:
+    _load_env_file(BASE_DIR / ".env.docker", override=True)
+else:
+    _load_env_file(BASE_DIR / ".env.local", override=True)
+
 from decouple import config, UndefinedValueError
 
 from celery.schedules import crontab
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-
-# Detect if running inside Docker
-RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "False").lower() == "true"
 
 # Feature flag: turn email verification on/off
 EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "false").lower() == "true"
@@ -27,6 +40,15 @@ PUBLIC_SIGNUP_ENABLED = os.getenv("PUBLIC_SIGNUP_ENABLED", "false").lower() == "
 RECAPTCHA_ENABLED = os.getenv("RECAPTCHA_ENABLED", "false").lower() == "true"
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "")
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@ambrosia-project.eu").strip()
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL).strip()
 LLM_URL = os.getenv("LLM_URL", "").strip()
 LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-30b-a3b-awq").strip()
@@ -133,7 +155,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',  # Enables django-allauth
-    'django.contrib.auth.backends.ModelBackend',
+    'lumenix.auth_backends.EmailOrUsernameModelBackend',
 ]
 
 SITE_ID = 1  # Required for django-allauth
@@ -141,6 +163,7 @@ SITE_ID = 1  # Required for django-allauth
 # Allauth Settings
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_UNIQUE_EMAIL = True
 
 # If EMAIL_VERIFICATION_ENABLED is False:
 #   - no verification emails are sent
@@ -238,14 +261,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SCIO_VOCAB_API_BASE = os.getenv("SCIO_VOCAB_API_BASE", "https://dev.api.ambrosia.scio.services/api/vocabulary")
 SCIO_NUTS_API_BASE = os.getenv("SCIO_NUTS_API_BASE", "https://dev.api.ambrosia.scio.services/api/nuts")
 SCIO_MODELS_API_URL = os.getenv("SCIO_MODELS_API_URL", "https://dev.api.ambrosia.scio.services/api/models")
+SCIO_TOXIN_QUERY_URL = os.getenv(
+    "SCIO_TOXIN_QUERY_URL",
+    "https://dev.api.ambrosia.scio.services/api/toxin-concentration/query",
+)
+SCIO_TOXIN_SYNC_CHUNK_DAYS = int(os.getenv("SCIO_TOXIN_SYNC_CHUNK_DAYS", "7"))
+SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS = float(os.getenv("SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS", "2"))
+SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES = int(os.getenv("SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES", "2"))
+SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES = int(os.getenv("SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES", "5"))
 
 # Broker/result (Redis example)
-# CELERY_BROKER_URL = "redis://localhost:6379/0"
-# CELERY_RESULT_BACKEND = "redis://localhost:6379/1"
-# CELERY_TIMEZONE = "Europe/Amsterdam"
-# CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-#
-# # Run every 5 minutes
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "").strip()
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "").strip()
+CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "Europe/Amsterdam").strip()
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Example beat schedule, disabled unless explicitly configured/used.
 # CELERY_BEAT_SCHEDULE = {
 #     "sync-plants-hourly": {
 #         "task": "lumenix.tasks.sync_vocabulary_task",

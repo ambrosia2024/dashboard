@@ -1,6 +1,7 @@
 # lumenix/views/dashboardV.py
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import get_language
 from django.views.generic import TemplateView
 
@@ -38,6 +39,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         mode = self._get_active_mode()
         context["current_mode"] = mode
+        context["mode_locked"] = self._is_mode_locked()
         context["available_modes"] = DashboardViewMode.active_objects.order_by("id")
 
         if mode:
@@ -64,6 +66,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def _get_active_mode(self):
         qs = DashboardViewMode.active_objects.all()
 
+        profile = self._get_user_profile()
+        if profile and profile.dashboard_mode_id:
+            mode = qs.filter(pk=profile.dashboard_mode_id).first()
+            if mode:
+                return mode
+
         # 1) Query param (shareable links)
         mode_code = self.request.GET.get("view") or self.request.GET.get("mode")
         if mode_code:
@@ -86,3 +94,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # 4) Last resort
         return qs.order_by("id").first()
 
+    def _is_mode_locked(self):
+        profile = self._get_user_profile()
+        return bool(profile and profile.dashboard_mode_id)
+
+    def _get_user_profile(self):
+        try:
+            return self.request.user.profile
+        except ObjectDoesNotExist:
+            return None

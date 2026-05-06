@@ -1,11 +1,32 @@
 $(document).ready(function () {
     // Initialize the map centered on Europe
     var map = L.map('farms_by_locations').setView([50, 10], 4);
+    const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const FALLBACK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    // Add a base layer with fallback when OSM blocks unaffiliated tile usage
+    (function addSafeBaseLayer() {
+        let switchedToFallback = false;
+        const layer = L.tileLayer(OSM_TILE_URL, {
+            attribution: '&copy; OpenStreetMap contributors',
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
+
+        layer.on('tileerror', function () {
+            if (switchedToFallback) {
+                return;
+            }
+
+            switchedToFallback = true;
+            map.removeLayer(layer);
+            L.tileLayer(FALLBACK_TILE_URL, {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                subdomains: 'abcd'
+            }).addTo(map);
+        });
+
+        layer.addTo(map);
+    })();
 
     // Add drawing functionality
     var drawnItems = new L.FeatureGroup();
@@ -421,4 +442,3 @@ function parseCoordinateInput(raw) {
     }
     return { lat, lon };
 }
-

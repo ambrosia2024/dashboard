@@ -1,19 +1,27 @@
 # lumenix/admin.py
 
+from urllib.parse import urlparse
+
+from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Count, JSONField
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import redirect
 from django.urls import path
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django_json_widget.widgets import JSONEditorWidget
 # from django.utils import timezone
 
+from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
-                     DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel)
+                     DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
+                     ToxinQuerySpec, ToxinConcentrationRecord)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
+from .services.toxin_query import sync_toxin_query_spec
 from .services.vocabulary_sync import sync_vocabulary
+from .tasks import sync_toxin_query_spec_task
 
 
 class ApiSyncedReadOnlyAdmin(admin.ModelAdmin):
@@ -33,6 +41,142 @@ class ApiSyncedReadOnlyAdmin(admin.ModelAdmin):
 
     def has_view_permission(self, request, obj=None):
         return bool(request.user and request.user.is_active and request.user.is_staff)
+
+
+def _toxin_sync_queue_available():
+    return bool(getattr(settings, "CELERY_BROKER_URL", "").strip())
+
+
+class DatalistTextInput(forms.TextInput):
+    def __init__(self, options=(), datalist_id="choices-list", attrs=None):
+        super().__init__(attrs)
+        self.options = list(options)
+        self.datalist_id = datalist_id
+
+    def get_context(self, name, value, attrs):
+        attrs = attrs or {}
+        attrs["list"] = self.datalist_id
+        return super().get_context(name, value, attrs)
+
+    def render(self, name, value, attrs=None, renderer=None):
+        input_html = super().render(name, value, attrs, renderer)
+        options_html = format_html_join(
+            "",
+            '<option value="{}">{}</option>',
+            ((option_value, option_label) for option_value, option_label in self.options),
+        )
+        datalist_html = format_html('<datalist id="{}">{}</datalist>', self.datalist_id, options_html)
+        return format_html("{}{}", input_html, datalist_html)
+
+
+def _concept_api_identifier(concept):
+    parsed = urlparse(concept.uri or "")
+    fragment = (parsed.fragment or "").rstrip("/")
+    source = fragment or parsed.path
+    tail = source.rstrip("/").split("/")[-1]
+    return tail or concept.uri
+
+
+def _concept_choice_label(concept):
+    label = concept.pref_label.get("en") or concept.uri
+    identifier = _concept_api_identifier(concept)
+    support = "supported" if concept.ambrosia_supported else "not marked supported"
+    return f"{label} ({identifier}, {support})"
+
+
+class ToxinQuerySpecAdminForm(forms.ModelForm):
+    name = forms.CharField(required=False, widget=forms.HiddenInput())
+    plant = forms.ChoiceField()
+    pathogen = forms.ChoiceField()
+    nuts_code = forms.CharField(label="NUTS code")
+    start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    end_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+
+    class Meta:
+        model = ToxinQuerySpec
+        fields = "__all__"
+
+    @staticmethod
+    def _build_spec_name(cleaned_data):
+        plant = (cleaned_data.get("plant") or "").strip()
+        pathogen = (cleaned_data.get("pathogen") or "").strip()
+        nuts_code = (cleaned_data.get("nuts_code") or "").strip()
+        time_scale = (cleaned_data.get("time_scale") or "").strip()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+
+        if not (plant and pathogen and nuts_code and time_scale and start_date and end_date):
+            return ""
+
+        return (
+            f"{plant}_{pathogen}_{nuts_code}_{time_scale}_"
+            f"{start_date.isoformat()}_{end_date.isoformat()}"
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        supported_plants = PlantConcept.objects.filter(ambrosia_supported=True).order_by("uri")
+        supported_pathogens = PathogenConcept.objects.filter(ambrosia_supported=True).order_by("uri")
+        if not supported_plants.exists():
+            supported_plants = PlantConcept.objects.order_by("uri")
+        if not supported_pathogens.exists():
+            supported_pathogens = PathogenConcept.objects.order_by("uri")
+
+        plant_choices = [
+            (_concept_api_identifier(concept), _concept_choice_label(concept))
+            for concept in supported_plants
+        ]
+        pathogen_choices = [
+            (_concept_api_identifier(concept), _concept_choice_label(concept))
+            for concept in supported_pathogens
+        ]
+        nuts_choices = [
+            (region.notation, f"L{region.level} {region.notation} - {region.pref_label}")
+            for region in NutsRegion.objects.filter(status=1, level=2).order_by("notation")
+        ]
+
+        self.fields["plant"].choices = plant_choices
+        self.fields["pathogen"].choices = pathogen_choices
+        self.fields["nuts_code"].widget = DatalistTextInput(
+            options=nuts_choices,
+            datalist_id="nuts-code-options",
+            attrs={"placeholder": "Type NUTS2 code or region name"},
+        )
+
+        self.fields["plant"].help_text = "Choose from synced SCiO plant concepts marked as Ambrosia supported."
+        self.fields["pathogen"].help_text = "Choose from synced SCiO pathogen concepts marked as Ambrosia supported."
+        self.fields["nuts_code"].help_text = "Choose from synced NUTS level 2 regions."
+
+        if not plant_choices:
+            self.fields["plant"].help_text = "No synced plant concepts found. Run SCiO plant sync first."
+        if not pathogen_choices:
+            self.fields["pathogen"].help_text = "No synced pathogen concepts found. Run SCiO pathogen sync first."
+        if not nuts_choices:
+            self.fields["nuts_code"].help_text = "No synced NUTS level 2 regions found. Run NUTS sync first."
+
+        self._valid_nuts_codes = {value for value, _label in nuts_choices}
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data["name"] = self._build_spec_name(cleaned_data)
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.name = self._build_spec_name(self.cleaned_data)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+    def clean_nuts_code(self):
+        value = (self.cleaned_data.get("nuts_code") or "").strip()
+        if not value:
+            raise forms.ValidationError("Select a NUTS level 2 region.")
+        if hasattr(self, "_valid_nuts_codes") and value not in self._valid_nuts_codes:
+            raise forms.ValidationError("Choose a valid synced NUTS level 2 code from the suggestions.")
+        return value
 
 
 class ScioModelNameDuplicateFilter(admin.SimpleListFilter):
@@ -81,8 +225,8 @@ class ConceptAdmin(ApiSyncedReadOnlyAdmin):
     @admin.display(description="Ambrosia Supported", ordering="ambrosia_supported")
     def ambrosia_supported_badge(self, obj):
         if obj.ambrosia_supported:
-            return format_html('<span style="color:#16a34a;font-weight:700;">✓</span>')
-        return format_html('<span style="color:#ef4444;font-weight:700;">✗</span>')
+            return format_html('<span style="color:#16a34a;font-weight:700;">{}</span>', "✓")
+        return format_html('<span style="color:#ef4444;font-weight:700;">{}</span>', "✗")
 
 @admin.register(PlantConcept)
 class PlantConceptAdmin(ConceptAdmin):
@@ -120,8 +264,8 @@ class ScioModelAdmin(ApiSyncedReadOnlyAdmin):
     def duplicate_name_badge(self, obj):
         is_dup = ScioModel.objects.filter(name=obj.name).exclude(pk=obj.pk).exists()
         if is_dup:
-            return format_html('<span style="color:#ef4444;font-weight:700;">Duplicate</span>')
-        return format_html('<span style="color:#16a34a;font-weight:700;">Unique</span>')
+            return format_html('<span style="color:#ef4444;font-weight:700;">{}</span>', "Duplicate")
+        return format_html('<span style="color:#16a34a;font-weight:700;">{}</span>', "Unique")
 
 # @admin.register(CropMaster)
 # class CropMasterAdmin(admin.ModelAdmin):
@@ -221,11 +365,11 @@ class ScioModelAdmin(ApiSyncedReadOnlyAdmin):
 #     search_fields = ("name",)
 #
 #
-# @admin.register(UserProfile)
-# class UserProfileAdmin(admin.ModelAdmin):
-#     list_display = ("user", "role")
-#     search_fields = ("user__username", "user__email", "role__name")
-#     autocomplete_fields = ("user", "role")
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "dashboard_mode")
+    search_fields = ("user__username", "user__email", "dashboard_mode__label", "dashboard_mode__code")
+    autocomplete_fields = ("user", "dashboard_mode")
 
 @admin.register(DashboardViewMode)
 class DashboardViewModeAdmin(admin.ModelAdmin):
@@ -265,9 +409,79 @@ class SidebarChartLinkAdmin(admin.ModelAdmin):
     ordering = ("menu_code", "order")
 
 
+@admin.register(ToxinQuerySpec)
+class ToxinQuerySpecAdmin(admin.ModelAdmin):
+    form = ToxinQuerySpecAdminForm
+    list_display = ("name", "plant", "pathogen", "nuts_code", "start_date", "end_date", "last_synced_at", "status")
+    list_filter = ("status", "nuts_code", "plant", "pathogen")
+    search_fields = ("name", "plant", "pathogen", "nuts_code")
+    actions = ("sync_selected_specs",)
+    readonly_fields = ("last_synced_at",)
+    exclude = ("deleted_at",)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "status",
+                    "plant",
+                    "pathogen",
+                    "nuts_code",
+                    "start_date",
+                    "end_date",
+                    "time_scale",
+                    "last_synced_at",
+                )
+            },
+        ),
+    )
+
+    @admin.action(description="Sync selected toxin datasets")
+    def sync_selected_specs(self, request, queryset):
+        if not _toxin_sync_queue_available():
+            self.message_user(
+                request,
+                "Background toxin sync is not configured. Set CELERY_BROKER_URL and start a Celery worker.",
+                level=messages.ERROR,
+            )
+            return
+
+        queued = 0
+        for spec in queryset:
+            try:
+                sync_toxin_query_spec_task.delay(spec.pk)
+                queued += 1
+                self.message_user(
+                    request,
+                    f"{spec.name}: toxin sync queued in background.",
+                    level=messages.SUCCESS,
+                )
+            except Exception as exc:
+                self.message_user(request, f"{spec.name} could not be queued: {exc}", level=messages.ERROR)
+        if not queued:
+            self.message_user(request, "No toxin datasets were queued.", level=messages.WARNING)
+
+
+@admin.register(ToxinConcentrationRecord)
+class ToxinConcentrationRecordAdmin(admin.ModelAdmin):
+    list_display = ("plant", "pathogen", "nuts_code", "observed_on", "toxin_value", "temperature_c", "status", "updated_at")
+    list_filter = ("status", "plant", "pathogen", "nuts_code")
+    search_fields = ("plant", "pathogen", "nuts_code", "source_time", "source_period", "provenance_model_title")
+    readonly_fields = (
+        "plant", "pathogen", "nuts_code", "observed_on", "source_time", "source_period",
+        "toxin_value", "temperature_c", "outcome", "provenance_model_id", "provenance_model_title",
+        "provenance_variable_name", "provenance_fetched_at_ms", "source_payload", "status",
+        "deleted_at", "created_at", "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
 admin.site.site_header = "Ambrosia Dashboard Admin"
 admin.site.site_title = "Ambrosia Admin"
 admin.site.index_title = "Administration"
+admin.site.login_form = EmailOrUsernameAdminAuthenticationForm
 
 
 # Split SCiO vocabulary models into their own section on admin index.
@@ -290,10 +504,14 @@ def _custom_get_app_list(request, app_label=None):
         "ConceptHistory",
         "PlantConcept",
         "PathogenConcept",
+        "ToxinQuerySpec",
+        "ToxinConcentrationRecord",
     }
     scio_order = {
         "ScioModel": 1,
         "NutsRegion": 2,
+        "ToxinQuerySpec": 3,
+        "ToxinConcentrationRecord": 4,
         "Scheme": 3,
         "Vocabulary": 4,
         "Concept": 5,
@@ -447,6 +665,36 @@ def _sync_models_view(request):
     return redirect("admin:index")
 
 
+def _sync_toxin_specs_view(request):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    if not _toxin_sync_queue_available():
+        messages.error(request, "Background toxin sync is not configured. Set CELERY_BROKER_URL and start a Celery worker.")
+        return redirect("admin:index")
+
+    specs = ToxinQuerySpec.active_objects.all()
+    if not specs.exists():
+        messages.warning(request, "No active toxin query specs are configured.")
+        return redirect("admin:index")
+
+    queued = 0
+    try:
+        for spec in specs:
+            sync_toxin_query_spec_task.delay(spec.pk)
+            queued += 1
+    except Exception as exc:
+        messages.error(request, f"toxin sync queueing failed: {exc}")
+        return redirect("admin:index")
+
+    if queued:
+        messages.success(request, f"Queued {queued} toxin sync task(s) in the background.")
+    else:
+        messages.warning(request, "No toxin datasets were queued.")
+
+    return redirect("admin:index")
+
+
 _ORIGINAL_GET_URLS = admin.site.get_urls
 
 
@@ -496,6 +744,11 @@ def _custom_get_urls():
             "sync-models/",
             admin.site.admin_view(_sync_models_view),
             name="sync-models",
+        ),
+        path(
+            "sync-toxin/",
+            admin.site.admin_view(_sync_toxin_specs_view),
+            name="sync-toxin",
         ),
     ]
     return custom_urls + _ORIGINAL_GET_URLS()

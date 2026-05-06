@@ -1,15 +1,14 @@
 # config/urls.py
 
 from django.contrib import admin
-from django.urls import path, include, re_path
+from django.urls import path, include
 
-from .views import status_view, disabled_auth_view
+from .views import status_view
 
 from lumenix.views.profile import CompleteProfileView
 
 urlpatterns = [
     path("status", status_view),
-    re_path(r"^accounts/password/reset(?:/.*)?$", disabled_auth_view, name="account_reset_password"),
 
     path('admin/', admin.site.urls),
 

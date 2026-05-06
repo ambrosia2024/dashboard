@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
 from urllib.parse import quote
+from allauth.account.models import EmailAddress
 
 from lumenix.security import is_locked, record_failure, record_success, register_attempt
 
@@ -37,6 +38,7 @@ class EnforceProfileCompletionMiddleware:
             login_url = reverse("account_login")
             signup_url = reverse("account_signup")
             reset_url = reverse("account_reset_password")
+            verification_sent_url = reverse("account_email_verification_sent")
         except Exception:
             return None
 
@@ -45,15 +47,28 @@ class EnforceProfileCompletionMiddleware:
             login_url,
             signup_url,
             reset_url,
+            verification_sent_url,
             "/admin/login/",
         }
 
         if user.is_authenticated:
+            if self._verification_required(user):
+                return None
+
             missing_names = not user.first_name or not user.last_name
             if missing_names and path not in exempt_paths:
                 return redirect("account_complete_profile")
 
         return None
+
+    def _verification_required(self, user):
+        if getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "none") != "mandatory":
+            return False
+
+        if not getattr(user, "email", ""):
+            return False
+
+        return not EmailAddress.objects.filter(user=user, email__iexact=user.email, verified=True).exists()
 
 
 class AdminLoginProtectionMiddleware:

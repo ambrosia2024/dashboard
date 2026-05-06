@@ -3,6 +3,7 @@
 from allauth.account.forms import LoginForm
 from django import forms
 from django.conf import settings
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth import get_user_model
 
 from lumenix.security import (
@@ -75,7 +76,8 @@ class SecureLoginForm(LoginForm):
 
         self.challenge_required = should_require_challenge(self.request, login_value)
         if self.challenge_required:
-            question, _ = get_or_create_challenge(self.request)
+            rotate_on_get = getattr(self.request, "method", "GET").upper() == "GET"
+            question, _ = get_or_create_challenge(self.request, rotate=rotate_on_get)
             self.fields["challenge_answer"].required = True
             self.fields["challenge_answer"].label = f"Security check: {question} = ?"
         else:
@@ -105,8 +107,6 @@ class SecureLoginForm(LoginForm):
             cleaned_data = super().clean()
         except forms.ValidationError:
             record_failure(self.request, login_value)
-            # Rotate challenge so replayed answers do not work.
-            get_or_create_challenge(self.request, rotate=True)
             raise
 
         # Adaptive security check after suspicious behavior.
@@ -114,7 +114,6 @@ class SecureLoginForm(LoginForm):
             answer = self.data.get("challenge_answer")
             if not validate_challenge(self.request, answer):
                 record_failure(self.request, login_value)
-                get_or_create_challenge(self.request, rotate=True)
                 raise forms.ValidationError(self.error_messages["challenge"])
 
         if self.recaptcha_enabled:
@@ -126,6 +125,22 @@ class SecureLoginForm(LoginForm):
         record_success(self.request, cleaned_data.get("login") or login_value)
         self.request.session.pop("login_challenge", None)
         return cleaned_data
+
+
+class EmailOrUsernameAdminAuthenticationForm(AdminAuthenticationForm):
+    """
+    Admin login form that accepts either username or email in the identifier field.
+    """
+
+    error_messages = {
+        **AdminAuthenticationForm.error_messages,
+        "invalid_login": "Please enter a valid email or username and password for a staff account. Both fields may be case-sensitive.",
+    }
+
+    def __init__(self, request=None, *args, **kwargs):
+        super().__init__(request, *args, **kwargs)
+        self.fields["username"].label = "Email or username"
+        self.fields["username"].widget.attrs["autofocus"] = True
 
 # from allauth.account.forms import SignupForm, LoginForm
 #

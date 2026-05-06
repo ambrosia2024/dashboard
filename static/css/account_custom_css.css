@@ -208,6 +208,38 @@ button[type="submit"]:active {
     text-align: center;
 }
 
+.small {
+    margin-top: -0.35rem;
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #6b7280;
+    text-align: center;
+}
+
+.button-back,
+.button-back:visited {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid #d7e3ff;
+    background: #f8fbff;
+    color: #376EB5;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+
+.button-back:hover,
+.button-back:focus-visible {
+    border-color: #376EB5;
+    background: #eef5ff;
+    transform: translateY(-1px);
+}
+
 .logout-form {
     margin-top: 0.4rem;
 }
@@ -226,4 +258,3 @@ button[type="submit"]:active {
 .logout-form .link-button:hover {
     text-decoration: underline;
 }
-

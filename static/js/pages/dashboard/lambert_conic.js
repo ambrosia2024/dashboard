@@ -6,6 +6,32 @@ function fixCoordinate(coord, decimals = 6) {
     return null;  // Return null for invalid numbers
 }
 
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const FALLBACK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+function addSafeBaseLayer(map) {
+    let switchedToFallback = false;
+    const layer = L.tileLayer(OSM_TILE_URL, {
+        attribution: '&copy; OpenStreetMap contributors',
+        referrerPolicy: 'strict-origin-when-cross-origin'
+    });
+
+    layer.on('tileerror', () => {
+        if (switchedToFallback) {
+            return;
+        }
+
+        switchedToFallback = true;
+        map.removeLayer(layer);
+        L.tileLayer(FALLBACK_TILE_URL, {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd'
+        }).addTo(map);
+    });
+
+    layer.addTo(map);
+}
+
 $(document).ready(function () {
     // Ensure Proj4Leaflet is properly loaded
     if (typeof L.Proj === "undefined") {
@@ -31,10 +57,8 @@ $(document).ready(function () {
         zoom: 3
     });
 
-    // Add OpenStreetMap as base layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    // Add a base layer with fallback when OSM blocks unaffiliated tile usage
+    addSafeBaseLayer(map);
 
     // Fetch climate data from Django API
     $.getJSON("/api/climate-data/", function (geojsonData) {

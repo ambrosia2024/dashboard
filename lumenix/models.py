@@ -471,6 +471,34 @@ class DashboardViewMode(BaseModel):
         self.full_clean()  # ensures clean() runs
         super().save(*args, **kwargs)
 
+
+class UserProfile(models.Model):
+    """
+    Per-user account metadata. For the dashboard use case this is where we assign
+    the user's fixed dashboard mode instead of trusting a self-selected view.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+    dashboard_mode = models.ForeignKey(
+        DashboardViewMode,
+        on_delete=models.PROTECT,
+        related_name="assigned_users",
+        null=True,
+        blank=True,
+        help_text="Assigned dashboard view for this user. When set, it overrides the cookie-based selector.",
+    )
+
+    class Meta:
+        db_table = "user_profiles"
+
+    def __str__(self):
+        if self.dashboard_mode_id:
+            return f"{self.user} ({self.dashboard_mode})"
+        return str(self.user)
+
 class DashboardChart(BaseModel):
     """
     One chart/widget that can be placed onto the dashboard in one or more modes.
@@ -583,3 +611,73 @@ class SidebarChartLink(BaseModel):
         reserved = {"dashboard", "ipcc-dashboard", "risk-charts"}
         if (self.menu_code or "").strip().lower() in reserved:
             raise ValidationError({"menu_code": "This menu code is reserved by built-in sidebar menus."})
+
+
+class ToxinQuerySpec(BaseModel):
+    """
+    Admin-managed query definition for syncing toxin concentration data from SCiO.
+    """
+
+    TIME_SCALE_CHOICES = [
+        ("daily", "Daily"),
+    ]
+
+    name = models.CharField(max_length=200, unique=True)
+    plant = models.SlugField(max_length=100, help_text="SCiO plant identifier, e.g. 'lettuce'.")
+    pathogen = models.SlugField(max_length=100, help_text="SCiO pathogen identifier, e.g. 'salmonella'.")
+    nuts_code = models.CharField(max_length=32, help_text="NUTS code, e.g. 'AL' or 'NL42'.")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    time_scale = models.CharField(max_length=20, choices=TIME_SCALE_CHOICES, default="daily")
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "toxin_query_specs"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["plant", "pathogen", "nuts_code", "start_date", "end_date", "time_scale"],
+                name="uq_toxin_query_spec_scope",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError({"end_date": "End date must be on or after start date."})
+
+
+class ToxinConcentrationRecord(BaseModel):
+    """
+    Local cache of daily toxin concentration query results from SCiO.
+    """
+
+    plant = models.SlugField(max_length=100, db_index=True)
+    pathogen = models.SlugField(max_length=100, db_index=True)
+    nuts_code = models.CharField(max_length=32, db_index=True)
+    observed_on = models.DateField(db_index=True)
+    source_time = models.CharField(max_length=64, blank=True, default="")
+    source_period = models.CharField(max_length=64, blank=True, default="")
+    toxin_value = models.FloatField(null=True, blank=True)
+    temperature_c = models.FloatField(null=True, blank=True)
+    outcome = models.JSONField(default=list, blank=True)
+    provenance_model_id = models.CharField(max_length=128, blank=True, default="")
+    provenance_model_title = models.CharField(max_length=512, blank=True, default="")
+    provenance_variable_name = models.CharField(max_length=128, blank=True, default="")
+    provenance_fetched_at_ms = models.BigIntegerField(null=True, blank=True)
+    source_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "toxin_concentration_records"
+        ordering = ["observed_on"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["plant", "pathogen", "nuts_code", "observed_on"],
+                name="uq_toxin_record_scope_day",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.plant}/{self.pathogen}/{self.nuts_code} @ {self.observed_on}"
