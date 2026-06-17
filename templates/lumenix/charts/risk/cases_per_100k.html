@@ -1,0 +1,73 @@
+{# templates/lumenix/charts/risk/cases_per_100k.html #}
+{% load json_extras %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="d-flex align-items-center gap-2 mb-3">
+                    <span>{{ chart_config.title|default:"Cases per 100k vs time" }}</span>
+                    {% if chart_config.data_source == 'real' %}
+                    <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
+                    {% else %}
+                    <span class="chart-data-badge is-demo" title="Illustrative / generated values – not real surveillance data">Demo data</span>
+                    {% endif %}
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download cases chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="cases" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
+                </h4>
+
+                <div id="casesChart" style="height: 360px;"></div>
+
+                <div id="casesExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'lumenix/partials/_ambra_chat.html' with chart_identifier=chart_identifier|default:'c4_cases_per_100k' %}
+
+<!-- Bootstrap 5 modal for cases data assumptions -->
+<div class="modal fade" id="casesAssumptionsModal" tabindex="-1" aria-labelledby="casesAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="casesAssumptionsLabel">Data assumptions – cases per 100k</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>Data is <strong>simulated</strong> from the same monthly series as the other risk charts.</li>
+                    <li>Cases per 100k are <strong>calculated</strong>, not reported.</li>
+                    <li>We assume about <strong>40,000 people exposed per 100,000</strong> in a month.</li>
+                    <li>So: <code>cases_per_100k ≈ (probability % / 100) × 40,000</code>, then rounded.</li>
+                    <li>We also show a short rolling average to smooth jumps between months.</li>
+                    <li>This is to show trends in the demo data, not real surveillance numbers.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ chart_config|json_script:"casesChartCfg" }}

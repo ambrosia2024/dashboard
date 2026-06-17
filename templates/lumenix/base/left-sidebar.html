@@ -8,6 +8,42 @@
         <!--- Sidemenu -->
         <div id="sidebar-menu">
             <ul class="metismenu list-unstyled" id="side-menu">
+
+                {% comment %}
+                  DATA-DRIVEN MENU — built from AdminMenuMaster (managed in
+                  Django admin: Lumenix -> Admin Menu Master). Add/edit menu
+                  items there; no template changes needed.
+                {% endcomment %}
+                {% admin_menu_tree as menu_nodes %}
+                {% for node in menu_nodes %}
+                  {% if node.is_parent %}
+                  <li class="{% if node.active %}mm-active{% endif %}">
+                    <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                      <i data-feather="{{ node.icon }}"></i>
+                      <span>{{ node.name }}</span>
+                    </a>
+                    <ul class="sub-menu mm-collapse" aria-expanded="false">
+                      {% for child in node.children %}
+                      <li class="{% if child.active %}mm-active{% endif %}">
+                        <a href="{{ child.url }}"{% if child.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ child.name }}</a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </li>
+                  {% else %}
+                  <li class="{% if node.active %}mm-active{% endif %}">
+                    <a href="{{ node.url }}"{% if node.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                      <i data-feather="{{ node.icon }}"></i>
+                      <span>{{ node.name }}</span>
+                    </a>
+                  </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% comment %}
+                  LEGACY STATIC MENU — replaced by the data-driven menu above.
+                  Kept for reference only; do NOT delete.
+
                 <li class="{% if request.resolver_match.url_name == 'dashboard' %}mm-active{% endif %}">
                     <a href="{% url 'dashboard' %}">
                         <i data-feather="home"></i>
@@ -56,6 +92,7 @@
                 </li>
                 {% endwith %}
                 {% endfor %}
+                {% endcomment %}
             </ul>
         </div>
         <!-- End Sidemenu -->

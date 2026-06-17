@@ -47,3 +47,9 @@ api_test/
 pidrive/
 
 /*.nc
+
+deliverables/
+docs/
+
+# Ignore markdown docs (every level — none are needed at runtime)
+**/*.md

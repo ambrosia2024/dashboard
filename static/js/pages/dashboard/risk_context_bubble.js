@@ -16,6 +16,71 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(value || "");
   }
 
+  const CTX_AIR_DP_LOCALE = {
+    days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    daysMin: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+    months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    today: "Today",
+    clear: "Clear",
+    dateFormat: "yyyy-MM-dd",
+    timeFormat: "",
+    firstDay: 1,
+  };
+
+  function ctxIsoToLocalDate(iso) {
+    if (!isISODate(iso)) return null;
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // Set an ISO value on a context date input, keeping the Air Datepicker
+  // selection in sync when present. Empty/invalid clears it; never re-fires
+  // onSelect.
+  function setCtxDateValue(el, isoValue) {
+    if (!el) return;
+    const next = isISODate(isoValue) ? isoValue : "";
+    if (el._airDp) {
+      if (next) el._airDp.selectDate(ctxIsoToLocalDate(next), { silent: true });
+      else el._airDp.clear({ silent: true });
+    } else {
+      el.value = next;
+    }
+  }
+
+  // Enhance the context-panel date inputs with Air Datepicker where it is loaded
+  // (risk pages). Inputs keep an ISO (Y-m-d) value via dateFormat, so every
+  // read/write site keeps working. On pages without it the inputs fall back to
+  // the native date picker unchanged.
+  function initCtxAirDatepicker(onChange) {
+    if (typeof window.AirDatepicker !== "function") return;
+    const handleChange = typeof onChange === "function" ? () => onChange() : undefined;
+    ["ctx-start", "ctx-end"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el || el._airDp) return;
+      const initialIso = el.value;
+      el.type = "text";
+      el.readOnly = true;
+      el.autocomplete = "off";
+      el._airDp = new window.AirDatepicker(el, {
+        locale: CTX_AIR_DP_LOCALE,
+        dateFormat: "yyyy-MM-dd",
+        autoClose: true,
+        isMobile: false,
+        position: "bottom left",
+        navTitles: { days: "MMMM yyyy" },
+        // Single-date filter: never unselect on re-click (and don't let a
+        // programmatic re-apply toggle the picked date back off).
+        toggleSelected: false,
+        selectedDates: isISODate(initialIso) ? [ctxIsoToLocalDate(initialIso)] : undefined,
+        onSelect: handleChange ? () => handleChange() : undefined,
+      });
+      const labelText = document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim();
+      if (labelText) el.setAttribute("aria-label", labelText);
+    });
+  }
+
   function currentRouteName() {
     const p = window.location.pathname || "";
     if (p.startsWith("/risk-charts/")) return "risk";
@@ -136,7 +201,7 @@
     if (isISODate(endEl.value)) startEl.max = endEl.value;
     else startEl.removeAttribute("max");
     if (isISODate(startEl.value) && isISODate(endEl.value) && startEl.value > endEl.value) {
-      endEl.value = startEl.value;
+      setCtxDateValue(endEl, startEl.value);
       endEl.min = startEl.value;
     }
   }
@@ -156,8 +221,8 @@
     loc.value = localStorage.getItem(LS_KEY_LOCATION) || "";
     crop.value = localStorage.getItem(LS_KEY_CROP) || "";
     hazard.value = localStorage.getItem(LS_KEY_PATHOGEN) || "";
-    start.value = isISODate(qs) ? qs : (localStorage.getItem(LS_KEY_START) || "");
-    end.value = isISODate(qe) ? qe : (localStorage.getItem(LS_KEY_END) || "");
+    setCtxDateValue(start, isISODate(qs) ? qs : (localStorage.getItem(LS_KEY_START) || ""));
+    setCtxDateValue(end, isISODate(qe) ? qe : (localStorage.getItem(LS_KEY_END) || ""));
 
     syncRangeGuards(start, end);
     const nutsId = localStorage.getItem(LS_KEY_NUTS2_ID) || "";
@@ -220,8 +285,15 @@
     const rmEnd = document.getElementById("rm-end");
     if (!rmStart || !rmEnd) return;
 
-    if (isISODate(startVal)) rmStart.value = startVal;
-    if (isISODate(endVal)) rmEnd.value = endVal;
+    // Keep the Air Datepicker selection in sync when present; otherwise set the raw value.
+    if (isISODate(startVal)) {
+      if (rmStart._airDp) rmStart._airDp.selectDate(ctxIsoToLocalDate(startVal), { silent: true });
+      else rmStart.value = startVal;
+    }
+    if (isISODate(endVal)) {
+      if (rmEnd._airDp) rmEnd._airDp.selectDate(ctxIsoToLocalDate(endVal), { silent: true });
+      else rmEnd.value = endVal;
+    }
     rmStart.dispatchEvent(new Event("input", { bubbles: true }));
     rmEnd.dispatchEvent(new Event("input", { bubbles: true }));
   }
@@ -332,6 +404,8 @@
     if (!panel) return;
 
     hydratePanel();
+    // Enhance with Air Datepicker after hydratePanel has set the initial values.
+    initCtxAirDatepicker(() => syncRangeGuards(start, end));
 
     fab?.addEventListener("click", () => setPanelOpen(panel, !panel.classList.contains("is-open")));
     inlineOpen?.addEventListener("click", () => setPanelOpen(panel, true));

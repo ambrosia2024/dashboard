@@ -1,0 +1,44 @@
+{% comment %}
+templates/lumenix/partials/_ambra_chat.html
+Reusable, prominent "Ask Ambra" experience for a single chart page:
+a floating action button (FAB) that opens a right-side slide-over drawer.
+Keeps the #c1-chat-* element ids so init.js initC1ChartChat() drives it.
+Pass: chart_identifier (the DashboardChart identifier this chat is about).
+{% endcomment %}
+
+<button id="ambra-fab" type="button" class="ambra-fab" aria-label="Ask Ambra about this chart" title="Ask Ambra about this chart">
+    <span class="ambra-fab-icon" aria-hidden="true">✨</span>
+    <span class="ambra-fab-text">Ask Ambra</span>
+</button>
+
+<div id="ambra-backdrop" class="ambra-backdrop" aria-hidden="true"></div>
+
+<aside id="c1-chat-panel" class="ambra-drawer" role="dialog" aria-label="Ask Ambra about this chart" aria-modal="false">
+    <div class="ambra-drawer-header">
+        <h5 class="mb-0 d-flex align-items-center gap-2"><span aria-hidden="true">✨</span> Ask Ambra</h5>
+        <div class="d-flex align-items-center gap-2">
+            <button id="c1-chat-download" type="button" class="btn btn-outline-secondary btn-sm" disabled>Download (.txt)</button>
+            <button id="ambra-close" type="button" class="btn-close" aria-label="Close Ambra"></button>
+        </div>
+    </div>
+
+    <p class="text-muted small px-3 pt-2 mb-2">Ambra answers only about the current chart.</p>
+
+    <div id="c1-chat-thread" class="ambra-drawer-thread"></div>
+
+    <form id="c1-chat-form" class="ambra-drawer-form" data-chart-identifier="{{ chart_identifier }}">
+        {% csrf_token %}
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="Summarize this chart">Summarize this chart</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="What is the trend?">What is the trend?</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="Any limit exceedances?">Any limit exceedances?</button>
+        </div>
+        <textarea id="c1-chat-input" class="form-control mb-2" rows="2" maxlength="1000"
+                  placeholder="Ask about this chart — trends, peaks, baseline shifts, crop/hazard context…"></textarea>
+        <div class="d-flex justify-content-between align-items-center">
+            <span id="c1-chat-char-count" class="small text-muted">0/1000</span>
+            <button id="c1-chat-send" type="submit" class="btn btn-primary btn-sm">Send</button>
+        </div>
+        <p class="text-muted small mt-2 mb-0">Ambra can make mistakes. Please verify responses before relying on them.</p>
+    </form>
+</aside>

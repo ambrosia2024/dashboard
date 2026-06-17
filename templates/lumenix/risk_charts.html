@@ -7,6 +7,51 @@
 {% block extra_css %}
     {# Leaflet CSS stays here since the map needs it #}
     <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+    <style>
+        .risk-chart-loading-shell {
+            position: relative;
+        }
+
+        .risk-chart-loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(2px);
+            border-radius: 10px;
+            z-index: 5;
+        }
+
+        .risk-chart-loading-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(17, 24, 39, 0.84);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+        }
+
+        .risk-chart-loading-spinner {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.28);
+            border-top-color: #fff;
+            animation: riskChartSpin 0.8s linear infinite;
+        }
+
+        @keyframes riskChartSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 {% endblock extra_css %}
 
 {% block content %}
@@ -16,5 +61,8 @@
 {% endblock content %}
 
 {% block extra_js %}
+    <script>
+      window.__AMBROSIA_SELECTED_RISK_CHART = null;
+    </script>
     {% include 'lumenix/partials/_risk_scripts.html' %}
 {% endblock extra_js %}

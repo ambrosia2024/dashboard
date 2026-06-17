@@ -1,4 +1,4 @@
-// Simple line with baseline-relative colouring and optional threshold.
+// Simple line for pathogen model output.
 window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
     const BRAND_BLUE = '#376EB5';
     const el = document.getElementById(domId);
@@ -10,24 +10,27 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
     }
 
     const x = rows.map(r => r.date);
-    const y = rows.map(r => r.pathogen_conc_units_per_g ?? 0);
-    if (y.every(v => v === 0)) {
-        console.warn('Pathogen chart: pathogen_conc_units_per_g missing in data.');
+    const y = rows.map(r => r.pathogen_model_value ?? null);
+    const unit = rows.find(r => r.pathogen_model_unit)?.pathogen_model_unit || 'model output';
+
+    if (!rows.length) {
+        chart.clear();
+        chart.setOption({
+            title: { text: '', subtext: pairLabel },
+            xAxis: { type: 'category', data: [] },
+            yAxis: { type: 'value', name: unit },
+            graphic: {
+                type: 'text',
+                left: 'center',
+                top: 'middle',
+                style: { text: 'No synced data for the selected filters', fill: '#667085', fontSize: 14 }
+            },
+            series: []
+        }, { notMerge: true });
+        window.__pathogenChartInstance = chart;
+        window.__pathogenRowsCurrent = [];
+        return;
     }
-
-    // Baseline = first point in the selected series (Jack’s rule)
-    const baseline = y.length ? y[0] : null;
-
-    function classifyBand(curr, base) {
-        if (base <= 0 || base == null) return 'significant';
-        const inc = ((curr - base) / base) * 100;
-        if (inc < 10)  return 'small';
-        if (inc < 25)  return 'moderate';
-        if (inc < 50)  return 'large';
-        return 'significant';
-    }
-
-    const colourFor = band => ({small:'#6cc070',moderate:'#ffbf00',large:'#ff7f0e',significant:'#d62728'})[band];
 
     chart.setOption({
         animationDuration: 320,
@@ -39,22 +42,20 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
             trigger: 'axis',
             formatter: (p) => {
                 const i = p[0].dataIndex;
+                const r = rows[i] || {};
                 const v = y[i];
-                const inc = baseline ? (((v - baseline) / baseline) * 100).toFixed(1) : '-';
-                return `<strong>${x[i]}</strong><br>Conc: <strong>${v}</strong><br>Baseline: ${baseline ?? '-'}<br>Δ vs baseline: ${inc}%`;
+                const temp = r.temperature_c == null ? '' : `<br>Temperature: <strong>${r.temperature_c}</strong>`;
+                return `<strong>${x[i]}</strong><br>Model value: <strong>${v}</strong> ${unit}${temp}`;
             }
         },
         xAxis: { type: 'category', data: x, boundaryGap: false },
-        yAxis: { type: 'value', name: 'units/g' },
+        yAxis: { type: 'value', name: unit },
         series: [{
             type: 'line',
             showSymbol: false,
             smooth: true,
             lineStyle: { width: 2, color: BRAND_BLUE },
-            data: y.map(v => ({
-                value: v,
-                itemStyle: { color: colourFor(classifyBand(v, baseline)) }
-            }))
+            data: y
         }]
     }, { notMerge: false, lazyUpdate: true });
 
