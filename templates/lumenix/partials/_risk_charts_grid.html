@@ -31,7 +31,15 @@
                         </ul>
                     </div>
                 </h4>
-                <div id="toxinsChart" style="height: 360px;"></div>
+                <div class="risk-chart-loading-shell">
+                    <div id="toxinsChart" style="height: 360px;"></div>
+                    <div id="toxinsChartLoadingOverlay" class="risk-chart-loading-overlay d-none" aria-hidden="true">
+                        <div class="risk-chart-loading-badge">
+                            <span class="risk-chart-loading-spinner"></span>
+                            <span>Loading chart data…</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div id="toxinsChart3D" style="height: 480px; margin-top: 1rem; max-width: 100%;"></div>
 

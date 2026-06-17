@@ -1,0 +1,73 @@
+{# templates/lumenix/charts/risk/seasonal_heatmap.html #}
+{% load json_extras %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="d-flex align-items-center gap-2 mb-3">
+                    <span>{{ chart_config.title|default:"Seasonal heatmap (× baseline)" }}</span>
+                    {% if chart_config.data_source == 'real' %}
+                    <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
+                    {% else %}
+                    <span class="chart-data-badge is-demo" title="Illustrative / generated values – not monitoring data">Demo data</span>
+                    {% endif %}
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download seasonal heatmap"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="pdf">Download PDF</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Data</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="csv">Download CSV</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="seasonal" data-chart-export="xlsx">Download Excel</button></li>
+                        </ul>
+                    </div>
+                </h4>
+
+                <div id="seasonalHeatmap" style="height: 360px;"></div>
+
+                <div id="heatmapExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'lumenix/partials/_ambra_chat.html' with chart_identifier=chart_identifier|default:'c5_seasonal_heatmap' %}
+
+<!-- Bootstrap 5 modal for seasonal heatmap assumptions -->
+<div class="modal fade" id="seasonalAssumptionsModal" tabindex="-1" aria-labelledby="seasonalAssumptionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="seasonalAssumptionsLabel">Data assumptions – seasonal heatmap</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Data assumptions</strong></p>
+                <ul class="mb-3">
+                    <li>The heatmap uses the <strong>same simulated monthly rows</strong> as the other charts.</li>
+                    <li>Each cell is one month in one year (e.g. May 2023).</li>
+                    <li>By default we colour by the <strong>risk multiplier</strong> (current ÷ baseline).</li>
+                    <li>A value around 1 means “like baseline”; higher than 1 means “above baseline”.</li>
+                    <li>The colour scale is fixed (green → orange → red) just to make differences clear.</li>
+                    <li>All values are demo values, not monitoring data.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ chart_config|json_script:"seasonalChartCfg" }}

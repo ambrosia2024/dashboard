@@ -44,3 +44,9 @@ celerybeat-schedule
 data/celery/
 docs/
 docker-compose.prod.yml
+deliverables/
+
+# Markdown: ignore all .md at every level by default; allow-list only what we track.
+*.md
+!README.md
+!CHANGELOG.md

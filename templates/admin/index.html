@@ -18,7 +18,7 @@
   <div class="scio-sync-left">
     <div class="app-scio module">
       <table>
-        <caption>SCiO Sync - Vocabulary</caption>
+        <caption>Sync - Vocabulary</caption>
         <tbody>
           <tr class="model-sync-plants">
             <th scope="row">Sync Plants Vocabulary</th>
@@ -53,7 +53,7 @@
 
     <div class="app-scio module">
       <table>
-        <caption>SCiO Sync - NUTS</caption>
+        <caption>Sync Locations - NUTS Level</caption>
         <tbody>
           <tr class="model-sync-nuts0">
             <th scope="row">Sync NUTS Level 0</th>
@@ -106,7 +106,7 @@
 
     <div class="app-scio module">
       <table>
-        <caption>SCiO Sync - Models</caption>
+        <caption>Sync - Models</caption>
         <tbody>
           <tr class="model-sync-models">
             <th scope="row">Sync API Models</th>
@@ -123,15 +123,27 @@
 
     <div class="app-scio module">
       <table>
-        <caption>SCiO Sync - Toxin</caption>
+        <caption>Sync - Pathogen</caption>
         <tbody>
-          <tr class="model-sync-toxin">
-            <th scope="row">Sync Configured Toxin Datasets</th>
+          <tr class="model-generate-pathogen">
+            <th scope="row">Generate Pathogen Query Specs</th>
             <td>
-              <form method="post" action="{% url 'admin:sync-toxin' %}" style="display:inline;">
+              <a href="{% url 'admin:pathogen-bulk-generate' %}" class="button sync-cta">Generate Specs</a>
+            </td>
+          </tr>
+          <tr class="model-sync-pathogen">
+            <th scope="row">Sync Configured Pathogen Datasets</th>
+            <td>
+              <form method="post" action="{% url 'admin:sync-pathogen' %}" style="display:inline;">
                 {% csrf_token %}
-                <button type="submit" class="button default sync-cta">Sync Toxin</button>
+                <button type="submit" class="button default sync-cta">Sync Pathogen</button>
               </form>
+            </td>
+          </tr>
+          <tr class="model-delete-pathogen">
+            <th scope="row">Delete Pathogen Specs / Data</th>
+            <td>
+              <a href="{% url 'admin:pathogen-bulk-delete' %}" class="button sync-cta">Delete Data</a>
             </td>
           </tr>
         </tbody>

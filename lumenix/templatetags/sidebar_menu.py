@@ -1,8 +1,81 @@
 from django import template
+from django.urls import reverse, NoReverseMatch
 
-from lumenix.models import SidebarChartLink
+from lumenix.models import SidebarChartLink, AdminMenuMaster
 
 register = template.Library()
+
+
+def _resolve_menu_url(route):
+    """Resolve a menu_route to an href.
+
+    Accepts a Django URL name (e.g. 'dashboard'), an absolute path
+    ('/risk-charts/...'), or a full external URL ('https://...').
+    """
+    route = (route or "").strip()
+    if not route:
+        return ""
+    if route.startswith(("http://", "https://", "//", "/")):
+        return route
+    try:
+        return reverse(route)
+    except NoReverseMatch:
+        return route
+
+
+def _is_active(url, current_path):
+    if not url or url.startswith(("http://", "https://", "//")):
+        return False
+    return url.rstrip("/") == (current_path or "").rstrip("/")
+
+
+@register.simple_tag(takes_context=True)
+def admin_menu_tree(context):
+    """Build the sidebar tree from AdminMenuMaster (active rows only).
+
+    Returns a list of top-level nodes (Parent groups and clickable Items),
+    each Parent carrying its active Submenu children, with resolved urls and
+    an `active` flag derived from the current request path.
+    """
+    request = context.get("request")
+    current_path = getattr(request, "path", "") if request else ""
+
+    nodes = list(AdminMenuMaster.active_objects.order_by("order", "id"))
+    children_by_parent = {}
+    tops = []
+    for node in nodes:
+        if node.menu_type == AdminMenuMaster.MenuType.SUBMENU and node.parent_id:
+            children_by_parent.setdefault(node.parent_id, []).append(node)
+        elif node.menu_type in (AdminMenuMaster.MenuType.PARENT, AdminMenuMaster.MenuType.ITEM):
+            tops.append(node)
+
+    tree = []
+    for node in tops:
+        is_parent = node.menu_type == AdminMenuMaster.MenuType.PARENT
+        url = _resolve_menu_url(node.menu_route)
+        children = []
+        any_child_active = False
+        if is_parent:
+            for child in children_by_parent.get(node.id, []):
+                child_url = _resolve_menu_url(child.menu_route)
+                child_active = _is_active(child_url, current_path)
+                any_child_active = any_child_active or child_active
+                children.append({
+                    "name": child.menu_name,
+                    "url": child_url,
+                    "open_in_new_tab": child.open_in_new_tab,
+                    "active": child_active,
+                })
+        tree.append({
+            "name": node.menu_name,
+            "icon": node.menu_icon or "circle",
+            "url": url,
+            "is_parent": is_parent,
+            "open_in_new_tab": node.open_in_new_tab,
+            "active": any_child_active or _is_active(url, current_path),
+            "children": children,
+        })
+    return tree
 
 
 @register.simple_tag

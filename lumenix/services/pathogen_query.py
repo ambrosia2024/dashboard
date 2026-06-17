@@ -9,28 +9,58 @@ from django.utils import timezone
 
 from django.conf import settings
 
-from lumenix.models import ToxinConcentrationRecord, ToxinQuerySpec
+from lumenix.models import PathogenConcentrationRecord, PathogenQuerySpec
 
-URL = settings.SCIO_TOXIN_QUERY_URL
-DEFAULT_CHUNK_DAYS = max(1, int(getattr(settings, "SCIO_TOXIN_SYNC_CHUNK_DAYS", 7)))
-REQUEST_DELAY_SECONDS = max(0.0, float(getattr(settings, "SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS", 2)))
-MAX_RETRIES_PER_CHUNK = max(0, int(getattr(settings, "SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES", 2)))
-MAX_CONSECUTIVE_FAILURES = max(1, int(getattr(settings, "SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES", 5)))
+URL = settings.SCIO_PATHOGEN_QUERY_URL
+DEFAULT_CHUNK_DAYS = max(1, int(getattr(settings, "SCIO_PATHOGEN_SYNC_CHUNK_DAYS", 7)))
+REQUEST_DELAY_SECONDS = max(0.0, float(getattr(settings, "SCIO_PATHOGEN_SYNC_REQUEST_DELAY_SECONDS", 2)))
+MAX_RETRIES_PER_CHUNK = max(0, int(getattr(settings, "SCIO_PATHOGEN_SYNC_CHUNK_MAX_RETRIES", 2)))
+MAX_CONSECUTIVE_FAILURES = max(1, int(getattr(settings, "SCIO_PATHOGEN_SYNC_MAX_CONSECUTIVE_FAILURES", 5)))
 logger = logging.getLogger(__name__)
 
 
-def fetch_toxin_concentration(payload: dict) -> dict:
+def _is_missing_model_error(exc) -> bool:
+    """A 400 from the source API means the plant/pathogen pair has no model.
+
+    That's permanent and independent of the date range, so retrying the chunk
+    or trying other chunks is pointless — the whole spec should be abandoned.
+    """
+    response = getattr(exc, "response", None)
+    return bool(response is not None and getattr(response, "status_code", None) == 400)
+
+
+def _api_error_detail(response):
+    try:
+        data = response.json()
+    except ValueError:
+        return response.text.strip()
+
+    if isinstance(data, dict):
+        for key in ("error", "message", "detail"):
+            value = data.get(key)
+            if value:
+                return str(value)
+        return str(data)
+    return str(data)
+
+
+def fetch_pathogen_concentration(payload: dict) -> dict:
     response = requests.post(
         URL,
         json=payload,
         headers={"Accept": "application/json", "Content-Type": "application/json"},
         timeout=120,
     )
-    response.raise_for_status()
+    if not response.ok:
+        detail = _api_error_detail(response)
+        message = f"Pathogen concentration API failed ({response.status_code})"
+        if detail:
+            message = f"{message}: {detail}"
+        raise requests.HTTPError(message, response=response)
     return response.json()
 
 
-def normalize_toxin_response(data: dict) -> dict:
+def normalize_pathogen_response(data: dict) -> dict:
     request_meta = data.get("request") or {}
     provenance = data.get("provenance") or {}
     rows = []
@@ -38,7 +68,7 @@ def normalize_toxin_response(data: dict) -> dict:
     for item in data.get("results") or []:
         outcome = item.get("outcome") or []
         final_pair = outcome[-1] if outcome else [None, None]
-        toxin_value = final_pair[1] if len(final_pair) > 1 else None
+        pathogen_model_value = final_pair[1] if len(final_pair) > 1 else None
 
         date_value = (item.get("time") or item.get("period") or "")[:10]
         rows.append(
@@ -46,8 +76,8 @@ def normalize_toxin_response(data: dict) -> dict:
                 "date": date_value,
                 "crop": request_meta.get("plant") or "",
                 "pathogen": request_meta.get("pathogen") or "",
-                "toxin_level_ug_per_kg": toxin_value,
-                "toxin_limit_ug_per_kg": None,
+                "pathogen_model_value": pathogen_model_value,
+                "pathogen_model_unit": "model output",
                 "temperature_c": item.get("variable"),
                 "humidity_pct": None,
                 "event": "none",
@@ -92,15 +122,16 @@ def _chunk_date_range(start_date: date, end_date: date, chunk_days: int = DEFAUL
     return chunks
 
 
-def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
+def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
     created = updated = unchanged = fetched = 0
     seen_dates = set()
     failed_ranges = []
     successful_chunks = 0
     consecutive_failures = 0
+    model_missing = False
     chunks = _chunk_date_range(spec.start_date, spec.end_date)
     logger.info(
-        "Starting toxin sync for spec=%s name=%s chunks=%s range=%s..%s",
+        "Starting pathogen sync for spec=%s name=%s chunks=%s range=%s..%s",
         spec.pk,
         spec.name,
         len(chunks),
@@ -117,7 +148,7 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
             "timeScale": "daily",
         }
         logger.info(
-            "Toxin sync chunk start spec=%s chunk=%s/%s range=%s..%s",
+            "Pathogen sync chunk start spec=%s chunk=%s/%s range=%s..%s",
             spec.pk,
             index + 1,
             len(chunks),
@@ -128,15 +159,17 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
         last_exc = None
         for attempt in range(MAX_RETRIES_PER_CHUNK + 1):
             try:
-                raw = fetch_toxin_concentration(payload)
+                raw = fetch_pathogen_concentration(payload)
                 last_exc = None
                 break
             except requests.RequestException as exc:
                 last_exc = exc
+                if _is_missing_model_error(exc):
+                    break  # permanent: no model for this plant/pathogen — retrying won't help
                 if attempt < MAX_RETRIES_PER_CHUNK:
                     sleep_seconds = REQUEST_DELAY_SECONDS * (attempt + 1)
                     logger.warning(
-                        "Toxin sync chunk retry %s/%s for spec=%s range=%s..%s after error: %s",
+                        "Pathogen sync chunk retry %s/%s for spec=%s range=%s..%s after error: %s",
                         attempt + 1,
                         MAX_RETRIES_PER_CHUNK,
                         spec.pk,
@@ -147,6 +180,15 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
                     if sleep_seconds > 0:
                         time.sleep(sleep_seconds)
         if raw is None:
+            if _is_missing_model_error(last_exc):
+                model_missing = True
+                logger.warning(
+                    "Pathogen sync: no model for spec=%s plant=%s pathogen=%s — aborting spec (will be deactivated).",
+                    spec.pk,
+                    spec.plant,
+                    spec.pathogen,
+                )
+                break
             failed_ranges.append(
                 {
                     "startDate": chunk_start.isoformat(),
@@ -155,7 +197,7 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
                 }
             )
             logger.warning(
-                "Toxin sync chunk failed for spec=%s range=%s..%s: %s",
+                "Pathogen sync chunk failed for spec=%s range=%s..%s: %s",
                 spec.pk,
                 chunk_start,
                 chunk_end,
@@ -164,7 +206,7 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
             consecutive_failures += 1
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 logger.warning(
-                    "Stopping toxin sync early for spec=%s after %s consecutive failed chunks.",
+                    "Stopping pathogen sync early for spec=%s after %s consecutive failed chunks.",
                     spec.pk,
                     consecutive_failures,
                 )
@@ -190,24 +232,26 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
                 seen_dates.add(observed_on)
                 outcome = item.get("outcome") or []
                 final_pair = outcome[-1] if outcome else [None, None]
-                toxin_value = final_pair[1] if len(final_pair) > 1 else None
+                pathogen_model_value = final_pair[1] if len(final_pair) > 1 else None
 
                 defaults = {
                     "source_time": (item.get("time") or "").strip(),
                     "source_period": (item.get("period") or "").strip(),
-                    "toxin_value": toxin_value,
+                    "pathogen_model_value": pathogen_model_value,
                     "temperature_c": item.get("variable"),
                     "outcome": outcome,
                     "provenance_model_id": provenance.get("model_id") or "",
                     "provenance_model_title": provenance.get("model_title") or "",
                     "provenance_variable_name": provenance.get("variable_name") or "",
                     "provenance_fetched_at_ms": provenance.get("fetched_at"),
+                    "request_payload": request_meta,
+                    "provenance_payload": provenance,
                     "source_payload": item,
                     "status": 1,
                     "deleted_at": None,
                 }
 
-                obj, was_created = ToxinConcentrationRecord.objects.select_for_update().get_or_create(
+                obj, was_created = PathogenConcentrationRecord.objects.select_for_update().get_or_create(
                     plant=request_meta.get("plant") or spec.plant,
                     pathogen=request_meta.get("pathogen") or spec.pathogen,
                     nuts_code=item.get("nuts_code") or request_meta.get("nutsCode") or spec.nuts_code,
@@ -231,7 +275,7 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
                     chunk_unchanged += 1
 
         logger.info(
-            "Toxin sync chunk success spec=%s chunk=%s/%s range=%s..%s fetched=%s created=%s updated=%s unchanged=%s",
+            "Pathogen sync chunk success spec=%s chunk=%s/%s range=%s..%s fetched=%s created=%s updated=%s unchanged=%s",
             spec.pk,
             index + 1,
             len(chunks),
@@ -258,9 +302,10 @@ def sync_toxin_query_spec(spec: ToxinQuerySpec) -> dict:
         "successful_chunks": successful_chunks,
         "failed_chunks": len(failed_ranges),
         "failed_ranges": failed_ranges,
+        "model_missing": model_missing,
     }
     logger.info(
-        "Finished toxin sync for spec=%s name=%s fetched=%s created=%s updated=%s unchanged=%s successful_chunks=%s failed_chunks=%s",
+        "Finished pathogen sync for spec=%s name=%s fetched=%s created=%s updated=%s unchanged=%s successful_chunks=%s failed_chunks=%s",
         spec.pk,
         spec.name,
         fetched,

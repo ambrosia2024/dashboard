@@ -161,6 +161,16 @@ The application supports customizable dashboard layouts:
 ## 🛠️ Development
 
 ### Local Development (Without Docker)
+Use the helper script to create or synchronize the local virtual environment from `requirements.txt`:
+
+```bash
+# Recreate .venv from scratch
+scripts/sync_env.sh recreate
+
+# Or synchronize an existing .venv exactly to requirements.txt
+scripts/sync_env.sh sync
+```
+
 
 ```bash
 # Create virtual environment

@@ -42,7 +42,7 @@ services:
     environment:
       - RUNNING_IN_DOCKER=true
       - POSTGRES_HOST=ambrosia_postgres
-      - SCIO_TOXIN_SYNC_CHUNK_DAYS=7
+      - SCIO_PATHOGEN_SYNC_CHUNK_DAYS=7
     depends_on:
       ambrosia_postgres:
         condition: service_healthy
@@ -97,16 +97,16 @@ services:
     image: ghcr.io/ambrosia2024/ambrosia-dashboard:latest
     container_name: ambrosia_celery_worker
     restart: unless-stopped
-    command: celery -A config worker -l info --concurrency=1
+    command: celery -A config worker -l info --concurrency=1 -B
     env_file:
       - .env
     environment:
       - RUNNING_IN_DOCKER=true
       - POSTGRES_HOST=ambrosia_postgres
-      - SCIO_TOXIN_SYNC_CHUNK_DAYS=7
-      - SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS=2
-      - SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES=2
-      - SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES=5
+      - SCIO_PATHOGEN_SYNC_CHUNK_DAYS=3650
+      - SCIO_PATHOGEN_SYNC_REQUEST_DELAY_SECONDS=2
+      - SCIO_PATHOGEN_SYNC_CHUNK_MAX_RETRIES=2
+      - SCIO_PATHOGEN_SYNC_MAX_CONSECUTIVE_FAILURES=5
     depends_on:
       ambrosia_postgres:
         condition: service_healthy

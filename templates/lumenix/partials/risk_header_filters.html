@@ -1,10 +1,27 @@
 {# templates/lumenix/partials/risk_header_filters.html #}
+{% load static %}
+<link rel="stylesheet" href="{% static 'vendor/air-datepicker/3.6.0/air-datepicker.css' %}">
+<style>
+    /* The date inputs live in the fixed top header (z-index: 1002) and the
+       Air Datepicker calendar is appended to <body> with --adp-z-index: 100,
+       so it renders behind the header. Lift it above the header. */
+    .air-datepicker { --adp-z-index: 1100; }
+</style>
+
 <div class="d-none d-lg-flex align-items-center me-3 gap-2 risk-header-filters">
     <span id="riskContextNutsBadge" class="btn btn-sm btn-outline-secondary d-none risk-context-nuts-chip"></span>
 
-    <label for="rm-start" class="mb-0 text-muted" style="font-weight:700; font-size:12px;">Start date</label>
-    <input id="rm-start" type="date" class="form-control form-control-sm" value="2023-01-01" style="width: 150px;">
+    <div class="risk-filter-item">
+        <label for="rm-start" class="mb-0 text-muted risk-filter-label">Start date</label>
+        <input id="rm-start" type="date" autocomplete="off"
+               class="form-control form-control-sm risk-date-input" value="">
+    </div>
 
-    <label for="rm-end" class="mb-0 text-muted ms-1" style="font-weight:700; font-size:12px;">End date</label>
-    <input id="rm-end" type="date" class="form-control form-control-sm" value="2023-12-31" style="width: 150px;">
+    <div class="risk-filter-item">
+        <label for="rm-end" class="mb-0 text-muted risk-filter-label">End date</label>
+        <input id="rm-end" type="date" autocomplete="off"
+               class="form-control form-control-sm risk-date-input" value="">
+    </div>
+
+    <div id="riskDateRangeHint" class="small text-muted d-none risk-date-range-hint"></div>
 </div>

@@ -236,8 +236,8 @@ class ScioModel(models.Model):
             models.Index(fields=["name"]),
             models.Index(fields=["updated_at"]),
         ]
-        verbose_name = "SCiO Model"
-        verbose_name_plural = "SCiO Models"
+        verbose_name = "Model"
+        verbose_name_plural = "Models"
 
     def __str__(self):
         return f"{self.name} ({self.external_id})"
@@ -613,9 +613,95 @@ class SidebarChartLink(BaseModel):
             raise ValidationError({"menu_code": "This menu code is reserved by built-in sidebar menus."})
 
 
-class ToxinQuerySpec(BaseModel):
+class AdminMenuMaster(BaseModel):
     """
-    Admin-managed query definition for syncing toxin concentration data from SCiO.
+    Data-driven definition of the left-sidebar menu, manageable from the admin
+    instead of being hardcoded in templates. Supports three node types:
+    a top-level expandable Parent, a top-level clickable Item, and a Submenu
+    child nested under a Parent.
+
+    Inherits status/created_at/updated_at/deleted_at/soft_delete from BaseModel.
+    NOTE: BaseModel status convention is 1=Active, 0=Inactive, 2=Deleted.
+    """
+
+    class MenuType(models.IntegerChoices):
+        PARENT = 0, "Parent (expandable group)"
+        ITEM = 1, "Clickable item (top-level link)"
+        SUBMENU = 2, "Submenu item (child of a parent)"
+
+    menu_name = models.CharField(
+        max_length=100,
+        verbose_name="Menu name",
+        help_text="Public label shown in the sidebar, e.g. 'Dashboard', 'External Resources'.",
+    )
+    menu_route = models.CharField(
+        max_length=2048,
+        blank=True,
+        default="",
+        verbose_name="Menu route",
+        help_text="Django URL name (e.g. 'dashboard'), an absolute path "
+                  "('/risk-charts/...'), or a full URL (https://...). "
+                  "Leave blank for Parent groups that only expand.",
+    )
+    menu_icon = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        verbose_name="Menu icon",
+        help_text="Feather icon name, e.g. 'home', 'activity', 'external-link'. "
+                  "Used for top-level Parent/Item nodes.",
+    )
+    menu_type = models.SmallIntegerField(
+        choices=MenuType.choices,
+        default=MenuType.ITEM,
+        verbose_name="Menu type",
+        help_text="Parent = expandable group, Item = top-level clickable link, "
+                  "Submenu = child link nested under a Parent.",
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="children",
+        limit_choices_to={"menu_type": MenuType.PARENT},
+        verbose_name="Parent menu",
+        help_text="Required for Submenu items: the Parent (expandable) menu they belong to.",
+    )
+    open_in_new_tab = models.BooleanField(
+        default=False,
+        verbose_name="Open in new tab",
+        help_text="Open the route in a new browser tab (useful for external links).",
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Order",
+        help_text="Sort order within the same level (lower numbers show first).",
+    )
+
+    class Meta:
+        db_table = "admin_menu_master"
+        ordering = ["order", "id"]
+        verbose_name = "Admin Menu"
+        verbose_name_plural = "Admin Menu Master"
+
+    def __str__(self):
+        if self.parent_id:
+            return f"{self.parent.menu_name} -> {self.menu_name}"
+        return self.menu_name
+
+    def clean(self):
+        if self.menu_type == self.MenuType.SUBMENU and not self.parent_id:
+            raise ValidationError({"parent": "Submenu items must have a parent menu."})
+        if self.menu_type != self.MenuType.SUBMENU and self.parent_id:
+            raise ValidationError({"parent": "Only Submenu items can have a parent."})
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({"parent": "A menu cannot be its own parent."})
+
+
+class PathogenQuerySpec(BaseModel):
+    """
+    Admin-managed query definition for syncing pathogen concentration data from the source API.
     """
 
     TIME_SCALE_CHOICES = [
@@ -623,8 +709,8 @@ class ToxinQuerySpec(BaseModel):
     ]
 
     name = models.CharField(max_length=200, unique=True)
-    plant = models.SlugField(max_length=100, help_text="SCiO plant identifier, e.g. 'lettuce'.")
-    pathogen = models.SlugField(max_length=100, help_text="SCiO pathogen identifier, e.g. 'salmonella'.")
+    plant = models.SlugField(max_length=100, help_text="Source plant identifier, e.g. 'lettuce'.")
+    pathogen = models.SlugField(max_length=100, help_text="Source pathogen identifier, e.g. 'salmonella'.")
     nuts_code = models.CharField(max_length=32, help_text="NUTS code, e.g. 'AL' or 'NL42'.")
     start_date = models.DateField()
     end_date = models.DateField()
@@ -632,12 +718,14 @@ class ToxinQuerySpec(BaseModel):
     last_synced_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "toxin_query_specs"
+        db_table = "pathogen_query_specs"
         ordering = ["name"]
+        verbose_name = "Pathogen query spec"
+        verbose_name_plural = "Pathogen query specs"
         constraints = [
             models.UniqueConstraint(
                 fields=["plant", "pathogen", "nuts_code", "start_date", "end_date", "time_scale"],
-                name="uq_toxin_query_spec_scope",
+                name="uq_pathogen_query_spec_scope",
             ),
         ]
 
@@ -649,9 +737,9 @@ class ToxinQuerySpec(BaseModel):
             raise ValidationError({"end_date": "End date must be on or after start date."})
 
 
-class ToxinConcentrationRecord(BaseModel):
+class PathogenConcentrationRecord(BaseModel):
     """
-    Local cache of daily toxin concentration query results from SCiO.
+    Local cache of daily pathogen concentration query results from the source API.
     """
 
     plant = models.SlugField(max_length=100, db_index=True)
@@ -660,22 +748,26 @@ class ToxinConcentrationRecord(BaseModel):
     observed_on = models.DateField(db_index=True)
     source_time = models.CharField(max_length=64, blank=True, default="")
     source_period = models.CharField(max_length=64, blank=True, default="")
-    toxin_value = models.FloatField(null=True, blank=True)
+    pathogen_model_value = models.FloatField(null=True, blank=True)
     temperature_c = models.FloatField(null=True, blank=True)
     outcome = models.JSONField(default=list, blank=True)
     provenance_model_id = models.CharField(max_length=128, blank=True, default="")
     provenance_model_title = models.CharField(max_length=512, blank=True, default="")
     provenance_variable_name = models.CharField(max_length=128, blank=True, default="")
     provenance_fetched_at_ms = models.BigIntegerField(null=True, blank=True)
+    request_payload = models.JSONField(default=dict, blank=True)
+    provenance_payload = models.JSONField(default=dict, blank=True)
     source_payload = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        db_table = "toxin_concentration_records"
+        db_table = "pathogen_concentration_records"
         ordering = ["observed_on"]
+        verbose_name = "Pathogen concentration record"
+        verbose_name_plural = "Pathogen concentration records"
         constraints = [
             models.UniqueConstraint(
                 fields=["plant", "pathogen", "nuts_code", "observed_on"],
-                name="uq_toxin_record_scope_day",
+                name="uq_pathogen_record_scope_day",
             ),
         ]
 

@@ -105,14 +105,14 @@ function explainToxins(rows) {
           ? over
             ? `There are occasional exceedances over the ${limit} μg/kg limit.`
             : `No exceedances detected in the selected period.`
-          : `No regulatory/action limit is shown here because the current SCiO toxin API response does not provide a toxin limit value.`
+          : `No regulatory or action limit is shown here because no limit value is currently available for this dataset.`
       }
     </p>
     <strong>Note</strong>
     <p class="mb-2">
       ${
         source === "scio_api" || source === "scio_db"
-          ? "Values are fetched from the SCiO toxin concentration query endpoint for the current crop, pathogen, location, and date range. Temperature is stored from the API response, but it is not displayed on the current 2D toxin chart."
+          ? "Values are shown for the current crop, pathogen, location, and date range. Temperature is available in the underlying data but is not displayed on the current 2D toxin chart."
           : "Values are illustrative dummy outputs - illustrative only."
       }
     </p>
@@ -120,9 +120,10 @@ function explainToxins(rows) {
 }
 
 function explainPathogens(rows) {
-  if (!rows?.length) return "<em>No data in the selected period.</em>";
+  if (!rows?.length) return "<em>No synced pathogen data for the selected filters and date range.</em>";
 
-  const y = rows.map((r) => r.pathogen_conc_units_per_g ?? 0);
+  const y = rows.map((r) => r.pathogen_model_value).filter((v) => Number.isFinite(v));
+  if (!y.length) return "<em>No pathogen model values in the selected period.</em>";
 
   const max = Math.max(...y);
   const min = Math.min(...y);
@@ -134,42 +135,35 @@ function explainPathogens(rows) {
   const slope = linearSlopeYPerStep(y);
   const trend = slope > 0.05 ? "rising" : slope < -0.05 ? "falling" : "flat";
   const arrow = slope > 0.05 ? "↑" : slope < -0.05 ? "↓" : "→";
+  const unit = rows.find((r) => r.pathogen_model_unit)?.pathogen_model_unit || "model output";
 
   const period = `${monthLabel(rows[0].date)} → ${monthLabel(
     rows[rows.length - 1].date
   )}`;
 
-  // crude “elevated month” marker: above avg + 1 sd
-  const sd = Math.sqrt(mean(y.map((v) => (v - avg) * (v - avg))));
-  const elevatedCount = y.filter((v) => v >= avg + sd).length;
-
   return `
     <strong>What this shows</strong>
     <ul class="mb-2">
-      <li><em>${period}</em> pathogen concentration for <strong>${rows[0].crop}</strong> - <strong>${rows[0].pathogen}</strong> (units/g).</li>
+      <li><em>${period}</em> pathogen model output for <strong>${rows[0].crop}</strong> - <strong>${rows[0].pathogen}</strong>.</li>
+      <li>Y axis: <strong>${unit}</strong>.</li>
     </ul>
     <strong>Key numbers</strong>
     <ul class="mb-2">
-      <li>Average: <strong>${avg.toFixed(1)}</strong> units/g (min <strong>${min.toFixed(
+      <li>Average: <strong>${avg.toFixed(1)}</strong> ${unit} (min <strong>${min.toFixed(
         1
       )}</strong>, max <strong>${max.toFixed(1)}</strong>).</li>
       <li>Trend: <strong>${trend}</strong> ${arrow} (≈ ${slope.toFixed(
         2
-      )} units/g per month).</li>
-      <li>Elevated months (≥ mean + 1σ): <strong>${elevatedCount}</strong>.</li>
+      )} ${unit} per period).</li>
       <li>Latest value: <strong>${last.toFixed(
         1
-      )}</strong> units/g; change vs first point: <strong>${(last - first >= 0
+      )}</strong> ${unit}; change vs first point: <strong>${(last - first >= 0
         ? "+"
         : "")}${(last - first).toFixed(1)}</strong>.</li>
     </ul>
-    <strong>Interpretation</strong>
-    <p class="mb-2">
-      Concentrations are ${trend}. Peaks often align with rainfall events in the dummy model.
-    </p>
     <strong>Note</strong>
     <p class="mb-2">
-      Values are illustrative dummy outputs - illustrative only.
+      Values are synced source model outputs for the selected crop, pathogen, location, and date range.
     </p>
   `;
 }
@@ -684,24 +678,246 @@ function isISODate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value || "");
 }
 
+const RISK_MIN_DATE = "1940-01-01";
+// Far-future upper bound for the pickers. This dataset legitimately contains
+// future-dated values (e.g. out to 2040), so we must NOT cap selectable dates
+// at "today" when the real data range is unknown.
+const RISK_MAX_DATE = "2100-12-31";
+const LEGACY_STATIC_START_DATE = "2023-01-01";
+const LEGACY_STATIC_END_DATE = "2023-12-31";
+// Earliest/latest dates actually present in the DB for the current toxin
+// crop/pathogen/region, discovered via the /meta/ endpoint. The pickers clamp
+// to this range on the dedicated toxin chart.
+let PATHOGEN_AVAILABLE_MIN_DATE = null;
+let PATHOGEN_AVAILABLE_MAX_DATE = null;
+
+function getTodayISODate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getRiskAbsoluteMaxDate() {
+  // Selectable upper bound: the data's real max when known, otherwise a wide
+  // far-future bound (NOT "today"). The dataset contains future-dated values,
+  // so capping selection at today is wrong.
+  if (isDedicatedPathogenChartContext() && isISODate(PATHOGEN_AVAILABLE_MAX_DATE)) {
+    return PATHOGEN_AVAILABLE_MAX_DATE;
+  }
+  return RISK_MAX_DATE;
+}
+
+function getRiskAbsoluteMinDate() {
+  if (isDedicatedPathogenChartContext() && isISODate(PATHOGEN_AVAILABLE_MIN_DATE)) {
+    return PATHOGEN_AVAILABLE_MIN_DATE;
+  }
+  return RISK_MIN_DATE;
+}
+
+function clampRiskDate(value) {
+  if (!isISODate(value)) return null;
+  const minDate = getRiskAbsoluteMinDate();
+  const maxDate = getRiskAbsoluteMaxDate();
+  if (value < minDate) return minDate;
+  if (value > maxDate) return maxDate;
+  return value;
+}
+
+function getCurrentYearStartISODate() {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
+function getDefaultRiskStartDate() {
+  return getCurrentYearStartISODate();
+}
+
+function getDefaultRiskEndDate() {
+  // Default END *value*: the data's real max when known, else today. (The
+  // selectable bound is wider, see getRiskAbsoluteMaxDate, so the user can
+  // still pick beyond today.)
+  if (isDedicatedPathogenChartContext() && isISODate(PATHOGEN_AVAILABLE_MAX_DATE)) {
+    return PATHOGEN_AVAILABLE_MAX_DATE;
+  }
+  return getTodayISODate();
+}
+
+function getRiskDateStorageScope() {
+  const selectedChart = (window.__AMBROSIA_SELECTED_RISK_CHART || "").trim().toLowerCase();
+  if (selectedChart) return selectedChart;
+
+  const path = window.location.pathname.replace(/\/+$/, "");
+  if (path.endsWith("/risk-charts/toxin")) return "toxin_over_time";
+  if (path.endsWith("/risk-charts/pathogen")) return "pathogen_concentration_over_time";
+  if (path.endsWith("/risk-charts")) return "all_risk_charts";
+
+  return "risk_default";
+}
+
+function getRiskDateStorageKeys() {
+  const scope = getRiskDateStorageScope();
+  return {
+    start: `risk_filter_start__${scope}`,
+    end: `risk_filter_end__${scope}`,
+  };
+}
+
+/* -----------------------
+   Air Datepicker date inputs
+
+   Air Datepicker replaces the native picker and adds a days -> months -> years
+   (decade grid) drill-down: click the calendar title to jump across years fast.
+   We keep each input's .value in ISO (Y-m-d) via dateFormat, so every existing
+   read/write site keeps working unchanged. The instance is stored on el._airDp.
+------------------------ */
+
+const AIR_DP_LOCALE = {
+  days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  daysMin: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+  months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  today: "Today",
+  clear: "Clear",
+  dateFormat: "yyyy-MM-dd",
+  timeFormat: "",
+  firstDay: 1,
+};
+
+const AIR_DP_OPTIONS = {
+  locale: AIR_DP_LOCALE,
+  dateFormat: "yyyy-MM-dd", // ISO value kept on the input itself
+  autoClose: true,
+  isMobile: false,
+  position: "bottom left",
+  navTitles: { days: "MMMM yyyy" },
+  // Single-date filter: never unselect on re-click. Also critical because
+  // normalizeRiskDateRange() re-applies the value via selectDate(); with the
+  // default toggleSelected:true that re-apply would toggle the just-picked
+  // date back off, so the new date never "takes".
+  toggleSelected: false,
+};
+
+function isoToLocalDate(iso) {
+  if (!isISODate(iso)) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Set an ISO value on a date input, keeping the Air Datepicker selection in
+// sync. Empty/invalid clears it. Never re-fires onSelect.
+function setRiskDateValue(el, isoValue) {
+  if (!el) return;
+  const next = isISODate(isoValue) ? isoValue : "";
+  if (el._airDp) {
+    if (next) el._airDp.selectDate(isoToLocalDate(next), { silent: true });
+    else el._airDp.clear({ silent: true });
+  } else {
+    el.value = next;
+  }
+}
+
+// Mirror the absolute selectable range onto the pickers. The start<=end
+// relationship is enforced separately by normalizeRiskDateRange, so the pickers
+// only get the absolute bounds and never fight that logic.
+function syncRiskPickerBounds() {
+  const minDate = isoToLocalDate(getRiskAbsoluteMinDate()) || "";
+  const maxDate = isoToLocalDate(getRiskAbsoluteMaxDate()) || "";
+  ["rm-start", "rm-end"].forEach((id) => {
+    const dp = document.getElementById(id)?._airDp;
+    if (!dp) return;
+    // IMPORTANT: pass { silent: true }. Air Datepicker's update() re-applies
+    // opts.selectedDates via a non-silent selectDate(), which re-fires onSelect
+    // (= handleRiskDateChange). Without silent this creates an infinite loop:
+    // onSelect -> normalizeRiskDateRange -> syncRiskPickerBounds -> update ->
+    // onSelect ..., and each pass fires a pathogen query, exhausting the browser
+    // (net::ERR_INSUFFICIENT_RESOURCES). We only want to refresh the bounds here.
+    dp.update({ minDate, maxDate }, { silent: true });
+  });
+}
+
+function initRiskDateWidgets(onChange) {
+  if (typeof window.AirDatepicker !== "function") return;
+  const startEl = document.getElementById("rm-start");
+  const endEl = document.getElementById("rm-end");
+  if (!startEl || !endEl) return;
+
+  const handleChange = typeof onChange === "function" ? () => onChange() : undefined;
+  [startEl, endEl].forEach((el) => {
+    if (el._airDp) return;
+    const initialIso = el.value;
+    // Switch off the native date UI so only Air Datepicker shows.
+    el.type = "text";
+    el.readOnly = true;
+    el.autocomplete = "off";
+    el._airDp = new window.AirDatepicker(el, {
+      ...AIR_DP_OPTIONS,
+      minDate: isoToLocalDate(getRiskAbsoluteMinDate()) || "",
+      maxDate: isoToLocalDate(getRiskAbsoluteMaxDate()) || "",
+      // Deliberately NOT passing selectedDates here. opts.selectedDates would
+      // stay frozen at this initial value, and dp.update() (in
+      // syncRiskPickerBounds) re-applies opts.selectedDates on every bounds
+      // refresh — reverting the user's freshly picked date. Set the initial
+      // selection via selectDate() below instead, which only updates the
+      // instance state, so update() has nothing stale to re-apply.
+      onSelect: handleChange ? () => handleChange() : undefined,
+    });
+    if (isISODate(initialIso)) {
+      el._airDp.selectDate(isoToLocalDate(initialIso), { silent: true });
+    }
+    const labelText = document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim();
+    if (labelText) el.setAttribute("aria-label", labelText);
+  });
+  syncRiskPickerBounds();
+}
+
+function updateRiskDatePickerBounds(startEl, endEl, absoluteMin, absoluteMax) {
+  if (!startEl || !endEl) return;
+  startEl.min = absoluteMin;
+  startEl.max = isISODate(endEl.value) ? endEl.value : absoluteMax;
+  endEl.min = isISODate(startEl.value) ? startEl.value : absoluteMin;
+  endEl.max = absoluteMax;
+  syncRiskPickerBounds();
+}
+
+function initRiskDatePickers() {
+  const startEl = document.getElementById("rm-start");
+  const endEl = document.getElementById("rm-end");
+  if (!startEl || !endEl) return;
+  updateRiskDatePickerBounds(startEl, endEl, getRiskAbsoluteMinDate(), getRiskAbsoluteMaxDate());
+}
+
 function normalizeRiskDateRange() {
   const startEl = document.getElementById("rm-start");
   const endEl = document.getElementById("rm-end");
   if (!startEl || !endEl) return;
+
+  const absoluteMin = getRiskAbsoluteMinDate();
+  const absoluteMax = getRiskAbsoluteMaxDate();
+  startEl.min = absoluteMin;
+  startEl.max = absoluteMax;
+  endEl.min = absoluteMin;
+  endEl.max = absoluteMax;
+
+  if (isISODate(startEl.value)) setRiskDateValue(startEl, clampRiskDate(startEl.value));
+  if (isISODate(endEl.value)) setRiskDateValue(endEl, clampRiskDate(endEl.value));
 
   const start = startEl.value;
   const end = endEl.value;
 
   // Keep browser pickers constrained to a valid range.
   if (isISODate(start)) endEl.min = start;
-  else endEl.removeAttribute("min");
+  else endEl.min = absoluteMin;
   if (isISODate(end)) startEl.max = end;
-  else startEl.removeAttribute("max");
+  else startEl.max = absoluteMax;
+  updateRiskDatePickerBounds(startEl, endEl, absoluteMin, absoluteMax);
 
   // Auto-fix invalid range if user typed dates manually.
   if (isISODate(start) && isISODate(end) && start > end) {
-    endEl.value = start;
+    setRiskDateValue(endEl, start);
     endEl.min = start;
+    updateRiskDatePickerBounds(startEl, endEl, absoluteMin, absoluteMax);
   }
 }
 
@@ -713,15 +929,33 @@ function hydrateRiskDateFilters() {
   const params = new URLSearchParams(window.location.search);
   const qStart = params.get("start");
   const qEnd = params.get("end");
-  const lsStart = localStorage.getItem("risk_filter_start");
-  const lsEnd = localStorage.getItem("risk_filter_end");
+  const storageKeys = getRiskDateStorageKeys();
+  const lsStart = localStorage.getItem(storageKeys.start);
+  const lsEnd = localStorage.getItem(storageKeys.end);
 
-  const start = isISODate(qStart) ? qStart : isISODate(lsStart) ? lsStart : startEl.value;
-  const end = isISODate(qEnd) ? qEnd : isISODate(lsEnd) ? lsEnd : endEl.value;
+  const start = clampRiskDate(
+    isISODate(qStart)
+      ? qStart
+      : isISODate(lsStart)
+        ? lsStart
+        : isISODate(startEl.value)
+          ? startEl.value
+          : getDefaultRiskStartDate()
+  );
+  const end = clampRiskDate(
+    isISODate(qEnd)
+      ? qEnd
+      : isISODate(lsEnd)
+        ? lsEnd
+        : isISODate(endEl.value)
+          ? endEl.value
+          : getDefaultRiskEndDate()
+  );
 
-  if (isISODate(start)) startEl.value = start;
-  if (isISODate(end)) endEl.value = end;
+  if (isISODate(start)) setRiskDateValue(startEl, start);
+  if (isISODate(end)) setRiskDateValue(endEl, end);
   normalizeRiskDateRange();
+  setRiskDateRangeHint(startEl.value, endEl.value);
 }
 
 function persistRiskDateFilters() {
@@ -729,8 +963,9 @@ function persistRiskDateFilters() {
   const endEl = document.getElementById("rm-end");
   if (!startEl || !endEl) return;
 
-  if (isISODate(startEl.value)) localStorage.setItem("risk_filter_start", startEl.value);
-  if (isISODate(endEl.value)) localStorage.setItem("risk_filter_end", endEl.value);
+  const storageKeys = getRiskDateStorageKeys();
+  if (isISODate(startEl.value)) localStorage.setItem(storageKeys.start, startEl.value);
+  if (isISODate(endEl.value)) localStorage.setItem(storageKeys.end, endEl.value);
 
   const url = new URL(window.location.href);
   if (isISODate(startEl.value)) url.searchParams.set("start", startEl.value);
@@ -760,6 +995,162 @@ function hydrateToxinScaleFilter() {
   scaleEl.value = queryScale || storedScale || fallbackScale;
 }
 
+function hasExplicitRiskDateSelection() {
+  const params = new URLSearchParams(window.location.search);
+  const qStart = params.get("start");
+  const qEnd = params.get("end");
+  if (isISODate(qStart) || isISODate(qEnd)) return true;
+
+  const storageKeys = getRiskDateStorageKeys();
+  const lsStart = localStorage.getItem(storageKeys.start);
+  const lsEnd = localStorage.getItem(storageKeys.end);
+  return isISODate(lsStart) || isISODate(lsEnd);
+}
+
+function hasLegacyStaticRiskDefaults(startEl, endEl) {
+  return startEl?.value === LEGACY_STATIC_START_DATE && endEl?.value === LEGACY_STATIC_END_DATE;
+}
+
+function formatHintDate(isoDate) {
+  if (!isISODate(isoDate)) return "";
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function setRiskDateRangeHint() {
+  const hintEl = document.getElementById("riskDateRangeHint");
+  if (!hintEl) return;
+
+  // Show the AVAILABLE data range from /meta/ (what a "Data:" label implies),
+  // not the selected start/end — those are already shown in the two inputs.
+  // Only meaningful once a region's range has been discovered.
+  if (
+    !isDedicatedPathogenChartContext()
+    || !isISODate(PATHOGEN_AVAILABLE_MIN_DATE)
+    || !isISODate(PATHOGEN_AVAILABLE_MAX_DATE)
+  ) {
+    hintEl.textContent = "";
+    hintEl.classList.add("d-none");
+    return;
+  }
+
+  hintEl.textContent = `Data available: ${formatHintDate(PATHOGEN_AVAILABLE_MIN_DATE)} - ${formatHintDate(PATHOGEN_AVAILABLE_MAX_DATE)}`;
+  hintEl.classList.remove("d-none");
+}
+
+function isDedicatedPathogenChartContext() {
+  const selectedChart = (window.__AMBROSIA_SELECTED_RISK_CHART || "").trim().toLowerCase();
+  if (selectedChart === "pathogen_concentration_over_time" || selectedChart === "c2_pathogen_over_time") {
+    return true;
+  }
+
+  const path = window.location.pathname.replace(/\/+$/, "");
+  return path.endsWith("/risk-charts/pathogen");
+}
+
+function isSystemGeneratedRiskRange(start, end) {
+  if (!isISODate(start) || !isISODate(end)) return false;
+  const currentMax = getRiskAbsoluteMaxDate();
+  const today = getTodayISODate();
+  // The auto-generated default end is either the available max or "today"
+  // (when the available range is unknown); accept both.
+  const isSystemEnd = (e) => e === currentMax || e === today;
+  return (
+    (start === LEGACY_STATIC_START_DATE && end === LEGACY_STATIC_END_DATE)
+    || (start === RISK_MIN_DATE && isSystemEnd(end))
+    || (start === getCurrentYearStartISODate() && isSystemEnd(end))
+  );
+}
+
+let PATHOGEN_AVAILABLE_RANGE_PROMISE = null;
+
+// Discover the earliest/latest synced dates for the current pathogen
+// crop/pathogen/region and store them so the pickers can clamp to real data.
+// Runs once per page load (cached) and is independent of the date defaults
+// logic, so the bounds are correct even when an explicit range is in the URL.
+async function loadPathogenAvailableRange() {
+  if (!isDedicatedPathogenChartContext()) return null;
+  if (PATHOGEN_AVAILABLE_RANGE_PROMISE) return PATHOGEN_AVAILABLE_RANGE_PROMISE;
+
+  PATHOGEN_AVAILABLE_RANGE_PROMISE = (async () => {
+    try {
+      const pair = getCurrentRiskPair();
+      const nutsCode =
+        localStorage.getItem("lx_selected_nuts2_id")
+        || document.getElementById("rm-country")?.value
+        || "NL";
+      const metaParams = new URLSearchParams({
+        plant: toApiSlug(pair.crop, "lettuce"),
+        pathogen: toApiSlug(pair.pathogen, "salmonella"),
+        nutsCode,
+      });
+      const response = await fetch(`/api/risk-charts/pathogen-concentration/meta/?${metaParams.toString()}`);
+      if (!response.ok) {
+        PATHOGEN_AVAILABLE_MIN_DATE = null;
+        PATHOGEN_AVAILABLE_MAX_DATE = null;
+        return null;
+      }
+      const data = await response.json();
+      PATHOGEN_AVAILABLE_MIN_DATE = isISODate(data?.available_start_date) ? data.available_start_date : null;
+      PATHOGEN_AVAILABLE_MAX_DATE = isISODate(data?.available_end_date) ? data.available_end_date : null;
+      return data;
+    } catch (_err) {
+      PATHOGEN_AVAILABLE_MIN_DATE = null;
+      PATHOGEN_AVAILABLE_MAX_DATE = null;
+      return null;
+    }
+  })();
+
+  return PATHOGEN_AVAILABLE_RANGE_PROMISE;
+}
+
+async function applyPathogenDateRangeDefaultsIfNeeded() {
+  const startEl = document.getElementById("rm-start");
+  const endEl = document.getElementById("rm-end");
+  if (!startEl || !endEl || !document.getElementById("pathogenConcChart")) return;
+  if (!isDedicatedPathogenChartContext()) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const qStart = params.get("start");
+  const qEnd = params.get("end");
+  const storageKeys = getRiskDateStorageKeys();
+  const lsStart = localStorage.getItem(storageKeys.start);
+  const lsEnd = localStorage.getItem(storageKeys.end);
+
+  const hasRealExplicitSelection =
+    hasExplicitRiskDateSelection()
+    && !isSystemGeneratedRiskRange(qStart, qEnd)
+    && !isSystemGeneratedRiskRange(lsStart, lsEnd);
+  if (hasRealExplicitSelection) return;
+
+  if (isSystemGeneratedRiskRange(qStart, qEnd)) {
+    params.delete("start");
+    params.delete("end");
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    window.history.replaceState({}, "", url.toString());
+  }
+  if (isSystemGeneratedRiskRange(lsStart, lsEnd)) {
+    localStorage.removeItem(storageKeys.start);
+    localStorage.removeItem(storageKeys.end);
+  }
+
+  const shouldApply =
+    (!isISODate(startEl.value) && !isISODate(endEl.value))
+    || isSystemGeneratedRiskRange(startEl.value, endEl.value)
+    || hasLegacyStaticRiskDefaults(startEl, endEl);
+  if (!shouldApply) return;
+
+  // Default the range to the full span of available data.
+  await loadPathogenAvailableRange();
+  const start = clampRiskDate(PATHOGEN_AVAILABLE_MIN_DATE);
+  const end = clampRiskDate(PATHOGEN_AVAILABLE_MAX_DATE);
+  if (isISODate(start)) setRiskDateValue(startEl, start);
+  if (isISODate(end)) setRiskDateValue(endEl, end);
+  updateRiskDatePickerBounds(startEl, endEl, getRiskAbsoluteMinDate(), getRiskAbsoluteMaxDate());
+  setRiskDateRangeHint(startEl.value, endEl.value);
+}
+
 function persistToxinScaleFilter() {
   const scaleEl = document.getElementById("toxinsScale");
   if (!scaleEl) return;
@@ -775,8 +1166,8 @@ function persistToxinScaleFilter() {
 }
 
 function filterByPeriod(rows) {
-  const s = new Date(document.getElementById("rm-start")?.value || "2023-01-01");
-  const e = new Date(document.getElementById("rm-end")?.value || "2023-12-31");
+  const s = new Date(document.getElementById("rm-start")?.value || getDefaultRiskStartDate());
+  const e = new Date(document.getElementById("rm-end")?.value || getDefaultRiskEndDate());
 
   return rows.filter((r) => {
     const d = new Date(r.date);
@@ -798,7 +1189,7 @@ function getCsrfToken() {
   return getCookie("csrftoken");
 }
 
-const TOXIN_DAILY_CACHE = new Map();
+const PATHOGEN_DAILY_CACHE = new Map();
 
 function toApiSlug(value, fallback = "") {
   return (value || fallback)
@@ -858,10 +1249,10 @@ function normalizeRequestDate(value, fallback) {
   return fallback;
 }
 
-function buildToxinQueryPayload() {
+function buildPathogenQueryPayload() {
   const pair = getCurrentRiskPair();
-  const startDate = normalizeRequestDate(document.getElementById("rm-start")?.value, "2023-01-01");
-  const endDate = normalizeRequestDate(document.getElementById("rm-end")?.value, "2023-12-31");
+  const startDate = normalizeRequestDate(document.getElementById("rm-start")?.value, getDefaultRiskStartDate());
+  const endDate = normalizeRequestDate(document.getElementById("rm-end")?.value, getDefaultRiskEndDate());
   const nutsCode =
     localStorage.getItem("lx_selected_nuts2_id")
     || document.getElementById("rm-country")?.value
@@ -877,36 +1268,45 @@ function buildToxinQueryPayload() {
   };
 }
 
-async function fetchRealToxinRows() {
-  const payload = buildToxinQueryPayload();
+async function fetchRealPathogenRows() {
+  const payload = buildPathogenQueryPayload();
   const cacheKey = JSON.stringify(payload);
-  if (TOXIN_DAILY_CACHE.has(cacheKey)) {
-    return TOXIN_DAILY_CACHE.get(cacheKey);
+  // Cache the in-flight PROMISE (not just the resolved value). This dedups
+  // concurrent identical requests, so even if some caller fires repeatedly,
+  // at most one network request per payload is ever in flight. Defensive
+  // guard against request floods (net::ERR_INSUFFICIENT_RESOURCES).
+  if (PATHOGEN_DAILY_CACHE.has(cacheKey)) {
+    return PATHOGEN_DAILY_CACHE.get(cacheKey);
   }
 
-  const response = await fetch("/api/risk-charts/toxin-concentration/query/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCsrfToken(),
-    },
-    body: JSON.stringify(payload),
-  });
+  const requestPromise = (async () => {
+    const response = await fetch("/api/risk-charts/pathogen-concentration/query/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    let detail = `Toxin query failed (${response.status})`;
-    try {
-      const data = await response.json();
-      if (data?.error) detail = data.error;
-    } catch (_err) {
-      // no-op
+    if (!response.ok) {
+      let detail = `Pathogen query failed (${response.status})`;
+      try {
+        const data = await response.json();
+        if (data?.error) detail = data.error;
+      } catch (_err) {
+        // no-op
+      }
+      throw new Error(detail);
     }
-    throw new Error(detail);
-  }
 
-  const data = await response.json();
-  TOXIN_DAILY_CACHE.set(cacheKey, data);
-  return data;
+    return response.json();
+  })();
+
+  // Don't keep a rejected promise cached, so a later attempt can retry.
+  requestPromise.catch(() => PATHOGEN_DAILY_CACHE.delete(cacheKey));
+  PATHOGEN_DAILY_CACHE.set(cacheKey, requestPromise);
+  return requestPromise;
 }
 
 function aggregateToxinRows(rows, scale) {
@@ -980,12 +1380,67 @@ function aggregateToxinRows(rows, scale) {
       time: null,
       period: bucket.displayLabel,
       toxin_level_ug_per_kg: avg(bucket.rows.map((r) => r.toxin_level_ug_per_kg)),
+      pathogen_model_value: avg(bucket.rows.map((r) => r.pathogen_model_value)),
       temperature_c: avg(bucket.rows.map((r) => r.temperature_c)),
       humidity_pct: avg(bucket.rows.map((r) => r.humidity_pct)),
       source_scale: scale,
       outcome: [],
     };
   });
+}
+function aggregatePathogenRows(rows, scale) {
+  return aggregateToxinRows(rows, scale).map((row) => ({
+    ...row,
+    pathogen_model_value: row.pathogen_model_value ?? row.toxin_level_ug_per_kg ?? null,
+    pathogen_model_unit: row.pathogen_model_unit || "model output",
+  }));
+}
+
+// Per-chart "data source" indicator: a small icon next to the chart title that
+// distinguishes live DB data from illustrative sample data (icon + tooltip).
+function setChartDataSourceBadge(domId, isLive, tooltip) {
+  // No-op: superseded by the template-rendered Live/Demo badge driven by
+  // default_config.data_source. Kept so existing call sites stay valid.
+  return;
+}
+
+function toxinSourceTooltip(isLive) {
+  if (!isLive) return "Illustrative sample data (live query unavailable for this selection)";
+  const p = window.__toxinsProvenanceCurrent;
+  return p && p.model_title ? `Live data - source model "${p.model_title}"` : "Live data from the database";
+}
+
+function pathogenSourceTooltip(isLive) {
+  if (!isLive) return "Illustrative sample data (live query unavailable for this selection)";
+  const p = window.__pathogenProvenanceCurrent;
+  return p && p.model_title ? `Live data - source model "${p.model_title}"` : "Live data from the database";
+}
+
+async function renderRealPathogenChart(fallbackRows) {
+  if (!document.getElementById("pathogenConcChart")) {
+    return;
+  }
+
+  const pairLabel = getCurrentPairLabel();
+  const scale = getSelectedToxinScale();
+
+  try {
+    const data = await fetchRealPathogenRows();
+    const usedReal = Array.isArray(data?.rows) && data.rows.length > 0;
+    const dailyRows = usedReal ? data.rows : fallbackRows;
+    const pathogenRows = aggregatePathogenRows(dailyRows, scale);
+    window.__pathogenProvenanceCurrent = usedReal ? (data?.provenance || null) : null;
+    window.renderPathogenConcChart("pathogenConcChart", pathogenRows, pairLabel);
+    const pathEl = document.getElementById("pathogenExplain");
+    if (pathEl) pathEl.innerHTML = explainPathogens(pathogenRows);
+    setChartDataSourceBadge("pathogenConcChart", usedReal, pathogenSourceTooltip(usedReal));
+  } catch (err) {
+    window.__pathogenProvenanceCurrent = null;
+    window.renderPathogenConcChart("pathogenConcChart", [], pairLabel);
+    const pathEl = document.getElementById("pathogenExplain");
+    if (pathEl) pathEl.innerHTML = `<em>${err?.message || "No synced pathogen data for the selected filters and date range."}</em>`;
+    setChartDataSourceBadge("pathogenConcChart", false, "No synced data for the selected filters");
+  }
 }
 
 async function renderRealToxinChart(fallbackRows) {
@@ -996,32 +1451,22 @@ async function renderRealToxinChart(fallbackRows) {
   const cfg = getCfg("toxinsChart");
   const pairLabel = getCurrentPairLabel();
   const scale = getSelectedToxinScale();
-
-  try {
-    const data = await fetchRealToxinRows();
-    const dailyRows = Array.isArray(data?.rows) && data.rows.length ? data.rows : fallbackRows;
-    const toxinRows = aggregateToxinRows(dailyRows, scale);
-    window.__toxinsProvenanceCurrent = data?.provenance || null;
-    window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
-    if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
-      window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
-    }
-    const toxEl = document.getElementById("toxinsExplain");
-    if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
-  } catch (_err) {
-    window.__toxinsProvenanceCurrent = null;
-    const toxinRows = aggregateToxinRows(fallbackRows, scale);
-    window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
-    if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
-      window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
-    }
-    const toxEl = document.getElementById("toxinsExplain");
-    if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
+  const toxinRows = aggregateToxinRows(fallbackRows, scale);
+  window.__toxinsProvenanceCurrent = null;
+  window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
+  if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
+    window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
   }
+  const toxEl = document.getElementById("toxinsExplain");
+  if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
+  setChartDataSourceBadge("toxinsChart", false, toxinSourceTooltip(false));
 }
 
 function initC1ChartChat() {
   const toggleBtn = document.getElementById("c1-chat-toggle");
+  const fab = document.getElementById("ambra-fab");
+  const closeBtn = document.getElementById("ambra-close");
+  const backdrop = document.getElementById("ambra-backdrop");
   const panel = document.getElementById("c1-chat-panel");
   const form = document.getElementById("c1-chat-form");
   const input = document.getElementById("c1-chat-input");
@@ -1030,7 +1475,7 @@ function initC1ChartChat() {
   const downloadBtn = document.getElementById("c1-chat-download");
   const thread = document.getElementById("c1-chat-thread");
   const quickPromptBtns = Array.from(document.querySelectorAll(".c1-chat-quick-prompt[data-c1-quick-prompt]"));
-  if (!form || !input || !sendBtn || !thread || !downloadBtn || !toggleBtn || !panel) return;
+  if (!form || !input || !sendBtn || !thread || !downloadBtn || !panel) return;
 
   const chatHistory = [];
   const MAX_QUESTION_CHARS = Number(input.getAttribute("maxlength") || 1000);
@@ -1140,9 +1585,18 @@ function initC1ChartChat() {
   }
 
   function openChatPanel() {
-    panel.style.display = "";
-    toggleBtn.style.display = "none";
+    panel.classList.add("open");
+    backdrop?.classList.add("open");
+    fab?.classList.add("is-hidden");
+    if (toggleBtn?.style) toggleBtn.style.display = "none";
     setTimeout(() => input.focus(), 0);
+  }
+
+  function closeChatPanel() {
+    panel.classList.remove("open");
+    backdrop?.classList.remove("open");
+    fab?.classList.remove("is-hidden");
+    if (toggleBtn?.style) toggleBtn.style.display = "";
   }
 
   function isTypingTarget(el) {
@@ -1422,8 +1876,12 @@ function initC1ChartChat() {
     downloadCurrentChat();
   });
 
-  toggleBtn.addEventListener("click", () => {
-    openChatPanel();
+  toggleBtn?.addEventListener("click", () => openChatPanel());
+  fab?.addEventListener("click", () => openChatPanel());
+  closeBtn?.addEventListener("click", () => closeChatPanel());
+  backdrop?.addEventListener("click", () => closeChatPanel());
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && panel.classList.contains("open")) closeChatPanel();
   });
 
   quickPromptBtns.forEach((btn) => {
@@ -1466,8 +1924,14 @@ function initC1ChartChat() {
   updateSendBtnState();
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
+  // Always learn the available data range first so the pickers clamp to it,
+  // even when an explicit date range is already present in the URL/storage.
+  await loadPathogenAvailableRange();
+  await applyPathogenDateRangeDefaultsIfNeeded();
   hydrateRiskDateFilters();
+  initRiskDatePickers();
+  normalizeRiskDateRange();
   persistRiskDateFilters();
   hydrateToxinScaleFilter();
   persistToxinScaleFilter();
@@ -1497,11 +1961,14 @@ document.addEventListener("DOMContentLoaded", function () {
     { iso: "2023-09-01", type: "heavy_rain", boost: 2.2 },
   ];
 
-  // 2) build dummy rows (shared for all charts)
+  // 2) build dummy rows (shared for all charts that have no real data wired).
+  // Span the full selectable window so the dummy fallback always overlaps the
+  // chosen date range (filterByPeriod then slices it to the selection). If this
+  // is kept narrow, charts go blank whenever the range sits outside it.
   const rows = window.buildDummyRiskSeries({
     ...pair,
-    startISO: "2021-01-01",
-    endISO: "2023-12-01",
+    startISO: RISK_MIN_DATE,
+    endISO: `${new Date().getFullYear() + 15}-12-01`,
     baseProb: 1.2,
     seasonAmp: 1.1,
     noise: 0.25,
@@ -1551,21 +2018,32 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const doRender = () => {
-      // toxins (cfg-aware)
+      // Toxin does not have a confirmed live endpoint in this dashboard yet.
       if (document.getElementById("toxinsChart")) {
-        renderRealToxinChart(rerows);
+        const cfg = getCfg("toxinsChart");
+        const toxinRows = aggregateToxinRows(rerows, getSelectedToxinScale());
+        window.__toxinsProvenanceCurrent = null;
+        window.renderToxinChart("toxinsChart", toxinRows, pairLabel, cfg);
+        if (cfg?.defaults?.enable_3d && document.getElementById("toxinsChart3D")) {
+          window.renderToxinChart3D("toxinsChart3D", toxinRows, pairLabel);
+        }
+        const toxEl = document.getElementById("toxinsExplain");
+        if (toxEl) toxEl.innerHTML = explainToxins(toxinRows);
+        setChartDataSourceBadge("toxinsChart", false, toxinSourceTooltip(false));
       }
 
       if (document.getElementById("pathogenConcChart")) {
-        window.renderPathogenConcChart("pathogenConcChart", rerows, pairLabel);
+        renderRealPathogenChart(rerows);
       }
 
       if (document.getElementById("probChart")) {
         window.renderProbChart("probChart", rerows, pairLabel);
+        setChartDataSourceBadge("probChart", false);
       }
 
       if (document.getElementById("casesChart")) {
         window.renderCasesChart("casesChart", rerows, pairLabel);
+        setChartDataSourceBadge("casesChart", false);
       }
 
       // heatmap needs risk_multiplier computed locally vs current period baseline
@@ -1578,6 +2056,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }));
 
         window.renderSeasonalHeatmap("seasonalHeatmap", hmRows, "risk_multiplier", pairLabel);
+        setChartDataSourceBadge("seasonalHeatmap", false);
       }
 
       // explanations: only show where containers exist (renderExplanations already checks)
@@ -1650,16 +2129,28 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Re-render when date/scale changes (only if those controls exist)
+  // Shared handler for any date-range change (Air Datepicker selection or native input).
+  function handleRiskDateChange() {
+    normalizeRiskDateRange();
+    persistRiskDateFilters();
+    setRiskDateRangeHint(
+      document.getElementById("rm-start")?.value,
+      document.getElementById("rm-end")?.value
+    );
+    renderAllVisible(filterByPeriod(rows), { withSkeleton: true });
+  }
+
+  // Enhance the date inputs with Air Datepicker (values stay ISO via dateFormat).
+  // Done here, after the hydrate/normalize sequence has set the initial values.
+  initRiskDateWidgets(handleRiskDateChange);
+
+  // Re-render when date/scale changes. Air Datepicker drives rm-start / rm-end via
+  // its onSelect callback above; the "input" listener stays as a graceful fallback
+  // for when the picker is unavailable and for the legacy rm-scale control.
   ["rm-start", "rm-end", "rm-scale"].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
-
-    el.addEventListener("input", () => {
-      normalizeRiskDateRange();
-      persistRiskDateFilters();
-      renderAllVisible(filterByPeriod(rows), { withSkeleton: true });
-    });
+    el.addEventListener("input", handleRiskDateChange);
   });
 
   const toxinScaleEl = document.getElementById("toxinsScale");
@@ -1673,7 +2164,13 @@ document.addEventListener("DOMContentLoaded", function () {
   // OPTIONAL: expose a hook to re-render when switching crop/pathogen later
   window.renderRiskFor = function (opts) {
     const next = { ...opts };
-    const newRows = window.buildDummyRiskSeries({ ...next, events });
+    // Keep the same wide span so the dummy fallback still covers any date range.
+    const newRows = window.buildDummyRiskSeries({
+      startISO: RISK_MIN_DATE,
+      endISO: `${new Date().getFullYear() + 15}-12-01`,
+      ...next,
+      events,
+    });
     // Reuse label from opts (fallbacks)
     const label = `${next.crop || "Crop"} - ${next.pathogen || "Pathogen"}`;
     // Render visible charts using those new rows + label

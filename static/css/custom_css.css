@@ -50,15 +50,57 @@
     line-height: 1;
 }
 
-.risk-header-filters input[type="date"] {
+.risk-header-filters {
+    flex-wrap: nowrap;
+    min-width: 0;
+    gap: 10px;
+}
+
+.risk-filter-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.risk-filter-label {
+    white-space: nowrap;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.risk-header-filters input.risk-date-input {
     min-height: 31px;
+    width: 150px;
+    min-width: 150px;
+}
+
+/* Air Datepicker: match the dashboard blue, sit above the sticky topbar */
+.air-datepicker {
+    --adp-accent-color: #1c84ee;
+    --adp-cell-background-color-selected: #1c84ee;
+    --adp-cell-background-color-selected-hover: #1769c4;
+    --adp-color-current-date: #1c84ee;
+    --adp-day-name-color: #1c84ee;
+    --adp-border-radius: 10px;
+    z-index: 99999;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+
+/* readonly text inputs the picker is attached to should still look editable */
+.risk-header-filters input.risk-date-input[readonly] {
+    background-color: #fff;
+    cursor: pointer;
 }
 
 .risk-header-filters #riskContextNutsBadge {
-    max-width: 220px;
+    max-width: 420px;
+    min-width: 88px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 0 1 auto;
 }
 
 .risk-context-nuts-chip {
@@ -68,6 +110,15 @@
     min-height: 31px;
     display: inline-flex;
     align-items: center;
+}
+
+.risk-date-range-hint {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.2;
+    flex: 0 0 auto;
 }
 
 .risk-context-fab {
@@ -289,4 +340,34 @@
     .risk-chart-skeleton {
         animation: none;
     }
+}
+
+/* Per-chart data-source indicator (live DB vs illustrative sample data).
+   Icon + tooltip; colour is a secondary cue (green = live, amber = sample). */
+.chart-source-indicator {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    cursor: help;
+    line-height: 1;
+    font-size: 18px; /* size of the ● status dot */
+}
+
+.chart-source-indicator svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Target the svg + set stroke with !important so the indicator colour wins over
+   the sidebar/link theme colours (Feather icons are drawn with `stroke`). */
+.chart-source-indicator.is-live,
+.chart-source-indicator.is-live svg {
+    color: #2e7d32 !important; /* green */
+    stroke: #2e7d32 !important;
+}
+
+.chart-source-indicator.is-sample,
+.chart-source-indicator.is-sample svg {
+    color: #b8860b !important; /* amber */
+    stroke: #b8860b !important;
 }

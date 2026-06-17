@@ -261,14 +261,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SCIO_VOCAB_API_BASE = os.getenv("SCIO_VOCAB_API_BASE", "https://dev.api.ambrosia.scio.services/api/vocabulary")
 SCIO_NUTS_API_BASE = os.getenv("SCIO_NUTS_API_BASE", "https://dev.api.ambrosia.scio.services/api/nuts")
 SCIO_MODELS_API_URL = os.getenv("SCIO_MODELS_API_URL", "https://dev.api.ambrosia.scio.services/api/models")
-SCIO_TOXIN_QUERY_URL = os.getenv(
-    "SCIO_TOXIN_QUERY_URL",
-    "https://dev.api.ambrosia.scio.services/api/toxin-concentration/query",
+SCIO_PATHOGEN_QUERY_URL = os.getenv(
+    "SCIO_PATHOGEN_QUERY_URL",
+    "https://dev.api.ambrosia.scio.services/api/pathogen-concentration/query",
 )
-SCIO_TOXIN_SYNC_CHUNK_DAYS = int(os.getenv("SCIO_TOXIN_SYNC_CHUNK_DAYS", "7"))
-SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS = float(os.getenv("SCIO_TOXIN_SYNC_REQUEST_DELAY_SECONDS", "2"))
-SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES = int(os.getenv("SCIO_TOXIN_SYNC_CHUNK_MAX_RETRIES", "2"))
-SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES = int(os.getenv("SCIO_TOXIN_SYNC_MAX_CONSECUTIVE_FAILURES", "5"))
+SCIO_PATHOGEN_AVAILABLE_START_DATE = os.getenv("SCIO_PATHOGEN_AVAILABLE_START_DATE", "1971-01-01")
+SCIO_PATHOGEN_AVAILABLE_END_DATE = os.getenv("SCIO_PATHOGEN_AVAILABLE_END_DATE", "2095-12-31")
+SCIO_PATHOGEN_SYNC_CHUNK_DAYS = int(os.getenv("SCIO_PATHOGEN_SYNC_CHUNK_DAYS", "7"))
+SCIO_PATHOGEN_SYNC_REQUEST_DELAY_SECONDS = float(os.getenv("SCIO_PATHOGEN_SYNC_REQUEST_DELAY_SECONDS", "2"))
+SCIO_PATHOGEN_SYNC_CHUNK_MAX_RETRIES = int(os.getenv("SCIO_PATHOGEN_SYNC_CHUNK_MAX_RETRIES", "2"))
+SCIO_PATHOGEN_SYNC_MAX_CONSECUTIVE_FAILURES = int(os.getenv("SCIO_PATHOGEN_SYNC_MAX_CONSECUTIVE_FAILURES", "5"))
 
 # Broker/result (Redis example)
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "").strip()
@@ -276,16 +278,18 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "").strip()
 CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "Europe/Amsterdam").strip()
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# Example beat schedule, disabled unless explicitly configured/used.
-# CELERY_BEAT_SCHEDULE = {
-#     "sync-plants-hourly": {
-#         "task": "lumenix.tasks.sync_vocabulary_task",
-#         "schedule": crontab(minute="5", hour="*"),
-#         "args": ("plants",),
-#     },
-#     "sync-pathogens-hourly": {
-#         "task": "lumenix.tasks.sync_vocabulary_task",
-#         "schedule": crontab(minute="10", hour="*"),
-#         "args": ("pathogens",),
-#     },
-# }
+# How long the auto-resume pathogen sync holds its run-lock before it auto-expires.
+PATHOGEN_AUTO_SYNC_LOCK_TTL = int(os.getenv("PATHOGEN_AUTO_SYNC_LOCK_TTL", str(6 * 60 * 60)))
+
+# Number of pending specs synced per beat tick (overlapping ticks are skipped via lock).
+PATHOGEN_AUTO_SYNC_BATCH_SIZE = int(os.getenv("PATHOGEN_AUTO_SYNC_BATCH_SIZE", "10"))
+
+CELERY_BEAT_SCHEDULE = {
+    # Self-resuming pathogen sync: drains the backlog of pending PathogenQuerySpecs,
+    # then becomes a no-op (no SCiO calls) once everything has last_synced_at.
+    "auto-sync-pending-pathogen": {
+        "task": "lumenix.tasks.auto_sync_pending_pathogen_specs_task",
+        "schedule": crontab(minute="*/5"),
+        "kwargs": {"batch_size": PATHOGEN_AUTO_SYNC_BATCH_SIZE},
+    },
+}

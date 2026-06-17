@@ -7,9 +7,11 @@
             <div class="card-body">
                 <h4 class="d-flex align-items-center gap-2 mb-3">
                     <span>{{ chart_config.title|default:"Probability of illness vs time" }}</span>
-                    <button id="c1-chat-toggle" type="button" class="btn btn-outline-primary btn-sm ms-2">
-                        Ask Ambra
-                    </button>
+                    {% if chart_config.data_source == 'real' %}
+                    <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
+                    {% else %}
+                    <span class="chart-data-badge is-demo" title="Illustrative / generated values">Demo data</span>
+                    {% endif %}
                     <div class="dropdown ms-auto">
                         <button class="btn btn-link p-0 text-muted dropdown-toggle"
                                 type="button"
@@ -40,48 +42,7 @@
     </div>
 </div>
 
-<div class="row" id="c1-chat-panel" style="display: none;">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-2">
-                    <h5 class="mb-0">Ask Ambra about this chart</h5>
-                    <button id="c1-chat-download" type="button" class="btn btn-outline-secondary btn-sm ms-auto" disabled>
-                        Download chat (.txt)
-                    </button>
-                </div>
-                <p class="text-muted small mb-2">
-                    Ambra answers only about the current chart.
-                </p>
-
-                <div id="c1-chat-thread" class="border rounded p-3 mb-3 bg-light" style="height: 640px; overflow-y: auto;"></div>
-
-                <form id="c1-chat-form" data-chart-identifier="{{ chart_identifier|default:'c3_probability_over_time' }}">
-                    {% csrf_token %}
-                    <p class="text-muted small mb-2">
-                        Ambra can make mistakes. Please verify responses before relying on them.
-                    </p>
-                    <div class="d-flex flex-wrap gap-2 mb-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="Explain latest spike">Explain latest spike</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="Summarize this chart">Summarize this chart</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm c1-chat-quick-prompt" data-c1-quick-prompt="Any limit exceedances?">Any limit exceedances?</button>
-                    </div>
-                    <div class="mb-2">
-                        <textarea id="c1-chat-input"
-                                  class="form-control"
-                                  rows="3"
-                                  maxlength="1000"
-                                  placeholder="Ask about probability trend, baseline changes, date range, and chart interpretation."></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span id="c1-chat-char-count" class="small text-muted">0/1000</span>
-                        <button id="c1-chat-send" type="submit" class="btn btn-primary btn-sm">Send</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'lumenix/partials/_ambra_chat.html' with chart_identifier=chart_identifier|default:'c3_probability_over_time' %}
 
 {{ chart_config|json_script:"probChartCfg" }}
 
