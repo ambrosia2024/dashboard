@@ -24,28 +24,39 @@
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Nginx (Port 80)                      │
-│                    Static Files + Reverse Proxy             │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│              Django Application (Port 8000)                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │   Dashboard  │  │  Risk Charts │  │  Climate Data API│   │
-│  └──────────────┘  └──────────────┘  └──────────────────┘   │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │Vocabulary Mgr│  │  Simulation  │  │   User Auth      │   │
-│  └──────────────┘  └──────────────┘  └──────────────────┘   │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│           PostgreSQL 16 + PostGIS (Port 5432)               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │Climate Data  │  │ Simulations  │  │  Vocabularies    │   │
-│  └──────────────┘  └──────────────┘  └──────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Browser / Client                               │
+└───────────────┬─────────────────────────────────────────────────────────────┘
+                │ HTTP :80
+┌───────────────▼─────────────────────────────────────────────────────────────┐
+│                         Nginx reverse proxy                                 │
+│  /static/ → shared staticfiles volume                                       │
+│  /       → ambrosia_dashboard:8000                                          │
+└───────────────┬─────────────────────────────────────────────────────────────┘
+                │
+┌───────────────▼────────────────────────────────────────────────────────────┐
+│                   Django / Gunicorn app (container :8000)                  │
+│  Dashboard + view modes        Risk charts + chart pages                   │
+│  Climate data API              Pathogen concentration API                  │
+│  Vocabulary / NUTS / models    User auth + admin                           │
+│  Ambra chart assistant         Health endpoint (/status)                   │
+└───────┬───────────────┬──────────────────┬─────────────────────────────────┘
+        │               │                  │
+        │ SQL/PostGIS   │ broker/result     │ HTTPS
+        │               │                  │
+┌───────▼────────┐ ┌────▼──────────┐ ┌─────▼─────────────────────────────────┐
+│ PostgreSQL 16  │ │ Redis 7       │ │ External services                     │
+│ + PostGIS      │ │ broker/result  │ │ SCiO vocabulary / NUTS / models APIs │
+│ Climate data   │ └────┬──────────┘ │ SCiO pathogen concentration API       │
+│ Pathogen data  │      │            │ LLM chat completions endpoint         │
+│ Vocabularies   │      │            └───────────────────────────────────────┘
+│ Users / admin  │      │
+└───────┬────────┘      │ Celery broker/result
+        │               │
+┌───────▼────────┐ ┌────▼───────────────────────────────────────────────────┐
+│ pgAdmin :5050  │ │ Celery worker + embedded beat                          │
+│ DB management  │ │ Auto-resumes pending pathogen sync every 5 minutes     │
+└────────────────┘ └────────────────────────────────────────────────────────┘
 ```
 
 ---
