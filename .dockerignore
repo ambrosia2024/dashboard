@@ -1,43 +1,79 @@
-# Ignore Python virtual environment
-.venv
-venv/
+# Version-control metadata
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab-ci.yml
 
-# Ignore PostgreSQL directory
+# Docker and deployment files that are not copied into the runtime image
+.dockerignore
+Dockerfile~
+build_and_push.sh
+docker-compose*.yml
+nginx.conf
 postgres/
+mongodb/
 
-# Ignore compiled Python files
+# Python build, cache, and virtualenv files
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 *.so
-*.sqlite3
+.Python
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Ignore environment and secret files
+# Test, coverage, and tooling caches
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.cache/
+**/tests/
+**/test_*.py
+**/*_test.py
+
+# Environment, credentials, local databases, and logs
 .env
-.env.local
-.env.docker
-.env.sample
+.env.*
+*.sqlite3
+*.db
 *.log
+celerybeat-schedule
+data/celery/
 
-# Ignore IDE/editor config files
+# IDE, editor, and OS files
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Ignore Docker build cache
-.dockerignore
-Dockerfile~
-
+*~
 .DS_Store
-.git
-.gitignore
-docker-compose.yml
-docker-compose.prod.yml
-nginx/
+Thumbs.db
 
+# Frontend dependency caches and package-manager noise
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local data, generated assets, and non-runtime folders
 media/
+assets/
 data/
 !static/data/
 !static/data/**
@@ -45,11 +81,18 @@ synda/
 testing/
 api_test/
 pidrive/
-
-/*.nc
-
 deliverables/
 docs/
 
-# Ignore markdown docs (every level — none are needed at runtime)
+# Large or local-only data exports
+/*.nc
+*.bin
+*.deb
+*.csv
+*.json
+*.xlsx
+*.xls
+*.txt
+
+# Markdown docs are not required at runtime.
 **/*.md
