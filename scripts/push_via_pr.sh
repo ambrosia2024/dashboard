@@ -13,10 +13,7 @@ set -eu
 #   PR_BODY="My PR body"
 
 BASE_BRANCH="${BASE_BRANCH:-main}"
-TEMP_BRANCH="${1:-auto/merge-to-${BASE_BRANCH}-$(date +%Y%m%d-%H%M%S)}"
 CURRENT_BRANCH="$(git branch --show-current)"
-PR_TITLE="${PR_TITLE:-$(git log -1 --pretty=%s)}"
-PR_BODY="${PR_BODY:-Automated PR for changes that cannot be pushed directly to protected ${BASE_BRANCH}.}"
 
 if ! command -v gh >/dev/null 2>&1; then
   echo "GitHub CLI (gh) is required." >&2
@@ -38,6 +35,33 @@ fi
 if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/${BASE_BRANCH}")" ]; then
   echo "No committed changes to publish." >&2
   exit 1
+fi
+
+HEAD_SUBJECT="$(git log -1 --pretty=%s)"
+HEAD_SHORT_SHA="$(git rev-parse --short HEAD)"
+COMMIT_COUNT="$(git rev-list --count "origin/${BASE_BRANCH}..HEAD")"
+COMMIT_LIST="$(git log --reverse --format='- %h %s' "origin/${BASE_BRANCH}..HEAD")"
+
+SLUG="$(printf '%s' "${HEAD_SUBJECT}" \
+  | tr '[:upper:]' '[:lower:]' \
+  | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-//; s/-$//; s/^\(................................................\).*/\1/; s/-$//')"
+
+if [ -z "${SLUG}" ]; then
+  SLUG="changes"
+fi
+
+TEMP_BRANCH="${1:-auto/${SLUG}-${HEAD_SHORT_SHA}}"
+
+if [ -z "${PR_TITLE:-}" ]; then
+  if [ "${COMMIT_COUNT}" = "1" ]; then
+    PR_TITLE="${HEAD_SUBJECT}"
+  else
+    PR_TITLE="Merge ${COMMIT_COUNT} commits into ${BASE_BRANCH}"
+  fi
+fi
+
+if [ -z "${PR_BODY:-}" ]; then
+  PR_BODY="$(printf 'Automated PR for changes that cannot be pushed directly to protected `%s`.\n\nCommits:\n%s\n' "${BASE_BRANCH}" "${COMMIT_LIST}")"
 fi
 
 if git show-ref --verify --quiet "refs/heads/${TEMP_BRANCH}"; then
