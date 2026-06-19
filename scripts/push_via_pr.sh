@@ -64,6 +64,10 @@ fi
 
 git fetch origin "${BASE_BRANCH}"
 git merge --ff-only "origin/${BASE_BRANCH}"
-git branch -d "${TEMP_BRANCH}"
+if git show-ref --verify --quiet "refs/heads/${TEMP_BRANCH}"; then
+  git branch -d "${TEMP_BRANCH}"
+else
+  echo "Local temporary branch ${TEMP_BRANCH} was already deleted."
+fi
 
 echo "Merged ${TEMP_BRANCH} into ${BASE_BRANCH} and deleted the temporary branch."
