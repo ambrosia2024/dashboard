@@ -11,8 +11,10 @@ set -eu
 #   BASE_BRANCH=main
 #   PR_TITLE="My PR title"
 #   PR_BODY="My PR body"
+#   USE_LLM_METADATA=auto  # auto, 1/true/yes, or 0/false/no
 
 BASE_BRANCH="${BASE_BRANCH:-main}"
+USE_LLM_METADATA="${USE_LLM_METADATA:-auto}"
 CURRENT_BRANCH="$(git branch --show-current)"
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -48,6 +50,26 @@ SLUG="$(printf '%s' "${HEAD_SUBJECT}" \
 
 if [ -z "${SLUG}" ]; then
   SLUG="changes"
+fi
+
+if [ "${USE_LLM_METADATA}" != "0" ] && [ "${USE_LLM_METADATA}" != "false" ] && [ "${USE_LLM_METADATA}" != "no" ]; then
+  METADATA_FILE="/tmp/push-via-pr-metadata-$$.env"
+
+  if scripts/generate_pr_metadata.py --base "${BASE_BRANCH}" --output "${METADATA_FILE}"; then
+    . "${METADATA_FILE}"
+    SLUG="${LLM_BRANCH_SLUG:-${SLUG}}"
+    PR_TITLE="${PR_TITLE:-${LLM_PR_TITLE}}"
+    PR_BODY="${PR_BODY:-${LLM_PR_BODY}}"
+    echo "Generated PR metadata with LLM."
+  elif [ "${USE_LLM_METADATA}" = "1" ] || [ "${USE_LLM_METADATA}" = "true" ] || [ "${USE_LLM_METADATA}" = "yes" ]; then
+    rm -f "${METADATA_FILE}"
+    echo "LLM metadata generation was required but failed." >&2
+    exit 1
+  else
+    echo "Using commit-derived PR metadata fallback."
+  fi
+
+  rm -f "${METADATA_FILE}"
 fi
 
 TEMP_BRANCH="${1:-auto/${SLUG}-${HEAD_SHORT_SHA}}"
