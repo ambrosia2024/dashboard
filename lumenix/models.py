@@ -755,8 +755,6 @@ class PathogenConcentrationRecord(BaseModel):
     provenance_model_title = models.CharField(max_length=512, blank=True, default="")
     provenance_variable_name = models.CharField(max_length=128, blank=True, default="")
     provenance_fetched_at_ms = models.BigIntegerField(null=True, blank=True)
-    request_payload = models.JSONField(default=dict, blank=True)
-    provenance_payload = models.JSONField(default=dict, blank=True)
     source_payload = models.JSONField(default=dict, blank=True)
 
     class Meta:

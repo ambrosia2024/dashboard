@@ -42,11 +42,11 @@
 │  Ambra chart assistant         Health endpoint (/status)                   │
 └───────┬───────────────┬──────────────────┬─────────────────────────────────┘
         │               │                  │
-        │ SQL/PostGIS   │ broker/result     │ HTTPS
+        │ SQL/PostGIS   │ broker/result    │ HTTPS
         │               │                  │
 ┌───────▼────────┐ ┌────▼──────────┐ ┌─────▼─────────────────────────────────┐
 │ PostgreSQL 16  │ │ Redis 7       │ │ External services                     │
-│ + PostGIS      │ │ broker/result  │ │ SCiO vocabulary / NUTS / models APIs │
+│ + PostGIS      │ │ broker/result │ │ SCiO vocabulary / NUTS / models APIs  │
 │ Climate data   │ └────┬──────────┘ │ SCiO pathogen concentration API       │
 │ Pathogen data  │      │            │ LLM chat completions endpoint         │
 │ Vocabularies   │      │            └───────────────────────────────────────┘

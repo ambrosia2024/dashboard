@@ -244,8 +244,6 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
                     "provenance_model_title": provenance.get("model_title") or "",
                     "provenance_variable_name": provenance.get("variable_name") or "",
                     "provenance_fetched_at_ms": provenance.get("fetched_at"),
-                    "request_payload": request_meta,
-                    "provenance_payload": provenance,
                     "source_payload": item,
                     "status": 1,
                     "deleted_at": None,
