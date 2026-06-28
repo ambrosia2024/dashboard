@@ -93,6 +93,8 @@ docs/
 *.xlsx
 *.xls
 *.txt
+# ...but requirements.txt must be in the build context for the Docker build.
+!requirements.txt
 
 # Markdown docs are not required at runtime.
 **/*.md
