@@ -531,9 +531,20 @@ class DashboardViewChart(BaseModel):
     """
     Through model: which charts appear in which mode, with ordering and per-mode config overrides.
     """
+
+    class Emphasis(models.TextChoices):
+        PRIMARY = "primary", "Primary (prominent)"
+        SECONDARY = "secondary", "Secondary (available, de-emphasised)"
+        DISABLED = "disabled", "Disabled (visible but greyed out)"
+
     mode = models.ForeignKey(DashboardViewMode, on_delete=models.CASCADE, related_name="view_charts",)
     chart = models.ForeignKey(DashboardChart, on_delete=models.CASCADE, related_name="view_modes",)
     order = models.PositiveIntegerField(default=0, help_text="Ordering of charts within a mode.",)
+
+    emphasis = models.CharField(
+        max_length=12, choices=Emphasis.choices, default=Emphasis.PRIMARY,
+        help_text="How prominent this chart is in this view. 'Disabled' greys it out instead of hiding it.",
+    )
 
     config_override = models.JSONField(default=dict, blank=True,
                                        help_text="Optional per-mode override of chart config (the 'how').",)

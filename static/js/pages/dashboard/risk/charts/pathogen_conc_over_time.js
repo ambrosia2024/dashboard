@@ -16,14 +16,28 @@ window.renderPathogenConcChart = function (domId, rows, pairLabel = "") {
     if (!rows.length) {
         chart.clear();
         chart.setOption({
-            title: { text: '', subtext: pairLabel },
-            xAxis: { type: 'category', data: [] },
-            yAxis: { type: 'value', name: unit },
+            title: { show: false },
+            // Hide the empty axes so the card reads as a clean message, not a blank plot.
+            xAxis: { type: 'category', data: [], show: false },
+            yAxis: { type: 'value', show: false },
             graphic: {
-                type: 'text',
+                type: 'group',
                 left: 'center',
                 top: 'middle',
-                style: { text: 'No synced data for the selected filters', fill: '#667085', fontSize: 14 }
+                children: [
+                    // Simple "no data" glyph: a soft ring with a dash.
+                    { type: 'circle', x: 0, y: -40, shape: { cx: 0, cy: 0, r: 17 },
+                      style: { fill: '#f2f4f7', stroke: '#d0d5dd', lineWidth: 1.5 } },
+                    { type: 'line', shape: { x1: -7, y1: -40, x2: 7, y2: -40 },
+                      style: { stroke: '#98a2b3', lineWidth: 2 } },
+                    { type: 'text', x: 0, y: -10,
+                      style: { text: 'No synced data', textAlign: 'center', textVerticalAlign: 'middle',
+                               fill: '#475467', fontSize: 15, fontWeight: 600 } },
+                    { type: 'text', x: 0, y: 14,
+                      style: { text: 'for the selected location / crop / hazard combination',
+                               textAlign: 'center', textVerticalAlign: 'middle',
+                               fill: '#98a2b3', fontSize: 13 } },
+                ],
             },
             series: []
         }, { notMerge: true });

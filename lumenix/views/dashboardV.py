@@ -1,14 +1,14 @@
 # lumenix/views/dashboardV.py
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import get_language
 from django.views.generic import TemplateView
 
 from lumenix.models import PlantConcept, PathogenConcept, DashboardViewMode, DashboardViewChart
+from lumenix.views.mixins import DashboardModeMixin
 
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(DashboardModeMixin, LoginRequiredMixin, TemplateView):
     template_name = "lumenix/index.html"
 
     def get_context_data(self, **kwargs):
@@ -37,16 +37,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["crops"] = [{"id": c.id, "label": pick_label(c.pref_label)} for c in crops_qs]
         context["pathogens"] = [{"id": p.id, "label": pick_label(p.pref_label)} for p in paths_qs]
 
-        mode = self._get_active_mode()
+        mode = self.get_active_mode()
         context["current_mode"] = mode
-        context["mode_locked"] = self._is_mode_locked()
+        context["mode_locked"] = self.is_mode_locked()
         context["available_modes"] = DashboardViewMode.active_objects.order_by("id")
 
         if mode:
             view_charts = (
                 DashboardViewChart.active_objects
                 .select_related("chart", "mode")
-                .filter(mode=mode)
+                .filter(mode=mode, chart__page_code="risk")
                 .order_by("order")
             )
             context["charts"] = [
@@ -55,6 +55,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     "label": vc.chart.label,
                     "template_name": vc.chart.template_name,
                     "config": vc.effective_config,
+                    "emphasis": vc.emphasis,
                 }
                 for vc in view_charts
             ]
@@ -62,44 +63,3 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context["charts"] = []
 
         return context
-
-    def _get_active_mode(self):
-        qs = DashboardViewMode.active_objects.all()
-
-        profile = self._get_user_profile()
-        if profile and profile.dashboard_mode_id:
-            mode = qs.filter(pk=profile.dashboard_mode_id).first()
-            if mode:
-                return mode
-
-        # 1) Query param (shareable links)
-        mode_code = self.request.GET.get("view") or self.request.GET.get("mode")
-        if mode_code:
-            mode = qs.filter(code=mode_code).first()
-            if mode:
-                return mode
-
-        # 2) Cookie (no-login persistence)
-        cookie_code = self.request.COOKIES.get("dashboard_mode")
-        if cookie_code:
-            mode = qs.filter(code=cookie_code).first()
-            if mode:
-                return mode
-
-        # 3) Default mode
-        mode = qs.filter(is_default=True).order_by("id").first()
-        if mode:
-            return mode
-
-        # 4) Last resort
-        return qs.order_by("id").first()
-
-    def _is_mode_locked(self):
-        profile = self._get_user_profile()
-        return bool(profile and profile.dashboard_mode_id)
-
-    def _get_user_profile(self):
-        try:
-            return self.request.user.profile
-        except ObjectDoesNotExist:
-            return None

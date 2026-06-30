@@ -1,6 +1,7 @@
 {# templates/lumenix/risk_charts_new.html #}
 {% extends 'lumenix/base/base.html' %}
 {% load static %}
+{% load sidebar_menu %}
 
 {% block title %}Risk Charts{% endblock title %}
 
@@ -111,7 +112,20 @@
 
 {% block content %}
     {# Render ONLY the selected chart template #}
-    {% if selected_chart %}
+    {% if chart_unavailable %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-eye-slash" style="font-size: 2rem; color: #98a2b3;"></i>
+                        <h4 class="mt-3">{{ selected_chart.label|strip_chart_code|default:"This chart" }} isn’t part of the {{ current_mode_label }} view</h4>
+                        <p class="text-muted mb-3">Switch your View using the selector at the top right to one where this chart is available, or choose another chart.</p>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-primary btn-sm">Back to dashboard</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% elif selected_chart %}
         {% include selected_chart.template_name with chart_config=selected_chart.config chart_identifier=selected_chart.identifier %}
     {% else %}
         <div class="alert alert-warning">No risk charts are configured for this view.</div>

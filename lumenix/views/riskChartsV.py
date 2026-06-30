@@ -1,19 +1,18 @@
 # lumenix/views/riskChartsV.py
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist
 from django.views.generic import TemplateView
 
 from lumenix.models import DashboardViewMode, DashboardViewChart, DashboardChart
+from lumenix.services.dashboard_modes import chart_emphasis_map
+from lumenix.views.mixins import DashboardModeMixin
 
 
-class RiskChartsView(LoginRequiredMixin, TemplateView):
+class RiskChartsView(DashboardModeMixin, LoginRequiredMixin, TemplateView):
     template_name = "lumenix/risk_charts.html"  # default fallback
 
     def get_template_names(self):
         name = self.request.resolver_match.url_name
-
-        print("url name: ", name)
 
         if name == "risk-charts-all":
             return ["lumenix/risk_charts.html"]
@@ -29,9 +28,9 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
-        mode = self._get_active_mode()
+        mode = self.get_active_mode()
         ctx["current_mode"] = mode
-        ctx["mode_locked"] = self._is_mode_locked()
+        ctx["mode_locked"] = self.is_mode_locked()
         ctx["available_modes"] = DashboardViewMode.active_objects.order_by("id")
 
         view_charts = (
@@ -46,14 +45,18 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
             "label": vc.chart.label,
             "template_name": vc.chart.template_name,
             "config": vc.effective_config,
+            "emphasis": vc.emphasis,
         } for vc in view_charts]
 
         ctx["charts"] = charts
 
-        # default selection
+        def first_enabled(items):
+            return next((c for c in items if c["emphasis"] != "disabled"), items[0] if items else None)
+
+        # default selection: honour ?chart=, else the first non-disabled chart
         requested = self.request.GET.get("chart")
         selected = next((c for c in charts if c["identifier"] == requested), None) if requested else None
-        ctx["selected_chart"] = selected or (charts[0] if charts else None)
+        ctx["selected_chart"] = selected or first_enabled(charts)
 
         # If a specific chart identifier is in path, force that selection.
         chart_identifier = self.kwargs.get("chart_identifier")
@@ -90,42 +93,11 @@ class RiskChartsView(LoginRequiredMixin, TemplateView):
             if pathogen:
                 ctx["selected_chart"] = pathogen
 
-            print(pathogen)
+        # Guard: if the selected chart is greyed-out (disabled) for the active view,
+        # the template shows a "not available in this view" notice instead of the chart.
+        selected = ctx.get("selected_chart")
+        emphasis = chart_emphasis_map(mode).get(selected["identifier"]) if selected else None
+        ctx["chart_unavailable"] = emphasis == "disabled"
+        ctx["current_mode_label"] = mode.label if mode else ""
 
         return ctx
-
-    def _get_active_mode(self):
-        qs = DashboardViewMode.active_objects.all()
-
-        profile = self._get_user_profile()
-        if profile and profile.dashboard_mode_id:
-            mode = qs.filter(pk=profile.dashboard_mode_id).first()
-            if mode:
-                return mode
-
-        # prefer ?view= over anything else
-        code = self.request.GET.get("view") or self.request.GET.get("mode")
-        if code:
-            mode = qs.filter(code=code).first()
-            if mode:
-                return mode
-
-        # cookie fallback
-        cookie_code = self.request.COOKIES.get("dashboard_mode")
-        if cookie_code:
-            mode = qs.filter(code=cookie_code).first()
-            if mode:
-                return mode
-
-        mode = qs.filter(is_default=True).order_by("id").first()
-        return mode or qs.order_by("id").first()
-
-    def _is_mode_locked(self):
-        profile = self._get_user_profile()
-        return bool(profile and profile.dashboard_mode_id)
-
-    def _get_user_profile(self):
-        try:
-            return self.request.user.profile
-        except ObjectDoesNotExist:
-            return None

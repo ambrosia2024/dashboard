@@ -623,8 +623,9 @@ class DashboardChartAdmin(admin.ModelAdmin):
 
 @admin.register(DashboardViewChart)
 class DashboardViewChartAdmin(admin.ModelAdmin):
-    list_display = ("mode", "chart", "order", "status")
-    list_filter = ("mode", "chart", "status")
+    list_display = ("mode", "chart", "emphasis", "order", "status")
+    list_editable = ("emphasis", "order")
+    list_filter = ("mode", "chart", "emphasis", "status")
     search_fields = ("mode__label", "chart__label")
     ordering = ("mode", "order")
 
