@@ -1,6 +1,7 @@
 {% extends 'lumenix/base/base.html' %}
 {% load static %}
 {% load json_extras %}
+{% load sidebar_menu %}
 
 {% block title %}Forms{% endblock title %}
 
@@ -128,6 +129,42 @@
     </div>
 </div>
 
+{% comment %}
+Chart picker: pick a chart for the active View, carrying the selections.
+Charts disabled for this view are shown greyed-out (not clickable).
+{% endcomment %}
+{% if charts %}
+<div class="row" id="home-chart-picker">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3" id="chartPickerTitle">Explore charts</h5>
+                <div class="row g-3">
+                    {% for chart in charts %}
+                    <div class="col-sm-4">
+                        {% if chart.emphasis == 'disabled' %}
+                        <span class="chart-pick-card is-disabled" aria-disabled="true"
+                              title="Not part of the {{ current_mode.label }} view">
+                            <span class="chart-pick-card-label">{{ chart.label|strip_chart_code }}</span>
+                            <span class="chart-source-indicator {% if chart.config.data_source == 'real' %}is-live{% else %}is-sample{% endif %}" aria-hidden="true">&#9679;</span>
+                        </span>
+                        {% else %}
+                        <a class="chart-pick-card{% if chart.emphasis == 'secondary' %} is-secondary{% endif %}"
+                           href="{% url 'risk-charts-item' chart_identifier=chart.identifier %}">
+                            <span class="chart-pick-card-label">{{ chart.label|strip_chart_code }}</span>
+                            <span class="chart-source-indicator {% if chart.config.data_source == 'real' %}is-live{% else %}is-sample{% endif %}" aria-hidden="true">&#9679;</span>
+                            <i class="bi bi-arrow-right chart-pick-card-arrow"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <div class="col-sm-12">
         <div class="card">
@@ -211,6 +248,51 @@
     <script src="{% static 'js/pages/dashboard/locate_nuts_region.js' %}"></script>
 
     <script src="{% static 'js/pages/dashboard/keep_location_crop_hazard_in_cookies.js' %}"></script>
+
+    <!-- Reflect the current location/crop/hazard selection in the chart-picker title -->
+    <script>
+      (function () {
+        // Read a <select>'s chosen label; empty value or placeholder ("-- ... --") = not selected.
+        function selectLabel(id) {
+          var el = document.getElementById(id);
+          if (!el || !el.value) return "";
+          var opt = el.options[el.selectedIndex];
+          var txt = (opt ? opt.textContent : "").trim();
+          return txt.indexOf("--") === 0 ? "" : txt;
+        }
+        function refreshChartPickerTitle() {
+          var titleEl = document.getElementById("chartPickerTitle");
+          if (!titleEl) return;
+          var crop = selectLabel("crop_list");
+          var hazard = selectLabel("pathogen_list");
+          var locEl = document.getElementById("searchAddress");
+          var location = locEl ? (locEl.value || "").trim() : "";
+          var subject = [crop, hazard].filter(Boolean).join(" · ");
+          var title;
+          if (subject && location) title = "Charts for " + subject + " in " + location;
+          else if (subject) title = "Charts for " + subject;
+          else if (location) title = "Charts for " + location;
+          else title = "Explore charts";
+          titleEl.textContent = title;
+        }
+        document.addEventListener("DOMContentLoaded", refreshChartPickerTitle);
+        document.addEventListener("change", function (ev) {
+          var id = ev.target && ev.target.id;
+          if (id === "crop_list" || id === "pathogen_list" || id === "searchAddress") {
+            refreshChartPickerTitle();
+          }
+        });
+        document.addEventListener("input", function (ev) {
+          if (ev.target && ev.target.id === "searchAddress") refreshChartPickerTitle();
+        });
+        // Clear/Reset buttons mutate the inputs in their own handlers; refresh after them.
+        document.addEventListener("click", function (ev) {
+          if (ev.target && ev.target.closest && ev.target.closest("#clearSearch, #resetSelections")) {
+            setTimeout(refreshChartPickerTitle, 0);
+          }
+        });
+      })();
+    </script>
 
     <!-- script for showing food safety hazard dummy figure -->
     <script src="{% static 'js/pages/dashboard/food_safety_hazard_dummy.js' %}"></script>

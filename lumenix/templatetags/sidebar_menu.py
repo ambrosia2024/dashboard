@@ -1,9 +1,24 @@
+import re
+
 from django import template
 from django.urls import reverse, NoReverseMatch
 
 from lumenix.models import SidebarChartLink, AdminMenuMaster
+from lumenix.services.dashboard_modes import get_active_mode, chart_emphasis_map
 
 register = template.Library()
+
+# Matches a leading chart-code prefix like "C1 - " / "c2 – " used in chart labels.
+_CHART_CODE_PREFIX = re.compile(r"^[Cc]\d+\s*[-–—:]\s*")
+
+# Pulls the chart identifier out of a /risk-charts/chart/<id>/ menu route.
+_CHART_LINK_RE = re.compile(r"/risk-charts/chart/([^/]+)/")
+
+
+@register.filter
+def strip_chart_code(label):
+    """Drop the leading "C1 - " style code so labels match the sidebar names."""
+    return _CHART_CODE_PREFIX.sub("", (label or "").strip())
 
 
 def _resolve_menu_url(route):
@@ -40,6 +55,9 @@ def admin_menu_tree(context):
     request = context.get("request")
     current_path = getattr(request, "path", "") if request else ""
 
+    # Per-view chart emphasis, so chart links can be greyed-out for the active view.
+    emphasis_map = chart_emphasis_map(get_active_mode(request)) if request else {}
+
     nodes = list(AdminMenuMaster.active_objects.order_by("order", "id"))
     children_by_parent = {}
     tops = []
@@ -60,11 +78,14 @@ def admin_menu_tree(context):
                 child_url = _resolve_menu_url(child.menu_route)
                 child_active = _is_active(child_url, current_path)
                 any_child_active = any_child_active or child_active
+                chart_match = _CHART_LINK_RE.search(child_url or "")
+                emphasis = emphasis_map.get(chart_match.group(1)) if chart_match else None
                 children.append({
                     "name": child.menu_name,
                     "url": child_url,
                     "open_in_new_tab": child.open_in_new_tab,
                     "active": child_active,
+                    "emphasis": emphasis,
                 })
         tree.append({
             "name": node.menu_name,

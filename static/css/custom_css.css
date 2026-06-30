@@ -371,3 +371,73 @@
     color: #b8860b !important; /* amber */
     stroke: #b8860b !important;
 }
+
+/* Home-page chart picker: clickable tiles that open each chart's own page. */
+.chart-pick-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #344054;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.chart-pick-card:hover,
+.chart-pick-card:focus-visible {
+    border-color: #376EB5;
+    color: #376EB5;
+    box-shadow: 0 6px 18px rgba(55, 110, 181, 0.15);
+    transform: translateY(-2px);
+}
+
+.chart-pick-card-label {
+    flex: 1 1 auto;
+}
+
+/* Nudge the arrow to the right; slide it on hover as a subtle affordance. */
+.chart-pick-card-arrow {
+    flex: 0 0 auto;
+    opacity: 0.5;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.chart-pick-card:hover .chart-pick-card-arrow,
+.chart-pick-card:focus-visible .chart-pick-card-arrow {
+    opacity: 1;
+    transform: translateX(3px);
+}
+
+/* Secondary charts are still available/clickable — they render like normal
+   tiles (no greying), so only truly disabled charts read as unavailable. */
+
+/* Disabled: chart isn't part of the active view — visible but greyed out. */
+.chart-pick-card.is-disabled {
+    background: #f2f4f7;
+    color: #98a2b3;
+    border-color: #eaecf0;
+    cursor: not-allowed;
+    pointer-events: auto; /* keep the tooltip on hover */
+    box-shadow: none;
+    transform: none;
+}
+
+.chart-pick-card.is-disabled .chart-source-indicator {
+    opacity: 0.45;
+    filter: grayscale(1);
+}
+
+/* Sidebar: chart not part of the active view — greyed out, not clickable. */
+#side-menu .menu-chart-disabled > a {
+    color: #b0b4bb !important;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.7;
+}
+

@@ -120,7 +120,7 @@ function explainToxins(rows) {
 }
 
 function explainPathogens(rows) {
-  if (!rows?.length) return "<em>No synced pathogen data for the selected filters and date range.</em>";
+  if (!rows?.length) return "<em>No synced data for the selected location / crop / hazard combination.</em>";
 
   const y = rows.map((r) => r.pathogen_model_value).filter((v) => Number.isFinite(v));
   if (!y.length) return "<em>No pathogen model values in the selected period.</em>";
@@ -1200,9 +1200,15 @@ function toApiSlug(value, fallback = "") {
 }
 
 function getCurrentRiskPair() {
+  // Treat an empty value or a placeholder label ("-- Select a Crop --") as "not
+  // chosen" so it never leaks into chart subtitles; fall back to the defaults.
+  const clean = (value, fallback) => {
+    const label = (value || "").trim();
+    return !label || label.startsWith("--") ? fallback : label;
+  };
   return {
-    crop: localStorage.getItem("lx_selected_crop_label") || "Lettuce",
-    pathogen: localStorage.getItem("lx_selected_pathogen_label") || "Salmonella",
+    crop: clean(localStorage.getItem("lx_selected_crop_label"), "Lettuce"),
+    pathogen: clean(localStorage.getItem("lx_selected_pathogen_label"), "Salmonella"),
   };
 }
 
@@ -1416,6 +1422,32 @@ function pathogenSourceTooltip(isLive) {
   return p && p.model_title ? `Live data - source model "${p.model_title}"` : "Live data from the database";
 }
 
+// Toggle the shimmer skeleton on a single chart and its card.
+function setChartSkeleton(domId, isLoading) {
+  const chartEl = document.getElementById(domId);
+  if (!chartEl) return;
+  chartEl.classList.toggle("risk-chart-skeleton", isLoading);
+  chartEl.setAttribute("aria-busy", isLoading ? "true" : "false");
+  const card = chartEl.closest(".card");
+  if (card) card.classList.toggle("risk-card-loading", isLoading);
+}
+
+// ECharts' built-in spinner ("loading" icon + text). Shown on charts that
+// fetch their own data after the batch skeleton has already been cleared, so
+// the user keeps seeing a clear loading state until the data actually lands.
+function showChartLoading(domId) {
+  const el = document.getElementById(domId);
+  if (!el || typeof echarts === "undefined") return null;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  chart.showLoading("default", {
+    text: "Loading chart data…",
+    color: "#376EB5",
+    textColor: "#475467",
+    maskColor: "rgba(255, 255, 255, 0.85)",
+  });
+  return chart;
+}
+
 async function renderRealPathogenChart(fallbackRows) {
   if (!document.getElementById("pathogenConcChart")) {
     return;
@@ -1424,6 +1456,10 @@ async function renderRealPathogenChart(fallbackRows) {
   const pairLabel = getCurrentPairLabel();
   const scale = getSelectedToxinScale();
 
+  // Show the spinner until the async fetch below resolves; the batch renderer
+  // clears every chart's skeleton on a fixed ~90ms timer, well before the
+  // live pathogen query returns.
+  const loadingChart = showChartLoading("pathogenConcChart");
   try {
     const data = await fetchRealPathogenRows();
     const usedReal = Array.isArray(data?.rows) && data.rows.length > 0;
@@ -1438,8 +1474,10 @@ async function renderRealPathogenChart(fallbackRows) {
     window.__pathogenProvenanceCurrent = null;
     window.renderPathogenConcChart("pathogenConcChart", [], pairLabel);
     const pathEl = document.getElementById("pathogenExplain");
-    if (pathEl) pathEl.innerHTML = `<em>${err?.message || "No synced pathogen data for the selected filters and date range."}</em>`;
-    setChartDataSourceBadge("pathogenConcChart", false, "No synced data for the selected filters");
+    if (pathEl) pathEl.innerHTML = "<em>No synced data for the selected location / crop / hazard combination.</em>";
+    setChartDataSourceBadge("pathogenConcChart", false, "No synced data for the selected location / crop / hazard combination");
+  } finally {
+    if (loadingChart) loadingChart.hideLoading();
   }
 }
 
@@ -1995,14 +2033,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   function setChartsLoading(chartDomIds, isLoading) {
-    chartDomIds.forEach((id) => {
-      const chartEl = document.getElementById(id);
-      if (!chartEl) return;
-      chartEl.classList.toggle("risk-chart-skeleton", isLoading);
-      chartEl.setAttribute("aria-busy", isLoading ? "true" : "false");
-      const card = chartEl.closest(".card");
-      if (card) card.classList.toggle("risk-card-loading", isLoading);
-    });
+    chartDomIds.forEach((id) => setChartSkeleton(id, isLoading));
   }
 
   // 3) render only charts that exist in the DOM

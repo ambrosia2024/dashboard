@@ -28,23 +28,10 @@ $(document).ready(function () {
         layer.addTo(map);
     })();
 
-    // Add drawing functionality
+    // Keep the feature group for storing/clearing shapes, but don't show the
+    // draw toolbar (polygon/rectangle/circle/marker/edit/delete icons).
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
-
-    var drawControl = new L.Control.Draw({
-        edit: {
-            featureGroup: drawnItems
-        },
-        draw: {
-            polygon: true,
-            polyline: false,
-            rectangle: true,
-            circle: true,
-            marker: true
-        }
-    });
-    map.addControl(drawControl);
 
     // Handle drawing events
     map.on(L.Draw.Event.CREATED, function (event) {
@@ -79,6 +66,34 @@ $(document).ready(function () {
         }
     });
 
+    // Build a concise "City, Region, Country" label from a Nominatim reverse result.
+    function concisePlaceLabel(data) {
+        if (!data) return "";
+        var a = data.address || {};
+        var place = a.city || a.town || a.village || a.municipality || a.county || a.suburb || "";
+        var parts = [place, a.state, a.country].filter(Boolean);
+        return parts.length ? parts.join(", ") : (data.display_name || "");
+    }
+
+    // Set the location input and fire "change" so persistence (keep_location_...js)
+    // and the chart-picker title pick it up.
+    function setLocationInputValue(value) {
+        var input = document.getElementById("searchAddress");
+        if (!input) return;
+        input.value = value;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // Reverse-geocode coordinates to a readable place name for the input box.
+    function fillLocationInputFromCoords(lat, lon) {
+        var fallback = (+lat).toFixed(5) + ", " + (+lon).toFixed(5);
+        var url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=" +
+            lat + "&lon=" + lon + "&zoom=10&addressdetails=1";
+        $.getJSON(url)
+            .done(function (data) { setLocationInputValue(concisePlaceLabel(data) || fallback); })
+            .fail(function () { setLocationInputValue(fallback); });
+    }
+
     // "Locate Me" functionality
     $("#locateMe").click(function () {
         if (!navigator.geolocation) {
@@ -102,6 +117,15 @@ $(document).ready(function () {
 
                 // Zoom to user location
                 map.setView([lat, lon], 10);
+
+                // Persist coordinates so the chart pages can use the real location.
+                try {
+                    localStorage.setItem("lx_selected_location_lat", lat);
+                    localStorage.setItem("lx_selected_location_lon", lon);
+                } catch (e) { /* storage unavailable; non-fatal */ }
+
+                // Put the detected place name into the location input box.
+                fillLocationInputFromCoords(lat, lon);
 
                 // Fetch and highlight NUTS2 region
                 fetchNUTSRegions(lat, lon);

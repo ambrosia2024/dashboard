@@ -24,9 +24,16 @@
                     </a>
                     <ul class="sub-menu mm-collapse" aria-expanded="false">
                       {% for child in node.children %}
-                      <li class="{% if child.active %}mm-active{% endif %}">
+                      {% if child.emphasis == 'disabled' %}
+                      <li class="menu-chart-disabled">
+                        <a href="javascript: void(0);" aria-disabled="true" tabindex="-1"
+                           title="Not part of the current view">{{ child.name }}</a>
+                      </li>
+                      {% else %}
+                      <li class="{% if child.active %}mm-active{% endif %}{% if child.emphasis == 'secondary' %} menu-chart-secondary{% endif %}">
                         <a href="{{ child.url }}"{% if child.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ child.name }}</a>
                       </li>
+                      {% endif %}
                       {% endfor %}
                     </ul>
                   </li>
