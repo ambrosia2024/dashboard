@@ -30,6 +30,8 @@ def _is_missing_model_error(exc) -> bool:
 
 
 def _api_error_detail(response):
+    if response is None:
+        return ""
     try:
         data = response.json()
     except ValueError:
@@ -183,10 +185,12 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
             if _is_missing_model_error(last_exc):
                 model_missing = True
                 logger.warning(
-                    "Pathogen sync: no model for spec=%s plant=%s pathogen=%s — aborting spec (will be deactivated).",
+                    "Pathogen sync: no model for spec=%s plant=%s pathogen=%s — aborting spec "
+                    "(will be deactivated). Source API said: %s",
                     spec.pk,
                     spec.plant,
                     spec.pathogen,
+                    _api_error_detail(getattr(last_exc, "response", None)),
                 )
                 break
             failed_ranges.append(
@@ -288,7 +292,7 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
         if REQUEST_DELAY_SECONDS > 0 and index < len(chunks) - 1:
             time.sleep(REQUEST_DELAY_SECONDS)
 
-    if successful_chunks:
+    if successful_chunks and not failed_ranges:
         spec.last_synced_at = timezone.now()
         spec.save(update_fields=["last_synced_at", "updated_at"])
 
