@@ -1,0 +1,37 @@
+api:
+  dashboard: true            # dashboard is reachable via the routed domain
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false  # only route containers with traefik.enable=true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: p.bapat@maastrichtuniversity.nl
+      storage: /acme.json
+      httpChallenge:
+        entryPoint: web
+
+# Traefik's own internal log (not access logs). Useful for debugging.
+log:
+  level: INFO
+  filePath: "/var/log/traefik/traefik.log"
+
+# Nginx-style access log for every incoming request through Traefik.
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  format: json
+  bufferingSize: 100          # batches writes for performance
