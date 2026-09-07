@@ -193,12 +193,17 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
 ACCOUNT_SESSION_REMEMBER = None
 
 # Shared cache used by login anti-bruteforce controls.
+# Redis-backed so the cache is shared across containers. The admin sync guards
+# use cache.add() as a lock: the web container acquires it and the Celery worker
+# releases it, which only works if both see the same store. A file-based cache
+# gave each container its own copy, so worker-side releases never cleared the
+# web-side lock (it then sat for its full TTL, blocking every admin sync).
+# cache.add() maps to Redis SETNX, which is atomic — a shared volume would not be.
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": BASE_DIR / "data" / "django_cache",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_CACHE_URL", "redis://127.0.0.1:6379/2"),
         "TIMEOUT": 60 * 30,
-        "OPTIONS": {"MAX_ENTRIES": 50000},
     }
 }
 
