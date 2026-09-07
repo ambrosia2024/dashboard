@@ -199,13 +199,32 @@ ACCOUNT_SESSION_REMEMBER = None
 # gave each container its own copy, so worker-side releases never cleared the
 # web-side lock (it then sat for its full TTL, blocking every admin sync).
 # cache.add() maps to Redis SETNX, which is atomic — a shared volume would not be.
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("REDIS_CACHE_URL", "redis://127.0.0.1:6379/2"),
-        "TIMEOUT": 60 * 30,
+# Prefer REDIS_CACHE_URL; otherwise derive the cache URL from the Celery broker
+# (always set wherever Redis exists), so a missing env var cannot silently point
+# the cache at localhost. With no Redis at all — plain `runserver` locally — fall
+# back to the file cache so local development needs no extra service.
+_REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", "").strip()
+_BROKER_URL = os.getenv("CELERY_BROKER_URL", "").strip()
+if not _REDIS_CACHE_URL and _BROKER_URL.startswith("redis://"):
+    _REDIS_CACHE_URL = _BROKER_URL.rsplit("/", 1)[0] + "/2"
+
+if _REDIS_CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _REDIS_CACHE_URL,
+            "TIMEOUT": 60 * 30,
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+            "LOCATION": BASE_DIR / "data" / "django_cache",
+            "TIMEOUT": 60 * 30,
+            "OPTIONS": {"MAX_ENTRIES": 50000},
+        }
+    }
 
 # Login protection thresholds
 LOGIN_BURST_LIMIT_PER_MINUTE = int(os.getenv("LOGIN_BURST_LIMIT_PER_MINUTE", "20"))
