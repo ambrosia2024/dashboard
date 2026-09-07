@@ -96,5 +96,11 @@ docs/
 # ...but requirements.txt must be in the build context for the Docker build.
 !requirements.txt
 
-# Markdown docs are not required at runtime.
+# Markdown docs are not required at runtime. Deliberately a blanket exclusion
+# with NO allow-list: unlike .gitignore, nothing in the image ever reads a .md
+# file, so README/CHANGELOG/docs would only add build-context and layer weight.
+# Do not "sync" this with the .gitignore allow-list.
 **/*.md
+
+# Local-only PR/git workflow notes (also covered by **/*.md above; listed explicitly).
+git_pr_workflow.md

@@ -1,6 +1,6 @@
 # 🚀 Ambrosia Dashboard
 
-[![Django](https://img.shields.io/badge/Django-5.2.1-green.svg)](https://www.djangoproject.com/)
+[![Django](https://img.shields.io/badge/Django-6.1.1-green.svg)](https://www.djangoproject.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
 [![PostGIS](https://img.shields.io/badge/PostGIS-3.4-2E8B57.svg)](https://postgis.net/)
@@ -10,12 +10,9 @@
 
 ## 📋 Table of Contents
 
-- [Features](#-features)
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
 - [Configuration](#-configuration)
-- [API Reference](#-api-reference)
-- [Project Structure](#-project-structure)
 - [Development](#-development)
 - [Troubleshooting](#-troubleshooting)
 
