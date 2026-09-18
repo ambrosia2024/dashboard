@@ -1,0 +1,109 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Overview{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<div class="ws">
+    <nav class="ws-crumbs" aria-label="Breadcrumb"><span class="is-current">Home</span></nav>
+
+    <div class="ws-head">
+        <div>
+            <h1>Welcome{% if user.first_name %}, {{ user.first_name }}{% endif %}.</h1>
+            <p>Continue an assessment or explore a new question.</p>
+        </div>
+        <a href="{% url 'assessment-new' %}" class="ws-btn ws-btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New assessment
+        </a>
+    </div>
+
+    <div class="ws-grid">
+        <div>
+            <section class="ws-panel" id="saved">
+                <h2>Saved situations <a href="{% url 'situations' %}" class="ws-see-all">See all</a></h2>
+                {% if saved_situations %}
+                <div class="ws-situations">
+                    {% for s in saved_situations %}
+                    <article class="ws-situation">
+                        <strong>{{ s.name }}</strong>
+                        <span class="ws-situation-meta">{{ s.crop_label }}{% if s.crop and s.nuts2_name %} · {% endif %}{{ s.nuts2_name|default:s.nuts2_code }}</span>
+                        <span class="ws-situation-foot">
+                            <small>{% if s.last_used_at %}Last used {{ s.last_used_at|timesince }} ago{% else %}Saved {{ s.updated_at|timesince }} ago{% endif %}</small>
+                            <a href="{% url 'assessment-new' %}?situation={{ s.id }}">Use settings</a>
+                        </span>
+                    </article>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'assessment-new' %}" class="ws-btn-link" style="display:inline-block;margin-top:12px;font-size:14px;">+ Create a saved situation</a>
+                {% else %}
+                <div class="ws-empty">
+                    <strong>No saved situations yet.</strong>
+                    Named situations (location, crop, hazard and period) you can reuse will appear here.
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="ws-panel" id="history">
+                <h2>Recent requests <a href="{% url 'situations' %}?tab=history" class="ws-see-all">See all</a></h2>
+                {% if recent_requests %}
+                <div class="ws-table-wrap">
+                <table class="ws-table">
+                    <thead><tr><th>Assessment</th><th>Date</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    {% for r in recent_requests %}
+                    <tr>
+                        <td><strong>{{ r.name }}</strong><br><small>{{ r.crop_label }} · {{ r.hazard_label }} · {{ r.nuts2_code }} · v{{ r.version }}</small></td>
+                        <td>{{ r.created_at|date:"j M Y" }}</td>
+                        <td><span class="ws-status ws-status--{{ r.run_status }}">{{ r.get_run_status_display }}</span></td>
+                        <td class="ws-table-action"><a href="{% url 'assessment-outcome' r.id %}">Open</a></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {% else %}
+                <div class="ws-empty">
+                    <strong>No assessments run yet.</strong>
+                    Start a new assessment to see it listed here with its date and status.
+                </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <aside>
+            <section class="ws-panel">
+                <h2>New exploration</h2>
+                <div class="ws-explore">
+                    {% for e in explorations %}
+                    {% if e.url %}
+                    <a href="{{ e.url }}" class="ws-explore-card">
+                        <span class="ws-explore-icon"><i data-feather="{{ e.icon }}"></i></span>
+                        <strong>{{ e.title }}</strong>
+                        <small>{{ e.text }}</small>
+                    </a>
+                    {% else %}
+                    <div class="ws-explore-card is-disabled" aria-disabled="true">
+                        <span class="ws-explore-icon"><i data-feather="{{ e.icon }}"></i></span>
+                        <strong>{{ e.title }}</strong>
+                        <small>{{ e.text }}</small>
+                        <span class="ws-soon">Not yet available</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="ws-info" style="margin-top:14px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Available information depends on the question and selected area.</span>
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock content %}

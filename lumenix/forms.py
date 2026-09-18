@@ -1,6 +1,6 @@
 # lumenix/forms.py
 
-from allauth.account.forms import LoginForm
+from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 from django.conf import settings
 from django.contrib.admin.forms import AdminAuthenticationForm
@@ -70,6 +70,13 @@ class SecureLoginForm(LoginForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.fields["login"].widget.attrs.update(
+            {"placeholder": "name@example.com", "autocomplete": "email", "autofocus": "autofocus"}
+        )
+        self.fields["password"].widget.attrs.update(
+            {"placeholder": "Enter your password", "autocomplete": "current-password"}
+        )
+
         login_value = ""
         if hasattr(self, "data"):
             login_value = (self.data.get("login") or "").strip().lower()
@@ -125,6 +132,44 @@ class SecureLoginForm(LoginForm):
         record_success(self.request, cleaned_data.get("login") or login_value)
         self.request.session.pop("login_challenge", None)
         return cleaned_data
+
+
+class NamedSignupForm(SignupForm):
+    """
+    Allauth signup form that also collects first and last name, so a new
+    account never lands in the profile-completion gate after signing up.
+    The allauth adapter copies both names onto the user in ``save_user``.
+    """
+
+    first_name = forms.CharField(
+        label="First name",
+        max_length=150,
+        widget=forms.TextInput(attrs={"placeholder": "First name", "autocomplete": "given-name"}),
+    )
+    last_name = forms.CharField(
+        label="Last name",
+        max_length=150,
+        widget=forms.TextInput(attrs={"placeholder": "Last name", "autocomplete": "family-name"}),
+    )
+
+    field_order = ["first_name", "last_name", "email", "password1", "password2"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.update({"placeholder": "name@example.com", "autocomplete": "email"})
+        self.fields["password1"].widget.attrs.update(
+            {"placeholder": "Create a password", "autocomplete": "new-password"}
+        )
+        if "password2" in self.fields:
+            self.fields["password2"].widget.attrs.update(
+                {"placeholder": "Repeat your password", "autocomplete": "new-password"}
+            )
+
+    def clean_first_name(self):
+        return self.cleaned_data["first_name"].strip()
+
+    def clean_last_name(self):
+        return self.cleaned_data["last_name"].strip()
 
 
 class EmailOrUsernameAdminAuthenticationForm(AdminAuthenticationForm):

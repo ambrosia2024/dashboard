@@ -101,6 +101,9 @@ EMAIL_VERIFICATION_ENABLED=false
 
 # External APIs (optional)
 SCIO_VOCAB_API_BASE=
+
+# Ambra (Scaleway Serverless API)
+SCW_SECRET_KEY=your-scaleway-iam-api-key
 ```
 
 > ⚠️ **Security Note**: Generate a strong `DJANGO_SECRET_KEY` using:
@@ -152,6 +155,11 @@ docker compose exec ambrosia_dashboard python manage.py createsuperuser
 | `POSTGRES_PORT` | No | 5432 | Database port |
 | `EMAIL_VERIFICATION_ENABLED` | No | false | Enable email verification |
 | `SCIO_VOCAB_API_BASE` | No | dev.api... | Vocabulary API endpoint |
+| `SCW_SECRET_KEY` | For Ambra | - | Scaleway IAM API key |
+| `SCW_AI_BASE_URL` | No | api.scaleway.ai/.../v1 | Scaleway Serverless API base URL |
+| `SCW_AI_MODEL` | No | qwen3.5-397b-a17b | Model used by Ambra |
+| `SCW_AI_REASONING_EFFORT` | No | none | `none` skips the model's hidden reasoning pass; raise to `low`/`medium`/`high` for deeper (slower) answers |
+| `SCW_AI_MAX_TOKENS` | No | 1024 | Answer length cap |
 | `ALLOWED_HOSTS` | No | localhost | Comma-separated allowed hosts |
 
 ### Dashboard View Modes

@@ -1,12 +1,34 @@
-{% if available_modes %}
-<div class="d-none d-md-flex align-items-center me-2">
-    <label for="dashboard_mode" class="me-2 mb-0 text-muted" style="font-weight:700; font-size:12px;">View</label>
-    <select id="dashboard_mode" class="form-select form-select-sm" style="width: 180px;" {% if mode_locked %}disabled title="This account is assigned a fixed view profile by an administrator."{% endif %}>
-        {% for m in available_modes %}
-            <option value="{{ m.code }}" {% if current_mode and m.id == current_mode.id %}selected{% endif %}>
-                {{ m.label }}
-            </option>
+{% if roles %}
+<form id="header-role-form" method="post" action="{% url 'account_preferences' %}" class="d-none d-md-flex align-items-center me-2">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="quick_role">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="header_role" class="me-2 mb-0 text-muted" style="font-weight:700; font-size:12px;">Role</label>
+    <select id="header_role" name="role" class="form-select form-select-sm" style="width: 180px;" aria-label="Your role" title="Your role sets the dashboard view.">
+        {% if not current_role %}<option value="" selected disabled>Choose a role…</option>{% endif %}
+        {% for r in roles %}
+            <option value="{{ r.value }}" {% if r.value == current_role %}selected{% endif %}>{{ r.label }}</option>
         {% endfor %}
     </select>
-</div>
+    <a href="{% url 'account_preferences' %}?next={{ next|urlencode }}" class="ms-2 text-muted d-inline-flex" title="Preferences" aria-label="Preferences">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </a>
+</form>
+<script>
+(function () {
+    var select = document.getElementById("header_role");
+    if (!select) return;
+    select.addEventListener("change", function () {
+        if (!select.value) return;
+        if (select.value === "other") {
+            // Custom roles need a description: open the preferences page with Other preselected.
+            var form = select.form;
+            var next = form.querySelector('input[name="next"]').value;
+            window.location.href = form.getAttribute("action") + "?role=other&next=" + encodeURIComponent(next);
+            return;
+        }
+        select.form.submit();
+    });
+})();
+</script>
 {% endif %}

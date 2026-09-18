@@ -1,138 +1,100 @@
+{% extends "account/_auth_base.html" %}
 {% load i18n %}
-{% load static %}
 
-<!DOCTYPE html>
+{% block title %}{% trans "Sign in" %}{% endblock %}
 
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>{% trans "Sign in" %}</title>
+{% block card %}
+    <p class="auth-kicker">{% trans "Welcome back" %}</p>
+    <h1>{% trans "Sign in" %}</h1>
+    <p class="auth-lead">{% trans "Use your Ambrosia access details to continue." %}</p>
 
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% if form.non_field_errors %}
+        <div class="auth-alert" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
 
-        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
-    </head>
-    <body>
-        <div class="page">
-            <div class="card">
-                <h1 class="card-title">{% trans "Sign in" %}</h1>
+    <form method="post" action="{% url 'account_login' %}" data-single-submit novalidate>
+        {% csrf_token %}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
 
-                {# Non-field errors (e.g. "invalid login") #}
-                {% if form.non_field_errors %}
-                    <div class="non-field-errors">
-                        {{ form.non_field_errors }}
-                    </div>
-                {% endif %}
-
-                <form method="post" action="{% url 'account_login' %}">
-                    {% csrf_token %}
-
-                    <div class="form-group">
-                        <label for="{{ form.login.id_for_label }}">
-                            {% trans "Email" %}
-                        </label>
-                        {{ form.login }}
-                        {{ form.login.errors }}
-                    </div>
-
-{#                    <div class="form-group">#}
-{#                        <label for="{{ form.role.id_for_label }}">#}
-{#                            Role#}
-{#                        </label>#}
-{#                        {{ form.role }}#}
-{#                        {{ form.role.errors }}#}
-{#                    </div>#}
-
-                    <div class="form-group">
-                        <label for="{{ form.password.id_for_label }}">
-                            {% trans "Password" %}
-                        </label>
-                        {{ form.password }}
-                        {{ form.password.errors }}
-                    </div>
-
-                    {{ form.honey_field }}
-                    {{ form.honey_field.errors }}
-
-                    {% if form.challenge_answer.is_hidden == False %}
-                        <div class="form-group">
-                            <label for="{{ form.challenge_answer.id_for_label }}">
-                                {{ form.challenge_answer.label }}
-                            </label>
-                            {{ form.challenge_answer }}
-                            {{ form.challenge_answer.errors }}
-                        </div>
-                    {% else %}
-                        {{ form.challenge_answer }}
-                    {% endif %}
-
-                    {{ form.recaptcha_token }}
-                    <div id="recaptcha-container" class="form-group" style="display:none;">
-                        <div id="recaptcha-widget"></div>
-                    </div>
-
-                    <div class="form-group remember-me">
-                        <label>
-                            {{ form.remember }}
-                            Remember me
-                        </label>
-                    </div>
-
-                    <div class="actions">
-                        <button type="submit">
-                            {% trans "Sign in" %}
-                        </button>
-
-                        <div class="secondary-links">
-                            <a href="{% url 'account_reset_password' %}">{% trans "Forgot password?" %}</a>
-                            ·
-                            <a href="{% url 'account_signup' %}">{% trans "Create account" %}</a>
-                        </div>
-                    </div>
-                </form>
-            </div>
+        <div class="field{% if form.login.errors %} has-error{% endif %}">
+            <label for="{{ form.login.id_for_label }}">{% trans "Email address" %}</label>
+            {{ form.login }}
+            {{ form.login.errors }}
         </div>
 
-        <script>
-            (function () {
-                const form = document.querySelector("form");
-                if (!form) return;
+        <div class="field{% if form.password.errors %} has-error{% endif %}">
+            <label for="{{ form.password.id_for_label }}">{% trans "Password" %}</label>
+            <div class="field-wrap field-wrap--toggle">
+                {{ form.password }}
+                <button type="button" class="field-toggle" data-password-target="{{ form.password.id_for_label }}" aria-label="{% trans 'Show password' %}" aria-pressed="false">{% trans "Show" %}</button>
+            </div>
+            {{ form.password.errors }}
+        </div>
 
-                const tokenInput = document.getElementById("id_recaptcha_token");
-                const siteKey = tokenInput ? tokenInput.getAttribute("data-site-key") : "";
-                if (siteKey) {
-                    const recaptchaContainer = document.getElementById("recaptcha-container");
-                    if (recaptchaContainer) recaptchaContainer.style.display = "block";
+        {{ form.honey_field }}
 
-                    const script = document.createElement("script");
-                    script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
-                    script.async = true;
-                    script.defer = true;
-                    script.onload = function () {
-                        if (!window.grecaptcha || !tokenInput) return;
-                        window.grecaptcha.render("recaptcha-widget", {
-                            sitekey: siteKey,
-                            callback: function (token) {
-                                tokenInput.value = token;
-                            },
-                            "expired-callback": function () {
-                                tokenInput.value = "";
-                            }
-                        });
-                    };
-                    document.head.appendChild(script);
-                }
+        {% if form.challenge_answer.is_hidden %}
+            {{ form.challenge_answer }}
+        {% else %}
+            <div class="field{% if form.challenge_answer.errors %} has-error{% endif %}">
+                <label for="{{ form.challenge_answer.id_for_label }}">{{ form.challenge_answer.label }}</label>
+                {{ form.challenge_answer }}
+                {{ form.challenge_answer.errors }}
+            </div>
+        {% endif %}
 
-                form.addEventListener("submit", function (e) {
-                    const btn = form.querySelector("button[type='submit']");
-                    if (!btn) return;
-                    if (btn.dataset.submitted === "1") {
-                        e.preventDefault();
-                        return;
-                    }
-                    btn.dataset.submitted = "1";
-                });
-            })();
-        </script>
-    </body>
-</html>
+        {{ form.recaptcha_token }}
+        <div id="recaptcha-container" class="field" style="display:none;">
+            <div id="recaptcha-widget"></div>
+        </div>
+
+        <div class="auth-options">
+            <label class="auth-check">
+                {{ form.remember }}
+                {% trans "Keep me signed in" %}
+            </label>
+            <a href="{% url 'account_reset_password' %}">{% trans "Forgot password?" %}</a>
+        </div>
+
+        <button type="submit" class="btn-primary" data-pending-label="{% trans 'Signing in…' %}">
+            <span>{% trans "Sign in" %}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+    </form>
+
+    <div class="auth-card-foot">
+        <p>{% trans "New to Ambrosia?" %} <a href="{% url 'account_signup' %}">{% trans "Create account" %}</a></p>
+        {% if not signup_open %}
+            <p>{% trans "Using shared demo access?" %}<br>{% trans "Use the details provided by the Ambrosia team." %}</p>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var tokenInput = document.getElementById("id_recaptcha_token");
+    var siteKey = tokenInput ? tokenInput.getAttribute("data-site-key") : "";
+    if (!siteKey) return;
+
+    var container = document.getElementById("recaptcha-container");
+    if (container) container.style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.onload = function () {
+        if (!window.grecaptcha || !tokenInput) return;
+        window.grecaptcha.render("recaptcha-widget", {
+            sitekey: siteKey,
+            callback: function (token) { tokenInput.value = token; },
+            "expired-callback": function () { tokenInput.value = ""; }
+        });
+    };
+    document.head.appendChild(script);
+})();
+</script>
+{% endblock %}

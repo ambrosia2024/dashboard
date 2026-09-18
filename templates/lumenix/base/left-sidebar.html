@@ -42,6 +42,7 @@
                     <a href="{{ node.url }}"{% if node.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>
                       <i data-feather="{{ node.icon }}"></i>
                       <span>{{ node.name }}</span>
+                      {% if node.badge %}<span class="menu-badge">{{ node.badge }}</span>{% endif %}
                     </a>
                   </li>
                   {% endif %}

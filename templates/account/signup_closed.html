@@ -1,28 +1,14 @@
-{% load static %}
+{% extends "account/signup.html" %}
+{% load i18n %}
 
-<!DOCTYPE html>
+{% block title %}{% trans "Registration is currently closed" %}{% endblock %}
 
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>Sign up unavailable</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-
-        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
-    </head>
-    <body>
-        <div class="page">
-            <div class="card">
-                <h1 class="card-title">Sign up unavailable</h1>
-                <p class="card-text">
-                    Account registration is currently closed for this dashboard.
-                </p>
-                <p class="small">
-                    If you need access, contact the Ambrosia team or use an invited account.
-                </p>
-
-                <a href="{% url 'account_login' %}" class="button-back">Back to sign in</a>
-            </div>
-        </div>
-    </body>
-</html>
+{% block closed_notice %}
+    <div class="auth-note auth-note--warn" role="status">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+        <span>
+            <strong>{% trans "Registration is currently closed." %}</strong>
+            {% trans "Access to this dashboard is currently provided by the Ambrosia team. If you already have demo access, sign in using the details supplied to you." %}
+        </span>
+    </div>
+{% endblock %}

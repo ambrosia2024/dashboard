@@ -1,0 +1,7 @@
+{% extends "account/email/_base.html" %}
+{% block subject %}Help with Ambrosia access{% endblock %}
+{% block preheader %}We could not match this email address to an account.{% endblock %}
+{% block heading %}Check your sign-in email{% endblock %}
+{% block body %}<p>We received an access-recovery request for this email address, but could not find a matching Ambrosia account.</p>{% if signup_url %}<p>If you want an account, you can <a href="{{ signup_url }}" style="color:#376EB5;">create one</a>.</p>{% else %}<p>If you use shared demo access, use the details supplied to you or contact the team that provided them. Registration is currently closed.</p>{% endif %}<p>If you did not make this request, you can ignore this email.</p>{% endblock %}
+{% block cta %}<table role="presentation" cellspacing="0" cellpadding="0" style="margin:22px 0 8px;"><tr><td style="background:#376EB5;border-radius:6px;"><a href="{{ login_url }}" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">Back to sign in</a></td></tr></table>{% endblock %}
+{% block after %}<p style="margin:18px 0 0;font-size:12.5px;line-height:1.6;color:#64748b;">If the button does not work, copy and paste this link into your browser:<br><a href="{{ login_url }}" style="color:#376EB5;word-break:break-all;">{{ login_url }}</a></p>{% endblock %}

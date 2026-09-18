@@ -5,7 +5,7 @@
 
   const badge = document.getElementById('idle-timer-badge');
   const logoutForm = document.getElementById('idle-logout-form');
-  if (!badge || !logoutForm) return;
+  if (!logoutForm) return;  // the visible countdown badge is optional
 
   let lastActivityAt = Date.now();
   let warnedAt5 = false;
@@ -36,7 +36,7 @@
     const elapsed = Date.now() - lastActivityAt;
     const remaining = IDLE_TIMEOUT_MS - elapsed;
 
-    badge.textContent = `Session: ${formatMMSS(remaining)}`;
+    if (badge) badge.textContent = `Session: ${formatMMSS(remaining)}`;
 
     if (!warnedAt5 && remaining <= WARNING_5_MIN_MS && remaining > WARNING_1_MIN_MS) {
       warnedAt5 = true;

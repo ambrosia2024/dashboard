@@ -1,0 +1,352 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}{{ run.run_code }} · {{ run.name }}{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<script src="{% static 'vendor/leaflet/1.9.4/leaflet.js' %}"></script>
+<script src="{% static 'vendor/echarts/5.5.0/echarts.min.js' %}"></script>
+<div class="ws ws--wide ws--full">
+    <div class="ws-crumbs" style="justify-content:space-between;">
+        <nav aria-label="Progress" style="display:flex;align-items:center;gap:10px;">
+            <a href="{% url 'assessment-new' %}?run={{ run.id }}">Situation</a>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            <span class="is-current">Outcome</span>
+        </nav>
+        <form method="post" action="{% url 'account_preferences' %}" class="ws-tech" id="tech-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="technical">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <label class="ws-check" style="margin:0;padding:0;border:0;">
+                <span>Technical details</span>
+                <span class="ws-switch"><input type="checkbox" name="show_technical_details" {% if show_technical %}checked{% endif %} onchange="document.getElementById('tech-form').submit()"><span></span></span>
+            </label>
+        </form>
+    </div>
+
+    <div class="ws-head" style="margin-bottom:14px;">
+        <div>
+            <h1>{{ run.name }} <span class="ws-head-sub">· {{ run.start_date|date:"M Y" }} – {{ run.end_date|date:"M Y" }}</span></h1>
+            <p><span class="ws-run-code">{{ run.run_code }}</span> · v{{ run.version }} · run {{ run.created_at|date:"j M Y, H:i" }}{% if run.parent_run %} · rerun of <a href="{% url 'assessment-outcome' run.parent_run.id %}">{{ run.parent_run.run_code }}</a>{% endif %}</p>
+        </div>
+    </div>
+    <div class="ws-tags">
+        <span class="ws-tag">{{ run.crop_label }}</span>
+        <span class="ws-tag">{{ run.hazard_label }}</span>
+        <span class="ws-tag">{{ run.nuts2_name }} {{ run.nuts2_code }}</span>
+        <span class="ws-tag">{{ run.get_resolution_display }}</span>
+    </div>
+
+    {% if newer_runs %}
+    <div class="ws-note ws-note--warn" style="margin-bottom:18px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>This is the original result. A newer run exists: {% for n in newer_runs %}<a href="{% url 'assessment-outcome' n.id %}">{{ n.run_code }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</span>
+    </div>
+    {% endif %}
+
+    <div class="ws-info" style="margin-bottom:22px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><strong>Model output, not a validated risk prediction.</strong> Values are the source model's response to the region's climate input. Quantitative risk interpretation depends on confirmed model outputs.</span>
+    </div>
+
+    <div class="ws-outcome">
+        <div class="ws-outcome-main">
+            {% if run.run_status == "no_data" %}
+            <div class="ws-card"><div class="ws-empty"><strong>No data is available for these inputs.</strong> Nothing was computed for this run. Change the period or scope and run again.</div></div>
+            {% else %}
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>Pathogen concentration vs time</h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily model output</small></div>
+                    <span class="ws-badge ws-badge--live">Source data</span>
+                </div>
+                <div id="chart-series" class="ws-chart"></div>
+                <div class="ws-stats">
+                    <div><small>Mean</small><strong>{{ stats.mean|default:"—" }}</strong></div>
+                    <div><small>Peak</small><strong>{{ stats.max|default:"—" }}</strong><small>{{ stats.peak_date|default:"" }}</small></div>
+                    <div><small>Lowest</small><strong>{{ stats.min|default:"—" }}</strong></div>
+                    <div><small>Days of data</small><strong>{{ stats.days }}</strong></div>
+                </div>
+            </section>
+
+            <div class="ws-chart-grid">
+                <section class="ws-card ws-chart-card">
+                    <div class="ws-chart-head">
+                        <div><h2>Seasonal heatmap</h2><small>Monthly mean per year, same model output</small></div>
+                        <span class="ws-badge ws-badge--derived">Derived</span>
+                    </div>
+                    <div id="chart-seasonal" class="ws-chart ws-chart--sm"></div>
+                </section>
+                <section class="ws-card ws-chart-card">
+                    <div class="ws-chart-head">
+                        <div><h2>Geographic heatmap</h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
+                        <span class="ws-badge ws-badge--derived">Derived</span>
+                    </div>
+                    <div id="chart-geo" class="ws-chart ws-chart--sm"></div>
+                </section>
+            </div>
+
+            <details class="ws-card ws-details">
+                <summary>Assumptions &amp; methodology</summary>
+                <ul>
+                    <li>Source model: <strong>{{ run.model_name|default:provenance.model_title|default:"unknown" }}</strong>{% if provenance.variable_name %}, driven by <em>{{ provenance.variable_name }}</em>{% endif %}.</li>
+                    <li>Daily model values for region {{ run.nuts2_code }} were averaged per {{ run.get_resolution_display|lower }} period between {{ run.start_date }} and {{ run.end_date }}.</li>
+                    <li>The seasonal heatmap uses calendar-month means of the same values. The geographic heatmap averages the same crop and hazard over the period for every synced region.</li>
+                    {% for line in snapshot.limitations %}<li>{{ line }}</li>{% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+
+            <section class="ws-card" style="margin-top:20px;">
+                <h2 style="font-size:16px;margin:0 0 12px;">Explore charts</h2>
+                <div class="ws-explore-strip">
+                    {% for ident, label, kind, note in chart_status %}
+                    <div class="ws-explore-tile ws-explore-tile--{{ kind }}" title="{{ note }}">
+                        <span>{{ label }}</span>
+                        <small>{% if kind == "real" %}Shown above{% elif kind == "derived" %}Shown above · derived{% else %}Not available for this combination{% endif %}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <div class="ws-actions-row">
+                <a href="{% url 'assessment-new' %}?run={{ run.id }}" class="ws-btn ws-btn-secondary">Duplicate situation</a>
+                <form method="post" action="{% url 'assessment-run-again' run.id %}">{% csrf_token %}<button type="submit" class="ws-btn ws-btn-secondary">Run again with latest data</button></form>
+                <a href="{% url 'assessment-export' run.id %}" class="ws-btn ws-btn-primary">Export CSV</a>
+            </div>
+        </div>
+
+        <aside class="ws-outcome-side">
+            <section class="ws-card">
+                <h3 class="ws-side-title">Evidence &amp; limitations</h3>
+                <dl class="ws-evidence">
+                    <dt>Model / source</dt><dd>{{ run.model_name|default:provenance.model_title|default:"Unavailable" }}</dd>
+                    <dt>Data retrieved</dt><dd>{% if retrieved_at %}{{ retrieved_at|date:"j M Y, H:i" }}{% else %}Unavailable{% endif %}</dd>
+                    <dt>Coverage</dt><dd>Regional (NUTS2)</dd>
+                    <dt>Period in data</dt><dd>{{ stats.first_date|default:"—" }} to {{ stats.last_date|default:"—" }}</dd>
+                    <dt>Uncertainty</dt><dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small></dd>
+                    {% if show_technical %}
+                    <dt>Model ID</dt><dd class="wrap mono">{{ run.model_uuid|default:"—" }}</dd>
+                    <dt>Variable</dt><dd class="wrap">{{ provenance.variable_name|default:"—" }}</dd>
+                    <dt>Unit</dt><dd>{{ snapshot.unit|default:"—" }}</dd>
+                    <dt>Stored points</dt><dd>{{ snapshot.series|length }} ({{ run.get_resolution_display|lower }})</dd>
+                    {% endif %}
+                </dl>
+            </section>
+
+            <section class="ws-card ws-ambra">
+                <div class="ws-ambra-head">
+                    <h3 class="ws-side-title" style="margin:0;"><span class="ws-ambra-spark" aria-hidden="true">✨</span> Ask Ambra</h3>
+                    <button type="button" class="ws-btn ws-btn-primary ws-ambra-open" data-ambra-open>Open Ambra</button>
+                </div>
+                <p class="ws-hint" style="margin:8px 0 12px;">Answers only from this assessment's data. Your conversation is saved with this run.</p>
+                <div id="ambra-preview" class="ws-ambra-preview">
+                    <div class="ws-ambra-msg ws-ambra-msg--ambra">Hi, I'm Ambra. Ask me about this run: its peak, its trend, or its limits.</div>
+                </div>
+                <div class="ws-ambra-quick">
+                    <button type="button" class="ws-btn-link" data-q="Summarise this assessment and its limitations">Summarise limitations</button>
+                    <button type="button" class="ws-btn-link" data-q="When is the model output highest and what does that mean for the period?">When is it highest?</button>
+                    <button type="button" class="ws-btn-link" data-q="Is there any uncertainty information for these values?">Any uncertainty?</button>
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+
+<div id="ambra-backdrop" class="ws-drawer-backdrop" hidden></div>
+<aside id="ambra-drawer" class="ws-drawer" role="dialog" aria-modal="true" aria-label="Ask Ambra" hidden>
+    <div class="ws-drawer-head">
+        <h3><span class="ws-ambra-spark" aria-hidden="true">✨</span> Ask Ambra <small>{{ run.run_code }} · {{ run.name }}</small></h3>
+        <div class="ws-drawer-tools">
+            <a href="{% url 'assessment-ambra-download' run.id %}" class="ws-btn ws-btn-secondary ws-btn--sm" id="ambra-download">Download (.txt)</a>
+            <button type="button" class="ws-btn ws-btn-secondary ws-btn--sm" id="ambra-clear">Clear</button>
+            <button type="button" class="ws-drawer-close" id="ambra-close" aria-label="Close">×</button>
+        </div>
+    </div>
+    <p class="ws-hint ws-drawer-sub">Ambra answers only about this assessment's data ({{ run.crop_label }} · {{ run.hazard_label }} · {{ run.nuts2_code }}, {{ run.start_date }} to {{ run.end_date }}).</p>
+    <div id="ambra-thread" class="ws-drawer-thread" aria-live="polite"></div>
+    <form id="ambra-form" class="ws-drawer-form">
+        <div class="ws-ambra-quick">
+            <button type="button" class="ws-btn-link" data-q="Summarise this assessment and its limitations">Summarise limitations</button>
+            <button type="button" class="ws-btn-link" data-q="What is the trend over the period?">What is the trend?</button>
+            <button type="button" class="ws-btn-link" data-q="When is the model output highest and what does that mean for the period?">When is it highest?</button>
+            <button type="button" class="ws-btn-link" data-q="Is there any uncertainty information for these values?">Any uncertainty?</button>
+        </div>
+        <textarea id="ambra-q" rows="3" maxlength="1000" placeholder="Ask about this outcome — trend, peaks, seasonality, limitations…"></textarea>
+        <div class="ws-drawer-foot">
+            <span id="ambra-count" class="ws-hint" style="margin:0;">0/1000</span>
+            <button type="submit" class="ws-btn ws-btn-primary" id="ambra-send" style="height:40px;padding:0 18px;">Send</button>
+        </div>
+        <p class="ws-hint" style="margin:8px 0 0;">Ambra can make mistakes. Please verify responses before relying on them.</p>
+    </form>
+</aside>
+
+<script>
+(function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var snap = {{ snapshot_json|safe }};
+    var series = snap.series || [];
+    var unit = snap.unit || "model output";
+    var BLUE = "#376EB5";
+
+    // ---- main series ----------------------------------------------------
+    var el = document.getElementById("chart-series");
+    if (el && series.length) {
+        var chart = echarts.init(el);
+        window.addEventListener("resize", function () { chart.resize(); });
+        chart.setOption({
+            grid: { left: 56, right: 20, top: 24, bottom: 40 },
+            tooltip: { trigger: "axis", formatter: function (p) {
+                var r = series[p[0].dataIndex] || {};
+                return "<strong>" + r.date + "</strong><br>Model value: <strong>" + r.value + "</strong> " + unit +
+                       (r.temperature_c == null ? "" : "<br>Temperature: " + r.temperature_c + " °C") +
+                       (r.days ? "<br>" + r.days + " daily values" : "");
+            } },
+            xAxis: { type: "category", data: series.map(function (r) { return r.date; }), boundaryGap: false },
+            yAxis: { type: "value", name: unit, nameTextStyle: { color: "#64748b" } },
+            series: [{ type: "line", smooth: true, showSymbol: series.length < 80, lineStyle: { width: 2, color: BLUE },
+                       itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.12)" },
+                       data: series.map(function (r) { return r.value; }) }]
+        });
+    }
+
+    // ---- seasonal heatmap -----------------------------------------------
+    fetch("{% url 'assessment-seasonal' run.id %}", { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var rows = d.rows || [], el2 = document.getElementById("chart-seasonal");
+            if (!el2 || !rows.length) return;
+            var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            var years = Array.from(new Set(rows.map(function (r) { return r.year; }))).sort();
+            var vals = rows.map(function (r) { return r.value; }).filter(function (v) { return v != null; });
+            var c = echarts.init(el2);
+            window.addEventListener("resize", function () { c.resize(); });
+            c.setOption({
+                grid: { left: 56, right: 16, top: 12, bottom: 78 },
+                tooltip: { position: "top", formatter: function (p) { return "<strong>" + months[p.data[0]] + " " + years[p.data[1]] + "</strong><br>Mean: " + p.data[2] + " " + unit; } },
+                xAxis: { type: "category", data: months, splitArea: { show: true } },
+                yAxis: { type: "category", data: years, splitArea: { show: true } },
+                visualMap: { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), calculable: true, orient: "horizontal", left: "center", bottom: 4,
+                             itemHeight: 120, itemWidth: 12, text: ["high", "low"], textStyle: { color: "#64748b", fontSize: 11 }, precision: 2,
+                             inRange: { color: ["#eaf3fd", "#376EB5", "#112b39"] } },
+                series: [{ type: "heatmap", data: rows.map(function (r) { return [r.month - 1, years.indexOf(r.year), r.value]; }), label: { show: false } }]
+            });
+        }).catch(function () {});
+
+    // ---- geographic heatmap ---------------------------------------------
+    Promise.all([
+        fetch("{% url 'assessment-geographic' run.id %}", { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }),
+        fetch("/static/data/nuts/NUTS_RG_20M_2021_4326.geojson", { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); })
+    ]).then(function (res) {
+        var data = res[0], fc = res[1], el3 = document.getElementById("chart-geo");
+        if (!el3) return;
+        var values = data.values || {}, selected = data.selected || "";
+        document.getElementById("geo-count").textContent = data.regions || 0;
+        var vals = Object.keys(values).map(function (k) { return values[k].value; }).filter(function (v) { return v != null; });
+        var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+        function colour(v) {
+            if (v == null) return "#e5e7eb";
+            var t = hi > lo ? (v - lo) / (hi - lo) : 0.5;
+            var a = [234,243,253], b = [55,110,181], c2 = [17,43,57];
+            var from = t < 0.5 ? a : b, to = t < 0.5 ? b : c2, u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+            return "rgb(" + [0,1,2].map(function (i) { return Math.round(from[i] + (to[i] - from[i]) * u); }).join(",") + ")";
+        }
+        var map = L.map(el3, { zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([52, 8], 4);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { referrerPolicy: "strict-origin-when-cross-origin", opacity: 0.85 }).addTo(map);
+        var feats = (fc.features || []).filter(function (f) { return String(f.properties.LEVL_CODE) === "2"; });
+        var layer = L.geoJSON(feats, {
+            style: function (f) {
+                var id = f.properties.NUTS_ID, v = values[id] ? values[id].value : null;
+                return { color: id === selected ? "#112b39" : "#ffffff", weight: id === selected ? 2.5 : 0.6, fillColor: colour(v), fillOpacity: v == null ? 0.25 : 0.85 };
+            },
+            onEachFeature: function (f, l) {
+                var id = f.properties.NUTS_ID, v = values[id];
+                l.bindTooltip("<strong>" + (f.properties.NAME_LATN || id) + " (" + id + ")</strong><br>" + (v && v.value != null ? "Mean: " + v.value + " " + unit : "No data"), { sticky: true });
+            }
+        }).addTo(map);
+        var sel = feats.find(function (f) { return f.properties.NUTS_ID === selected; });
+        if (sel) { map.fitBounds(L.geoJSON(sel).getBounds().pad(2.5)); }
+        setTimeout(function () { map.invalidateSize(); }, 100);
+    }).catch(function () {});
+
+    // ---- Ask Ambra: persisted conversation + drawer -----------------------
+    var csrf = document.querySelector("#tech-form [name=csrfmiddlewaretoken]").value;
+    var drawer = $("ambra-drawer"), backdrop = $("ambra-backdrop"), thread = $("ambra-thread"), preview = $("ambra-preview");
+    var form = $("ambra-form"), q = $("ambra-q"), count = $("ambra-count"), send = $("ambra-send");
+    var URL_MSGS = "{% url 'assessment-ambra-messages' run.id %}", URL_ASK = "{% url 'assessment-ambra-ask' run.id %}";
+    var messages = [], busy = false;
+
+    function renderLite(text) {
+        var esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return esc.split("\n").map(function (line) {
+            var bullet = /^\s*[\*\-]\s+/.test(line);
+            line = line.replace(/^\s*[\*\-]\s+/, "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+            return bullet ? "<div class=\"ws-ambra-li\">" + line + "</div>" : line;
+        }).join("<br>").replace(/(<br>){3,}/g, "<br><br>");
+    }
+    function msgEl(kind, text) { var d = document.createElement("div"); d.className = "ws-ambra-msg ws-ambra-msg--" + kind; d.innerHTML = kind === "user" ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;") : renderLite(text); return d; }
+    function renderThread() {
+        thread.innerHTML = "";
+        if (!messages.length) thread.appendChild(msgEl("ambra", "Hi, I'm Ambra. Ask me about this run: its peak, its trend, or its limits."));
+        messages.forEach(function (m) { thread.appendChild(msgEl(m.role, m.content)); });
+        thread.scrollTop = thread.scrollHeight;
+        renderPreview();
+    }
+    function renderPreview() {
+        preview.innerHTML = "";
+        var last = messages.slice(-2);
+        if (!last.length) { preview.appendChild(msgEl("ambra", "Hi, I'm Ambra. Ask me about this run: its peak, its trend, or its limits.")); return; }
+        last.forEach(function (m) { var el = msgEl(m.role, m.content); el.classList.add("is-preview"); preview.appendChild(el); });
+        if (messages.length > 2) { var more = document.createElement("button"); more.type = "button"; more.className = "ws-btn-link"; more.textContent = "Open the full conversation (" + messages.length + " messages)"; more.addEventListener("click", openDrawer); preview.appendChild(more); }
+    }
+    function openDrawer(prefill) {
+        drawer.hidden = false; backdrop.hidden = false; document.body.classList.add("ws-drawer-open");
+        thread.scrollTop = thread.scrollHeight;
+        if (typeof prefill === "string") { q.value = prefill; updateCount(); }
+        setTimeout(function () { q.focus(); }, 50);
+    }
+    function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove("ws-drawer-open"); }
+    function updateCount() { count.textContent = q.value.length + "/1000"; }
+
+    async function load() {
+        try { var r = await fetch(URL_MSGS, { headers: { Accept: "application/json" } }); var d = await r.json(); messages = d.messages || []; } catch (e) { messages = []; }
+        renderThread();
+    }
+    async function ask(question) {
+        question = (question || "").trim(); if (!question || busy) return;
+        busy = true; send.disabled = true; q.value = ""; updateCount();
+        messages.push({ role: "user", content: question }); renderThread();
+        var live = { role: "ambra", content: "…" }; messages.push(live); renderThread();
+        try {
+            var resp = await fetch(URL_ASK, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf }, body: JSON.stringify({ question: question }) });
+            if (!resp.ok || !resp.body) { live.content = "Ambra is unavailable for this request. You can keep using and exporting the assessment."; renderThread(); return; }
+            var reader = resp.body.getReader(), dec = new TextDecoder(), text = "";
+            while (true) { var c = await reader.read(); if (c.done) break; text += dec.decode(c.value, { stream: true }); live.content = text; renderThread(); }
+            if (!text) live.content = "Ambra returned no answer.";
+        } catch (e) { live.content = "Ambra is unavailable for this request. You can keep using and exporting the assessment."; }
+        finally { busy = false; send.disabled = false; renderThread(); }
+    }
+
+    form.addEventListener("submit", function (e) { e.preventDefault(); ask(q.value); });
+    q.addEventListener("input", updateCount);
+    q.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(q.value); } });
+    document.querySelectorAll("[data-q]").forEach(function (b) { b.addEventListener("click", function () { openDrawer(); ask(b.dataset.q); }); });
+    document.querySelectorAll("[data-ambra-open]").forEach(function (b) { b.addEventListener("click", function () { openDrawer(); }); });
+    $("ambra-close").addEventListener("click", closeDrawer);
+    backdrop.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !drawer.hidden) closeDrawer(); });
+    $("ambra-clear").addEventListener("click", async function () {
+        if (!messages.length || !confirm("Clear this conversation with Ambra? This cannot be undone.")) return;
+        try { await fetch(URL_MSGS, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf }, body: JSON.stringify({ action: "clear" }) }); } catch (e) {}
+        messages = []; renderThread();
+    });
+    load();
+})();
+</script>
+{% endblock content %}

@@ -38,10 +38,21 @@ def _resolve_menu_url(route):
         return route
 
 
-def _is_active(url, current_path):
+def _is_active(url, current_path, current_get=None):
+    """Path match; when the menu URL carries query params, each must match the request too."""
     if not url or url.startswith(("http://", "https://", "//")):
         return False
-    return url.rstrip("/") == (current_path or "").rstrip("/")
+    path, _, query = url.partition("?")
+    if path.rstrip("/") != (current_path or "").rstrip("/"):
+        return False
+    if not query:
+        return True
+    current_get = current_get or {}
+    for pair in query.split("&"):
+        key, _, value = pair.partition("=")
+        if current_get.get(key) != value:
+            return False
+    return True
 
 
 @register.simple_tag(takes_context=True)
@@ -54,6 +65,7 @@ def admin_menu_tree(context):
     """
     request = context.get("request")
     current_path = getattr(request, "path", "") if request else ""
+    current_get = dict(request.GET.items()) if request is not None else {}
 
     # Per-view chart emphasis, so chart links can be greyed-out for the active view.
     emphasis_map = chart_emphasis_map(get_active_mode(request)) if request else {}
@@ -76,7 +88,7 @@ def admin_menu_tree(context):
         if is_parent:
             for child in children_by_parent.get(node.id, []):
                 child_url = _resolve_menu_url(child.menu_route)
-                child_active = _is_active(child_url, current_path)
+                child_active = _is_active(child_url, current_path, current_get)
                 any_child_active = any_child_active or child_active
                 chart_match = _CHART_LINK_RE.search(child_url or "")
                 emphasis = emphasis_map.get(chart_match.group(1)) if chart_match else None
@@ -93,9 +105,19 @@ def admin_menu_tree(context):
             "url": url,
             "is_parent": is_parent,
             "open_in_new_tab": node.open_in_new_tab,
-            "active": any_child_active or _is_active(url, current_path),
+            "badge": (node.badge or "").strip(),
+            "active": any_child_active or _is_active(url, current_path, current_get),
             "children": children,
+            "_has_query": "?" in (node.menu_route or ""),
         })
+
+    # When a plain path and a path+query item both match (e.g. /situations/ and
+    # /situations/?tab=history), keep only the more specific one active.
+    specific = {n["url"].partition("?")[0].rstrip("/") for n in tree if n["active"] and n["_has_query"]}
+    for n in tree:
+        if n["active"] and not n["_has_query"] and n["url"].rstrip("/") in specific:
+            n["active"] = False
+        n.pop("_has_query", None)
     return tree
 
 

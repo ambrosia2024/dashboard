@@ -12,9 +12,17 @@ from lumenix.security import is_locked, record_failure, record_success, register
 
 class EnforceProfileCompletionMiddleware:
     """
-    If a logged-in user has no first_name or last_name, redirect them to the profile completion page, unless they are
-    already there or on an allowed path (login, logout, static, etc.).
+    Two post-login gates, in order:
+
+    1. No first_name/last_name  -> profile completion page.
+    2. No self-declared role     -> V2 preferences page (design 01-profile). The
+       user may skip for the current sign-in; the page returns on the next
+       login until a role is saved.
+
+    Auth pages, logout, admin, static and API paths are never redirected.
     """
+
+    ROLE_EXEMPT_PREFIXES = ("/static/", "/media/", "/api/", "/admin/", "/accounts/", "/status")
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -35,7 +43,9 @@ class EnforceProfileCompletionMiddleware:
         # Resolve exempt paths once per request (cheap enough)
         try:
             complete_profile_url = reverse("account_complete_profile")
+            preferences_url = reverse("account_preferences")
             login_url = reverse("account_login")
+            logout_url = reverse("account_logout")
             signup_url = reverse("account_signup")
             reset_url = reverse("account_reset_password")
             verification_sent_url = reverse("account_email_verification_sent")
@@ -44,7 +54,9 @@ class EnforceProfileCompletionMiddleware:
 
         exempt_paths = {
             complete_profile_url,
+            preferences_url,
             login_url,
+            logout_url,
             signup_url,
             reset_url,
             verification_sent_url,
@@ -59,7 +71,22 @@ class EnforceProfileCompletionMiddleware:
             if missing_names and path not in exempt_paths:
                 return redirect("account_complete_profile")
 
+            if (
+                path not in exempt_paths
+                and not path.startswith(self.ROLE_EXEMPT_PREFIXES)
+                and not self._role_set(user)
+                and not request.session.get("preferences_skipped")
+            ):
+                return redirect(f"{preferences_url}?next={quote(request.get_full_path(), safe='/%?=&')}")
+
         return None
+
+    @staticmethod
+    def _role_set(user):
+        try:
+            return bool(user.profile.role)
+        except Exception:
+            return False
 
     def _verification_required(self, user):
         if getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "none") != "mandatory":

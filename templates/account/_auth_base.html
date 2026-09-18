@@ -1,0 +1,53 @@
+{% load i18n %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% trans "Account access" %}{% endblock %} · Ambrosia</title>
+    <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="auth-page">
+
+    <main class="auth-stage">
+        <section class="auth-card {% block card_class %}{% endblock %}">
+            {% block card %}{% endblock %}
+        </section>
+    </main>
+</div>
+
+<script>
+(function () {
+    // Show / hide password controls.
+    document.querySelectorAll("[data-password-target]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var input = document.getElementById(btn.dataset.passwordTarget);
+            if (!input) return;
+            var reveal = input.type === "password";
+            input.type = reveal ? "text" : "password";
+            btn.textContent = reveal ? "{% trans 'Hide' %}" : "{% trans 'Show' %}";
+            btn.setAttribute("aria-pressed", reveal ? "true" : "false");
+            input.focus();
+        });
+    });
+
+    // Prevent double submission.
+    document.querySelectorAll("form[data-single-submit]").forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+            var btn = form.querySelector("button[type='submit']");
+            if (!btn) return;
+            if (btn.dataset.submitted === "1") { e.preventDefault(); return; }
+            btn.dataset.submitted = "1";
+            if (btn.dataset.pendingLabel) {
+                btn.querySelector("span").textContent = btn.dataset.pendingLabel;
+            }
+        });
+    });
+})();
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -32,8 +32,11 @@
 
     // Navbar Link Activation
     $("#sidebar-menu a, .navbar-nav a").each(function () {
-        var currentUrl = window.location.href.split(/[?#]/)[0];
-        if (this.href === currentUrl) {
+        // Compare the full URL (query included, hash dropped) so /situations/ does not
+        // light up while /situations/?tab=history is open; the server also marks the
+        // active item (mm-active) with query-aware matching.
+        var currentUrl = window.location.href.split("#")[0];
+        if (this.href.split("#")[0] === currentUrl) {
             $(this).addClass("active")
                 .parentsUntil("#sidebar-menu, .navbar-nav")
                 .addClass("active");
@@ -52,8 +55,8 @@
 
         // Activate sidebar items based on URL
         $("#sidebar-menu a").each(function () {
-            var currentUrl = window.location.href.split(/[?#]/)[0];
-            if (this.href === currentUrl) {
+            var currentUrl = window.location.href.split("#")[0];
+            if (this.href.split("#")[0] === currentUrl) {
                 $(this).addClass("active").parents().addClass("mm-active mm-show");
             }
         });

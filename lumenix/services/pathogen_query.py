@@ -16,6 +16,12 @@ DEFAULT_CHUNK_DAYS = max(1, int(getattr(settings, "SCIO_PATHOGEN_SYNC_CHUNK_DAYS
 REQUEST_DELAY_SECONDS = max(0.0, float(getattr(settings, "SCIO_PATHOGEN_SYNC_REQUEST_DELAY_SECONDS", 2)))
 MAX_RETRIES_PER_CHUNK = max(0, int(getattr(settings, "SCIO_PATHOGEN_SYNC_CHUNK_MAX_RETRIES", 2)))
 MAX_CONSECUTIVE_FAILURES = max(1, int(getattr(settings, "SCIO_PATHOGEN_SYNC_MAX_CONSECUTIVE_FAILURES", 5)))
+# Re-fetch chunks already fully stored locally. Off by default: a retry after an
+# upstream outage should only request the ranges it is actually missing. Turn on
+# to refresh values that may have changed at the source.
+REFETCH_COMPLETE_CHUNKS = str(
+    getattr(settings, "SCIO_PATHOGEN_SYNC_REFETCH_COMPLETE_CHUNKS", "false")
+).strip().lower() in ("1", "true", "yes")
 logger = logging.getLogger(__name__)
 
 
@@ -140,7 +146,28 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
         spec.start_date,
         spec.end_date,
     )
+    skipped_chunks = 0
     for index, (chunk_start, chunk_end) in enumerate(chunks):
+        if not REFETCH_COMPLETE_CHUNKS:
+            expected_days = (chunk_end - chunk_start).days + 1
+            already = PathogenConcentrationRecord.objects.filter(
+                plant=spec.plant,
+                pathogen=spec.pathogen,
+                nuts_code=spec.nuts_code,
+                observed_on__gte=chunk_start,
+                observed_on__lte=chunk_end,
+            ).count()
+            if already >= expected_days:
+                successful_chunks += 1
+                consecutive_failures = 0
+                skipped_chunks += 1
+                logger.info(
+                    "Pathogen sync chunk skip spec=%s chunk=%s/%s range=%s..%s "
+                    "(already have %s/%s days)",
+                    spec.pk, index + 1, len(chunks),
+                    chunk_start, chunk_end, already, expected_days,
+                )
+                continue
         payload = {
             "plant": spec.plant,
             "pathogen": spec.pathogen,
@@ -302,6 +329,7 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
         "unchanged": unchanged,
         "fetched": fetched,
         "successful_chunks": successful_chunks,
+        "skipped_chunks": skipped_chunks,
         "failed_chunks": len(failed_ranges),
         "failed_ranges": failed_ranges,
         "model_missing": model_missing,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate PR metadata with an OpenAI-compatible chat endpoint.
+"""Generate PR metadata with the Scaleway Serverless API.
 
-The script reads LLM_* values from the environment and, if present, from the
+The script reads SCW_* values from the environment and, if present, from the
 repository .env file. It writes shell-safe assignments for push_via_pr.sh.
 """
 
@@ -81,18 +81,19 @@ def extract_json(content: str) -> dict[str, str]:
 
 
 def request_metadata(base_branch: str) -> dict[str, str]:
-    api_key = os.environ.get("LLM_API_KEY")
-    llm_url = os.environ.get("LLM_URL")
-    endpoint = os.environ.get("LLM_CHAT_ENDPOINT", "/v1/chat/completions")
-    model = os.environ.get("LLM_MODEL")
+    api_key = os.environ.get("SCW_SECRET_KEY")
+    base_url = os.environ.get("SCW_AI_BASE_URL")
+    model = os.environ.get("SCW_AI_MODEL")
 
-    if not api_key or not llm_url or not model:
-        raise RuntimeError("LLM_API_KEY, LLM_URL, and LLM_MODEL are required.")
+    if not api_key or not base_url or not model:
+        raise RuntimeError("SCW_SECRET_KEY, SCW_AI_BASE_URL, and SCW_AI_MODEL are required.")
 
-    max_user_chars = int(os.environ.get("LLM_MAX_USER_CHARS", "8000"))
-    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "512"))
-    temperature = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
-    timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "60"))
+    max_user_chars = int(os.environ.get("SCW_AI_MAX_USER_CHARS", "8000"))
+    max_tokens = int(os.environ.get("SCW_AI_MAX_TOKENS", "16384"))
+    temperature = float(os.environ.get("SCW_AI_TEMPERATURE", "0.6"))
+    top_p = float(os.environ.get("SCW_AI_TOP_P", "0.95"))
+    presence_penalty = float(os.environ.get("SCW_AI_PRESENCE_PENALTY", "0"))
+    timeout = float(os.environ.get("SCW_AI_TIMEOUT_SECONDS", "60"))
 
     commits = git(["log", "--reverse", "--format=%h %s", f"origin/{base_branch}..HEAD"])
     diff_stat = git(["diff", "--stat", f"origin/{base_branch}..HEAD"])
@@ -126,15 +127,19 @@ def request_metadata(base_branch: str) -> dict[str, str]:
         "Do not invent tests or behavior not supported by the commits."
     )
 
-    url = llm_url.rstrip("/") + "/" + endpoint.lstrip("/")
+    url = base_url.rstrip("/") + "/chat/completions"
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_context},
         ],
-        "temperature": temperature,
         "max_tokens": max_tokens,
+        "temperature": temperature,
+        "top_p": top_p,
+        "presence_penalty": presence_penalty,
+        "stream": False,
+        "response_format": {"type": "text"},
     }
 
     request = urllib.request.Request(

@@ -40,23 +40,56 @@ PUBLIC_SIGNUP_ENABLED = os.getenv("PUBLIC_SIGNUP_ENABLED", "false").lower() == "
 RECAPTCHA_ENABLED = os.getenv("RECAPTCHA_ENABLED", "false").lower() == "true"
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "")
+# Transactional email. With Postmark, one Server API token is both the SMTP
+# username and password; POSTMARK_SERVER_TOKEN takes precedence over the
+# generic EMAIL_HOST_USER/PASSWORD pair when set.
+POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN", "").strip()
+POSTMARK_MESSAGE_STREAM = os.getenv("POSTMARK_MESSAGE_STREAM", "outbound").strip()
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "").strip()
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.postmarkapp.com" if POSTMARK_SERVER_TOKEN else "").strip()
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_HOST_USER = POSTMARK_SERVER_TOKEN or os.getenv("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = POSTMARK_SERVER_TOKEN or os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@ambrosia-project.eu").strip()
-SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL).strip()
-LLM_URL = os.getenv("LLM_URL", "").strip()
-LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen3-30b-a3b-awq").strip()
-LLM_CHAT_ENDPOINT = os.getenv("LLM_CHAT_ENDPOINT", "/v1/chat/completions").strip()
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))
-LLM_MAX_USER_CHARS = int(os.getenv("LLM_MAX_USER_CHARS", "1000"))
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
-LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "20"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Ambrosia Dashboard <noreply@ambrosia-project.eu>").strip()
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", "noreply@ambrosia-project.eu").strip()
+EMAIL_REPLY_TO = os.getenv("EMAIL_REPLY_TO", "").strip()  # optional, e.g. support@ambrosia-project.eu
+SCW_AI_BASE_URL = os.getenv(
+    "SCW_AI_BASE_URL",
+    "https://api.scaleway.ai/6ca646d5-bc15-44af-bce4-43e83b3866a5/v1",
+).strip()
+SCW_SECRET_KEY = os.getenv("SCW_SECRET_KEY", "").strip()
+SCW_AI_MODEL = os.getenv("SCW_AI_MODEL", "qwen3.5-397b-a17b").strip()
+SCW_AI_MAX_TOKENS = int(os.getenv("SCW_AI_MAX_TOKENS", "1024"))
+# qwen3.5-397b-a17b reasons by default and emits its chain of thought into
+# `reasoning` before any `content`, which pushes time-to-first-token past 10s.
+# "none" turns reasoning off; set to "low"/"medium"/"high" to trade latency for depth.
+SCW_AI_REASONING_EFFORT = os.getenv("SCW_AI_REASONING_EFFORT", "none").strip()
+SCW_AI_MAX_USER_CHARS = int(os.getenv("SCW_AI_MAX_USER_CHARS", "1000"))
+SCW_AI_TEMPERATURE = float(os.getenv("SCW_AI_TEMPERATURE", "0.6"))
+SCW_AI_TOP_P = float(os.getenv("SCW_AI_TOP_P", "0.95"))
+SCW_AI_PRESENCE_PENALTY = float(os.getenv("SCW_AI_PRESENCE_PENALTY", "0"))
+SCW_AI_TIMEOUT_SECONDS = int(os.getenv("SCW_AI_TIMEOUT_SECONDS", "180"))
+
+# Django's default config only attaches handlers to the `django` loggers, so
+# `lumenix.*` INFO records (e.g. the chart_qa upstream timings) never reach the
+# container log. Give the app logger its own console handler.
+LUMENIX_LOG_LEVEL = os.getenv("LUMENIX_LOG_LEVEL", "INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "lumenix": {"format": "[{asctime}] {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "lumenix"},
+    },
+    "loggers": {
+        "lumenix": {"handlers": ["console"], "level": LUMENIX_LOG_LEVEL, "propagate": False},
+    },
+}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not RUNNING_IN_DOCKER  # Debug True in local, False in Docker
@@ -146,6 +179,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'lumenix.context_processors.risk_context_data',
+                'lumenix.context_processors.auth_flags',
+                'lumenix.context_processors.user_preferences',
             ],
         },
     },
@@ -170,17 +205,25 @@ ACCOUNT_UNIQUE_EMAIL = True
 #   - users (incl. superusers) can log in without confirming email
 ACCOUNT_EMAIL_VERIFICATION = "mandatory" if EMAIL_VERIFICATION_ENABLED else "none"
 ACCOUNT_PREVENT_ENUMERATION = True
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""              # subjects are written in full in templates/account/email/
+ACCOUNT_EMAIL_NOTIFICATIONS = True             # password changed / reset notices (design E03)
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
+ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
+ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = False  # link-based recovery (designs A04–A08)
+ACCOUNT_LOGIN_BY_CODE_ENABLED = False
 
 # ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
 ACCOUNT_LOGOUT_ON_GET = False
 
 LOGIN_URL = "/accounts/login/"      # allauth login URL
-LOGIN_REDIRECT_URL = "/"            # where to send user after login
+LOGIN_REDIRECT_URL = "/overview/"   # V2 workspace; the preferences gate runs first when no role is set
 ACCOUNT_ADAPTER = "lumenix.account_adapter.NoSignupAccountAdapter"
 
 ACCOUNT_FORMS = {
     "login": "lumenix.forms.SecureLoginForm",
+    "signup": "lumenix.forms.NamedSignupForm",
 }
 
 # How long a “remembered” login should last (14 days)
@@ -307,6 +350,15 @@ PATHOGEN_AUTO_SYNC_LOCK_TTL = int(os.getenv("PATHOGEN_AUTO_SYNC_LOCK_TTL", str(6
 
 # Number of pending specs synced per beat tick (overlapping ticks are skipped via lock).
 PATHOGEN_AUTO_SYNC_BATCH_SIZE = int(os.getenv("PATHOGEN_AUTO_SYNC_BATCH_SIZE", "10"))
+
+# Beat runs with no successful chunk before a spec is parked, so a permanently
+# failing spec cannot retry every 5 minutes forever. Any progress resets it.
+PATHOGEN_AUTO_SYNC_MAX_FAILED_RUNS = int(os.getenv("PATHOGEN_AUTO_SYNC_MAX_FAILED_RUNS", "5"))
+
+# Set true to re-download chunks already stored locally (a refresh, not a resume).
+SCIO_PATHOGEN_SYNC_REFETCH_COMPLETE_CHUNKS = os.getenv(
+    "SCIO_PATHOGEN_SYNC_REFETCH_COMPLETE_CHUNKS", "false"
+)
 
 CELERY_BEAT_SCHEDULE = {
     # Self-resuming pathogen sync: drains the backlog of pending PathogenQuerySpecs,
