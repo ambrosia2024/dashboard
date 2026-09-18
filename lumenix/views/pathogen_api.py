@@ -49,6 +49,35 @@ def _resolve_pathogen_queryset(plant, pathogen, nuts_code, start_date=None, end_
     return base_qs.none(), resolved_nuts_code
 
 
+def _models_for_queryset(qs):
+    """Distinct source models behind the records, joined to the ScioModel catalogue by UUID when possible."""
+    from lumenix.models import ScioModel
+
+    pairs = (
+        qs.exclude(provenance_model_id="", provenance_model_title="")
+        .order_by()  # drop the default ordering so DISTINCT applies to the two columns only
+        .values_list("provenance_model_id", "provenance_model_title")
+        .distinct()
+    )
+    models, seen = [], set()
+    for model_id, title in pairs:
+        if (model_id, title) in seen:
+            continue
+        seen.add((model_id, title))
+        uuid = (model_id or "").rstrip("/").split("/")[-1]
+        catalogue = ScioModel.objects.filter(external_id=uuid).first() if uuid else None
+        models.append(
+            {
+                "id": model_id,
+                "uuid": uuid,
+                "title": title,
+                "name": (catalogue.name if catalogue else "") or title or uuid,
+                "source_url": catalogue.source_url if catalogue else "",
+            }
+        )
+    return models
+
+
 @require_GET
 def pathogen_concentration_meta(request):
     plant = (request.GET.get("plant") or "").strip()
@@ -75,6 +104,7 @@ def pathogen_concentration_meta(request):
             "resolved_nuts_code": resolved_nuts_code,
             "available_start_date": aggregates["available_start_date"].isoformat(),
             "available_end_date": aggregates["available_end_date"].isoformat(),
+            "models": _models_for_queryset(qs),
         }
     )
 

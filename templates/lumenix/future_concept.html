@@ -1,0 +1,25 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<div class="ws ws-future">
+    <nav class="ws-crumbs" aria-label="Breadcrumb"><a href="{% url 'overview' %}">Home</a><span>›</span><span class="is-current">{{ title }}</span></nav>
+    <span class="ws-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Future concept · not active in this build
+    </span>
+    <div class="ws-head"><div><h1>{{ title }}</h1><p>{{ text }}</p></div></div>
+    <div class="ws-empty">
+        <strong>Nothing runs here yet.</strong>
+        This page reserves the place in the journey. No notifications are sent, no sensors are connected and no assessments are performed from this screen.
+    </div>
+</div>
+{% endblock content %}

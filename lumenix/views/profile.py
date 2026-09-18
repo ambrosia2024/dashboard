@@ -13,7 +13,7 @@ class CompleteProfileView(LoginRequiredMixin, FormView):
     """
     template_name = "account/complete_profile.html"
     form_class = ProfileCompletionForm
-    success_url = reverse_lazy("dashboard")
+    success_url = reverse_lazy("overview")
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

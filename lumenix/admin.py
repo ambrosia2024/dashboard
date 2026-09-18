@@ -19,7 +19,7 @@ from django_json_widget.widgets import JSONEditorWidget
 from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
-                     PathogenQuerySpec, PathogenConcentrationRecord, AdminMenuMaster)
+                     PathogenQuerySpec, PathogenConcentrationRecord, AdminMenuMaster, SavedSituation, AssessmentRun)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
 from .services.pathogen_query import sync_pathogen_query_spec
@@ -599,9 +599,11 @@ class ScioModelAdmin(ApiSyncedReadOnlyAdmin):
 #
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "dashboard_mode")
+    list_display = ("user", "role", "role_other", "show_technical_details", "dashboard_mode", "preferences_saved_at")
+    list_filter = ("role", "show_technical_details")
     search_fields = ("user__username", "user__email", "dashboard_mode__label", "dashboard_mode__code")
     autocomplete_fields = ("user", "dashboard_mode")
+    readonly_fields = ("preferences_saved_at",)
 
 @admin.register(DashboardViewMode)
 class DashboardViewModeAdmin(admin.ModelAdmin):
@@ -1278,3 +1280,22 @@ def _custom_get_urls():
 
 
 admin.site.get_urls = _custom_get_urls
+
+
+@admin.register(SavedSituation)
+class SavedSituationAdmin(admin.ModelAdmin):
+    list_display = ("name", "user", "purpose", "nuts2_code", "crop", "hazard", "start_date", "end_date", "resolution", "last_used_at", "status")
+    list_filter = ("purpose", "resolution", "status")
+    search_fields = ("name", "user__email", "nuts2_code", "location_label")
+    autocomplete_fields = ("user",)
+    raw_id_fields = ("crop", "hazard")
+
+
+@admin.register(AssessmentRun)
+class AssessmentRunAdmin(admin.ModelAdmin):
+    list_display = ("run_code", "name", "user", "nuts2_code", "crop_label", "hazard_label", "start_date", "end_date", "resolution", "model_name", "run_status", "created_at")
+    list_filter = ("run_status", "resolution")
+    search_fields = ("name", "user__email", "nuts2_code", "model_name")
+    autocomplete_fields = ("user",)
+    raw_id_fields = ("crop", "hazard", "situation", "parent_run")
+    readonly_fields = ("snapshot", "created_at", "updated_at")

@@ -1,0 +1,87 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Preferences{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<div class="ws ws--narrow">
+    <nav class="ws-crumbs" aria-label="Progress">
+        <span class="is-current">Preferences</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        <span>Overview</span>
+    </nav>
+
+    <div class="ws-head">
+        <div>
+            <h1>{% if first_time %}Set up your workspace{% else %}Your preferences{% endif %}</h1>
+            <p>Choose how you want to explore. You can change these preferences at any time.</p>
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'account_preferences' %}" class="ws-card" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <fieldset class="ws-section" style="border:0;padding:0;margin:0 0 30px;min-width:0;">
+            <legend style="float:left;width:100%;padding:0;margin:0;">
+                <h2>Your role</h2>
+                <p style="margin:0 0 16px;font-size:14px;color:#64748b;">Choose the role you want to explore. This is self-declared and is not verified.</p>
+            </legend>
+            {% if role_error %}<p class="ws-error" role="alert">{{ role_error }}</p>{% endif %}
+            <div class="ws-roles">
+                {% for r in roles %}
+                <div class="ws-role">
+                    <input type="radio" name="role" id="role-{{ r.value }}" value="{{ r.value }}" {% if r.selected %}checked{% endif %} required>
+                    <label for="role-{{ r.value }}">
+                        <i data-feather="{{ r.icon }}"></i>
+                        {{ r.label }}
+                        <svg class="ws-role-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="ws-role-other" id="role-other-wrap" hidden>
+                <label for="role_other">Your role</label>
+                <input type="text" id="role_other" name="role_other" value="{{ role_other }}" maxlength="100" placeholder="e.g. Researcher, Student, Inspector" autocomplete="organization-title">
+                {% if role_other_error %}<p class="ws-error" role="alert" style="margin:8px 0 0;">{{ role_other_error }}</p>{% endif %}
+            </div>
+            <p class="ws-hint">Data availability depends on your selected location, crop and hazard, not your role.</p>
+        </fieldset>
+
+
+        <div class="ws-actions">
+            <p class="ws-hint">Saved to your account.</p>
+            <div class="ws-actions-buttons">
+                {% if first_time %}
+                <button type="submit" name="action" value="skip" class="ws-btn ws-btn-secondary" formnovalidate>Skip for now</button>
+                {% else %}
+                <a href="{{ next }}" class="ws-btn ws-btn-secondary">Cancel</a>
+                {% endif %}
+                <button type="submit" name="action" value="save" class="ws-btn ws-btn-primary">Save preferences &amp; continue</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    var wrap = document.getElementById("role-other-wrap");
+    var input = document.getElementById("role_other");
+    var radios = document.querySelectorAll('input[name="role"]');
+    function sync() {
+        var other = document.getElementById("role-other") && document.getElementById("role-other").checked;
+        wrap.hidden = !other;
+        input.required = !!other;
+        if (other && document.activeElement && document.activeElement.name === "role") input.focus();
+    }
+    radios.forEach(function (r) { r.addEventListener("change", sync); });
+    sync();
+})();
+</script>
+{% endblock content %}

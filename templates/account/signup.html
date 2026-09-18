@@ -1,83 +1,86 @@
-{% load static %}
+{% extends "account/_auth_base.html" %}
+{% load i18n %}
 
-<!DOCTYPE html>
+{% block title %}{% trans "Create your account" %}{% endblock %}
 
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>Sign up</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+{% block card %}
+    <p class="auth-kicker">{% trans "Registration" %}</p>
+    <h1>{% trans "Create your account" %}</h1>
+    <p class="auth-lead">{% trans "Get access to the Ambrosia workspace." %}</p>
 
-        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
-    </head>
-    <body>
-        <div class="page">
-            <div class="card">
-                <h1 class="card-title">Create your account</h1>
+    {% block closed_notice %}{% endblock %}
 
-                {% if form.non_field_errors %}
-                    <div class="non-field-errors">
-                        {{ form.non_field_errors }}
-                    </div>
-                {% endif %}
+    {% if form.non_field_errors %}
+        <div class="auth-alert" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
 
-                <form method="post" action="{% url 'account_signup' %}">
-                    {% csrf_token %}
+    <form method="post" action="{% url 'account_signup' %}" data-single-submit novalidate{% if signup_closed %} class="is-closed" aria-disabled="true"{% endif %}>
+        {% csrf_token %}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
 
-                    {# EMAIL #}
-                    <div class="form-group">
-                        <label for="{{ form.email.id_for_label }}">Email</label>
-                        {{ form.email }}
-                        {{ form.email.errors }}
-                    </div>
-
-                    {# ROLE (dropdown from DB) #}
-{#                    <div class="form-group">#}
-{#                        <label for="{{ form.role.id_for_label }}">Role</label>#}
-{#                        {{ form.role }}#}
-{#                        {{ form.role.errors }}#}
-{#                    </div>#}
-
-                    {# PASSWORD 1 #}
-                    <div class="form-group">
-                        <label for="{{ form.password1.id_for_label }}">Password</label>
-                        {{ form.password1 }}
-                        {{ form.password1.errors }}
-                    </div>
-
-                    {# PASSWORD 2 #}
-                    <div class="form-group">
-                        <label for="{{ form.password2.id_for_label }}">Confirm password</label>
-                        {{ form.password2 }}
-                        {{ form.password2.errors }}
-                    </div>
-
-                    <div class="actions">
-                        <button type="submit">Sign up</button>
-
-                        <div class="secondary-links">
-                            Already have an account?
-                            <a href="{% url 'account_login' %}">Sign in</a>
-                        </div>
-                    </div>
-                </form>
+        <div class="field-row">
+            <div class="field{% if form.first_name.errors %} has-error{% endif %}">
+                <label for="{{ form.first_name.id_for_label }}">{% trans "First name" %}</label>
+                {{ form.first_name }}
+                {{ form.first_name.errors }}
+            </div>
+            <div class="field{% if form.last_name.errors %} has-error{% endif %}">
+                <label for="{{ form.last_name.id_for_label }}">{% trans "Last name" %}</label>
+                {{ form.last_name }}
+                {{ form.last_name.errors }}
             </div>
         </div>
 
-        <script>
-            (function () {
-                const form = document.querySelector("form");
-                if (!form) return;
-                form.addEventListener("submit", function (e) {
-                    const btn = form.querySelector("button[type='submit']");
-                    if (!btn) return;
-                    if (btn.dataset.submitted === "1") {
-                        e.preventDefault();
-                        return;
-                    }
-                    btn.dataset.submitted = "1";
-                });
-            })();
-        </script>
-    </body>
-</html>
+        <div class="field{% if form.email.errors %} has-error{% endif %}">
+            <label for="{{ form.email.id_for_label }}">{% trans "Email address" %}</label>
+            {{ form.email }}
+            {{ form.email.errors }}
+        </div>
+
+        <div class="field{% if form.password1.errors %} has-error{% endif %}">
+            <label for="{{ form.password1.id_for_label }}">{% trans "Password" %}</label>
+            <div class="field-wrap{% if not signup_closed %} field-wrap--toggle{% endif %}">
+                {{ form.password1 }}
+                {% if not signup_closed %}
+                <button type="button" class="field-toggle" data-password-target="{{ form.password1.id_for_label }}" aria-label="{% trans 'Show password' %}" aria-pressed="false">{% trans "Show" %}</button>
+                {% endif %}
+            </div>
+            {{ form.password1.errors }}
+            <div class="field-help">
+                {% if form.password1.help_text %}{{ form.password1.help_text|safe }}{% else %}{% trans "Use a long, unique password." %}{% endif %}
+            </div>
+        </div>
+
+        <div class="field{% if form.password2.errors %} has-error{% endif %}">
+            <label for="{{ form.password2.id_for_label }}">{% trans "Confirm password" %}</label>
+            <div class="field-wrap{% if not signup_closed %} field-wrap--toggle{% endif %}">
+                {{ form.password2 }}
+                {% if not signup_closed %}
+                <button type="button" class="field-toggle" data-password-target="{{ form.password2.id_for_label }}" aria-label="{% trans 'Show password confirmation' %}" aria-pressed="false">{% trans "Show" %}</button>
+                {% endif %}
+            </div>
+            {{ form.password2.errors }}
+        </div>
+
+        {% if signup_closed %}
+            <button type="button" class="btn-primary" disabled aria-disabled="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+                <span>{% trans "Registration is currently closed" %}</span>
+            </button>
+        {% else %}
+            <button type="submit" class="btn-primary" data-pending-label="{% trans 'Creating account…' %}">
+                <span>{% trans "Create account" %}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        {% endif %}
+    </form>
+
+    <div class="auth-card-foot">
+        <p>{% trans "Already have access?" %} <a href="{{ login_url|default:'/accounts/login/' }}">{% trans "Sign in" %}</a></p>
+        {% if signup_closed %}
+            <p>{% trans "Need help with access? Contact the team that provided your demo details." %}</p>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Saved situations{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<div class="ws ws--wide ws--full">
+
+    <p class="ws-hint" style="margin:0 0 10px;">Saved to your account · reopen a saved situation or an earlier result at any time.</p>
+
+    <div class="ws-tabs" role="tablist">
+        <a href="{% url 'situations' %}" role="tab" class="ws-tab{% if tab == 'saved' %} is-active{% endif %}" aria-selected="{% if tab == 'saved' %}true{% else %}false{% endif %}">Saved situations</a>
+        <a href="{% url 'situations' %}?tab=history" role="tab" class="ws-tab{% if tab == 'history' %} is-active{% endif %}" aria-selected="{% if tab == 'history' %}true{% else %}false{% endif %}">Assessment history</a>
+    </div>
+
+    {% if tab == 'saved' %}
+    <section class="ws-panel">
+        {% if situations %}
+        <div class="ws-situation-list">
+            {% for s in situations %}
+            <article class="ws-situation-row">
+                <span class="ws-situation-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <div class="ws-situation-body">
+                    <strong>{{ s.name }}</strong>
+                    <small>{{ s.crop_label }} · {{ s.hazard_label }} · {{ s.nuts2_name|default:s.nuts2_code }} · {{ s.start_date|date:"M Y" }} – {{ s.end_date|date:"M Y" }} · {{ s.get_resolution_display }}{% if s.model_name %} · {{ s.model_name }}{% endif %}</small>
+                    <small class="ws-faint">{% if s.last_used_at %}Last used {{ s.last_used_at|timesince }} ago{% else %}Saved {{ s.updated_at|timesince }} ago{% endif %}</small>
+                </div>
+                <div class="ws-situation-actions">
+                    <a href="{% url 'assessment-new' %}?situation={{ s.id }}" class="ws-btn ws-btn-primary" style="height:36px;padding:0 14px;">Use settings</a>
+                    <details class="ws-menu">
+                        <summary aria-label="More actions">⋮</summary>
+                        <div class="ws-menu-body">
+                            <form method="post" action="{% url 'situation-rename' s.id %}" class="ws-menu-form">{% csrf_token %}<input type="text" name="name" value="{{ s.name }}" maxlength="120" minlength="2" required aria-label="New name"><button type="submit" class="ws-btn-link">Rename</button></form>
+                            <form method="post" action="{% url 'situation-duplicate' s.id %}">{% csrf_token %}<button type="submit" class="ws-btn-link">Duplicate</button></form>
+                            <form method="post" action="{% url 'situation-delete' s.id %}" onsubmit="return confirm('Delete “{{ s.name|escapejs }}”? Existing assessment results will remain.');">{% csrf_token %}<button type="submit" class="ws-btn-link is-danger">Delete</button></form>
+                        </div>
+                    </details>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="ws-empty"><strong>No saved situations yet.</strong> Tick “Save this situation to my account” on a new assessment to keep its inputs here.</div>
+        {% endif %}
+        <a href="{% url 'assessment-new' %}" class="ws-btn-link" style="display:inline-block;margin-top:14px;font-size:14px;">+ Create a saved situation</a>
+    </section>
+
+    {% else %}
+    <form method="get" action="{% url 'situations' %}" class="ws-filters">
+        <input type="hidden" name="tab" value="history">
+        <div class="ws-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" name="q" value="{{ q }}" placeholder="Search assessments…" maxlength="100"></div>
+        <select name="when" onchange="this.form.submit()"><option value="">Any date</option><option value="7" {% if when == "7" %}selected{% endif %}>Past 7 days</option><option value="30" {% if when == "30" %}selected{% endif %}>Past 30 days</option><option value="90" {% if when == "90" %}selected{% endif %}>Past 90 days</option></select>
+        <select name="status" onchange="this.form.submit()"><option value="">All statuses</option>{% for v, l in statuses %}<option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+        <button type="submit" class="ws-btn ws-btn-secondary" style="height:40px;">Search</button>
+    </form>
+
+    <div class="ws-history">
+        <div class="ws-history-list">
+            <h2 class="ws-history-title">Recent runs</h2>
+            {% for r in runs %}
+            <a href="{% url 'situations' %}?tab=history&run={{ r.id }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if when %}&when={{ when }}{% endif %}" class="ws-run{% if selected and selected.id == r.id %} is-selected{% endif %}">
+                <div>
+                    <strong>{{ r.name }} <span class="ws-ver">v{{ r.version }}</span></strong>
+                    <small>{{ r.crop_label }} · {{ r.hazard_label }} · {{ r.nuts2_code }}</small>
+                    <small class="ws-faint">{{ r.created_at|date:"j M Y · H:i" }}</small>
+                </div>
+                <span class="ws-status ws-status--{{ r.run_status }}">{{ r.get_run_status_display }}</span>
+            </a>
+            {% empty %}
+            <div class="ws-empty"><strong>No assessments run yet.</strong> {% if q or status or when %}Nothing matches these filters.{% else %}Start a new assessment to see it listed here.{% endif %}</div>
+            {% endfor %}
+        </div>
+
+        {% if selected %}
+        <aside class="ws-card ws-history-detail">
+            <div class="ws-detail-head">
+                <div><h2>{{ selected.name }} <span class="ws-ver">v{{ selected.version }}</span></h2><p>{{ selected.get_run_status_display }} · {{ selected.created_at|date:"j M Y, H:i" }} · {{ selected.run_code }}</p></div>
+                <details class="ws-menu">
+                    <summary aria-label="More actions">⋮</summary>
+                    <div class="ws-menu-body">
+                        <a href="{% url 'assessment-export' selected.id %}" class="ws-btn-link">Export CSV</a>
+                        <form method="post" action="{% url 'assessment-delete' selected.id %}" onsubmit="return confirm('Delete this saved result from your history? It cannot be reopened afterwards.');">{% csrf_token %}<button type="submit" class="ws-btn-link is-danger">Delete result</button></form>
+                    </div>
+                </details>
+            </div>
+
+            {% if selected_newer %}
+            <div class="ws-note ws-note--warn"><span><strong>A newer run exists.</strong> <a href="{% url 'situations' %}?tab=history&run={{ selected_newer.id }}">{{ selected_newer.run_code }}</a> was run {{ selected_newer.created_at|date:"j M Y, H:i" }}. This entry preserves the original result.</span></div>
+            {% endif %}
+
+            <h3 class="ws-side-title" style="margin-top:6px;">Original assessment inputs</h3>
+            <dl class="ws-evidence ws-evidence--left">
+                <dt>Location</dt><dd>{{ selected.nuts2_name }} ({{ selected.nuts2_code }})</dd>
+                <dt>Crop</dt><dd>{{ selected.crop_label }}</dd>
+                <dt>Hazard</dt><dd>{{ selected.hazard_label }}</dd>
+                <dt>Time period</dt><dd>{{ selected.start_date|date:"M Y" }} – {{ selected.end_date|date:"M Y" }}</dd>
+                <dt>Time scale</dt><dd>{{ selected.get_resolution_display }}</dd>
+                <dt>Model</dt><dd class="wrap">{{ selected.model_name|default:"—" }}</dd>
+                {% if selected_stats %}<dt>Mean · peak</dt><dd>{{ selected_stats.mean|default:"—" }} · {{ selected_stats.max|default:"—" }}</dd>{% endif %}
+            </dl>
+            {% if show_technical %}
+            <h3 class="ws-side-title" style="margin-top:18px;">System details</h3>
+            <dl class="ws-evidence ws-evidence--left">
+                <dt>Model ID</dt><dd class="wrap mono">{{ selected.model_uuid|default:"—" }}</dd>
+                <dt>Run ID</dt><dd class="mono">{{ selected.run_code }}{% if selected.parent_run %} ← {{ selected.parent_run.run_code }}{% endif %}</dd>
+                <dt>Stored points</dt><dd>{{ selected.snapshot.series|length }} ({{ selected.get_resolution_display|lower }})</dd>
+            </dl>
+            {% endif %}
+
+            <div class="ws-detail-actions">
+                <form method="post" action="{% url 'assessment-run-again' selected.id %}">{% csrf_token %}<button type="submit" class="ws-btn ws-btn-primary" style="width:100%;">Run again with latest data</button></form>
+                <div class="ws-detail-actions-row">
+                    <a href="{% url 'assessment-outcome' selected.id %}" class="ws-btn ws-btn-secondary">Open original result</a>
+                    <a href="{% url 'assessment-new' %}?run={{ selected.id }}" class="ws-btn ws-btn-secondary">Duplicate settings</a>
+                </div>
+                <p class="ws-hint" style="text-align:center;margin-top:10px;">A new run preserves this original result.</p>
+            </div>
+        </aside>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

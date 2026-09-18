@@ -1,0 +1,503 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}New assessment{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<script src="{% static 'vendor/leaflet/1.9.4/leaflet.js' %}"></script>
+<div class="ws ws--wide ws--full">
+    <div class="ws-crumbs" style="justify-content:space-between;">
+        <nav aria-label="Progress" style="display:flex;align-items:center;gap:10px;">
+            <span class="is-current">Situation</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            <span>Outcome</span>
+        </nav>
+        <span class="ws-help-link" title="Planned conversational setup — not available yet" aria-disabled="true" style="opacity:.7;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Help me describe my situation (planned)
+        </span>
+    </div>
+
+    <div class="ws-head">
+        <div>
+            <h1>Describe your situation</h1>
+            <p>Model availability is checked before continuing. All fields are required.</p>
+        </div>
+    </div>
+
+    <div class="ws-draft" id="f-draft-notice" hidden>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>
+        <span>Unsaved draft restored from this browser.</span>
+        <button type="button" class="ws-btn-link" id="f-draft-discard">Discard draft</button>
+    </div>
+
+    {% if errors.availability %}
+    <div class="ws-availability is-bad" role="alert" style="margin:0 0 20px;font-size:14px;">{{ errors.availability }}</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'assessment-new' %}" id="assessment-form" class="ws-assess" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="situation_id" value="{{ form.situation_id|default:'' }}">
+        <input type="hidden" name="latitude" id="f-lat" value="{{ form.latitude|default:'' }}">
+        <input type="hidden" name="longitude" id="f-lon" value="{{ form.longitude|default:'' }}">
+        <input type="hidden" name="nuts2_code" id="f-nuts2" value="{{ form.nuts2_code|default:'' }}">
+        <input type="hidden" name="nuts2_name" id="f-nuts2-name" value="{{ form.nuts2_name|default:'' }}">
+
+        <div class="ws-card ws-card--form">
+            <section class="ws-step">
+                <span class="ws-step-num">1</span>
+                <h2>Basics</h2>
+                <div class="ws-field{% if errors.name %} has-error{% endif %}">
+                    <label for="f-name">Situation name</label>
+                    <input type="text" id="f-name" name="name" value="{{ form.name|default:'' }}" required minlength="2" maxlength="120" autocomplete="off" placeholder="e.g. North field, Lettuce season 2027, Limburg supplier region">
+                    {% if errors.name %}<p class="ws-field-error">{{ errors.name }}</p>{% endif %}
+                </div>
+                <div class="ws-field{% if errors.purpose %} has-error{% endif %}">
+                    <label for="f-purpose">Purpose</label>
+                    <select id="f-purpose" name="purpose">
+                        {% for value, label in purposes %}
+                        <option value="{{ value }}" {% if form.purpose == value %}selected{% endif %} {% if value != "assess" %}disabled{% endif %}>{{ label }}{% if value != "assess" %} (not yet available){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.purpose %}<p class="ws-field-error">{{ errors.purpose }}</p>{% endif %}
+                </div>
+            </section>
+
+            <section class="ws-step">
+                <span class="ws-step-num">2</span>
+                <h2>Location &amp; scope</h2>
+                <div class="ws-field{% if errors.location %} has-error{% endif %}">
+                    <label for="f-location">Location</label>
+                    <div class="ws-loc-row">
+                        <div class="ws-loc-input">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            <input type="text" id="f-location" name="location" value="{{ form.location|default:'' }}" placeholder="City, region, postcode or coordinates" autocomplete="off">
+                        </div>
+                        <button type="button" class="ws-btn ws-btn-secondary" id="f-locate" style="height:44px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+                            Locate me
+                        </button>
+                    </div>
+                    <ul class="ws-loc-results" id="f-location-results" hidden></ul>
+                    <div class="ws-resolved{% if not form.nuts2_code %} is-pending{% endif %}" id="f-resolved">
+                        {% if form.nuts2_code %}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Resolved to {{ form.nuts2_name }} ({{ form.nuts2_code }})
+                        {% else %}Search for a place, pick a result, and the supported region (NUTS2) is resolved.{% endif %}
+                    </div>
+                    {% if errors.location %}<p class="ws-field-error">{{ errors.location }}</p>{% endif %}
+                </div>
+
+                <div class="ws-field-row">
+                    <div class="ws-field{% if errors.crop %} has-error{% endif %}">
+                        <label for="f-crop">Crop</label>
+                        <select id="f-crop" name="crop" required>
+                            <option value="">Select a crop</option>
+                            {% for c in crops %}
+                            <option value="{{ c.id }}" data-identifier="{{ c.identifier }}" {% if form.crop|stringformat:"s" == c.id|stringformat:"s" %}selected{% endif %}>{{ c.label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.crop %}<p class="ws-field-error">{{ errors.crop }}</p>{% endif %}
+                    </div>
+                    <div class="ws-field{% if errors.hazard %} has-error{% endif %}">
+                        <label for="f-hazard">Hazard</label>
+                        <select id="f-hazard" name="hazard" required>
+                            <option value="">Select a hazard</option>
+                            {% for h in hazards %}
+                            <option value="{{ h.id }}" data-identifier="{{ h.identifier }}" {% if form.hazard|stringformat:"s" == h.id|stringformat:"s" %}selected{% endif %}>{{ h.label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.hazard %}<p class="ws-field-error">{{ errors.hazard }}</p>{% endif %}
+                    </div>
+                </div>
+                <div class="ws-field{% if errors.model %} has-error{% endif %}" style="margin-top:2px;">
+                    <label for="f-model">Model</label>
+                    <select id="f-model" name="model_uuid" disabled data-selected="{{ form.model_uuid|default:'' }}">
+                        <option value="">Available after location, crop and hazard are chosen</option>
+                    </select>
+                    <input type="hidden" name="model_name" id="f-model-name" value="{{ form.model_name|default:'' }}">
+                    {% if errors.model %}<p class="ws-field-error">{{ errors.model }}</p>{% endif %}
+                </div>
+                <div class="ws-availability" id="f-availability">Choose a location, crop and hazard to check data availability.</div>
+            </section>
+
+            <section class="ws-step" id="step-timeframe">
+                <span class="ws-step-num">3</span>
+                <h2>Time period</h2>
+                <div class="ws-field-row ws-field-row--3">
+                    <div class="ws-field{% if errors.start_date %} has-error{% endif %}">
+                        <label for="f-start">Start</label>
+                        <input type="date" id="f-start" name="start_date" required value="{{ form.start_date|default:'' }}">
+                        {% if errors.start_date %}<p class="ws-field-error">{{ errors.start_date }}</p>{% endif %}
+                    </div>
+                    <div class="ws-field{% if errors.end_date %} has-error{% endif %}">
+                        <label for="f-end">End</label>
+                        <input type="date" id="f-end" name="end_date" required value="{{ form.end_date|default:'' }}">
+                        {% if errors.end_date %}<p class="ws-field-error">{{ errors.end_date }}</p>{% endif %}
+                    </div>
+                    <div class="ws-field{% if errors.resolution %} has-error{% endif %}">
+                        <label for="f-resolution">Time scale</label>
+                        <select id="f-resolution" name="resolution">
+                            {% for value, label in resolutions %}
+                            <option value="{{ value }}" {% if form.resolution == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.resolution %}<p class="ws-field-error">{{ errors.resolution }}</p>{% endif %}
+                    </div>
+                </div>
+
+                <label class="ws-check">
+                    <input type="checkbox" name="save" {% if form.save == "on" %}checked{% endif %}>
+                    Save this situation to my account
+                </label>
+            </section>
+
+            <div class="ws-form-actions">
+                <a href="{% url 'overview' %}" class="ws-back">Back</a>
+                <button type="submit" class="ws-btn ws-btn-primary" id="f-submit" disabled title="Choose a location, crop and hazard with available data first." data-pending="Running…">Run assessment</button>
+            </div>
+        </div>
+
+        <aside class="ws-card ws-summary">
+            <h3>Current selection</h3>
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px;">Location preview</div>
+            <div class="ws-summary-map">
+                <div id="s-map" aria-label="Location preview map"></div>
+                <span id="s-region" class="ws-summary-chip">{% if form.nuts2_code %}{{ form.nuts2_name }} ({{ form.nuts2_code }}){% else %}No region yet{% endif %}</span>
+            </div>
+            <p class="ws-summary-note">Results represent the supported region (NUTS2 level), not an individual field.</p>
+            <dl>
+                <dt>Name</dt><dd id="s-name">{{ form.name|default:"—" }}</dd>
+                <dt>Purpose</dt><dd id="s-purpose">Assess my situation</dd>
+                <dt>Crop</dt><dd id="s-crop">—</dd>
+                <dt>Hazard</dt><dd id="s-hazard">—</dd>
+                <dt>Period</dt><dd id="s-period">—</dd>
+                <dt>Time scale</dt><dd id="s-scale">—</dd>
+                <dt>Model</dt><dd id="s-model" class="wrap">—</dd>
+            </dl>
+        </aside>
+    </form>
+</div>
+
+<script>
+(function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var form = $("assessment-form");
+    var loc = $("f-location"), results = $("f-location-results"), resolved = $("f-resolved");
+    var latEl = $("f-lat"), lonEl = $("f-lon"), nutsEl = $("f-nuts2"), nutsNameEl = $("f-nuts2-name");
+    var crop = $("f-crop"), hazard = $("f-hazard"), start = $("f-start"), end = $("f-end"), resolutionEl = $("f-resolution");
+    var avail = $("f-availability");
+    var nutsPromise = null;
+
+    // ---- preview map (Leaflet, same tiles as the dashboard) ------------
+    var map = null, marker = null, regionLayer = null;
+    function initMap() {
+        if (map || !window.L) return;
+        map = L.map("s-map", { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView([50, 10], 3);
+        var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { referrerPolicy: "strict-origin-when-cross-origin" });
+        var swapped = false;
+        osm.on("tileerror", function () {
+            if (swapped) return; swapped = true; map.removeLayer(osm);
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd" }).addTo(map);
+        });
+        osm.addTo(map);
+    }
+    function showOnMap(lat, lon, feature) {
+        initMap(); if (!map) return;
+        if (marker) map.removeLayer(marker);
+        if (regionLayer) map.removeLayer(regionLayer);
+        marker = L.circleMarker([lat, lon], { radius: 6, color: "#376EB5", fillColor: "#376EB5", fillOpacity: 0.9, weight: 2 }).addTo(map);
+        if (feature) {
+            regionLayer = L.geoJSON(feature, { style: { color: "#376EB5", weight: 2, fillColor: "#376EB5", fillOpacity: 0.12 } }).addTo(map);
+            map.fitBounds(regionLayer.getBounds(), { padding: [8, 8] });
+        } else {
+            map.setView([lat, lon], 8);
+        }
+        setTimeout(function () { map.invalidateSize(); }, 50);
+    }
+
+    // ---- summary panel -------------------------------------------------
+    function text(el) { var o = el.options[el.selectedIndex]; return (el.value && o) ? o.textContent.trim() : "—"; }
+    function fmt(iso) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) return null;
+        var d = new Date(iso + "T00:00:00");
+        return d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }).replace(" ", " '");
+    }
+    function updateSummary() {
+        $("s-name").textContent = $("f-name").value.trim() || "—";
+        $("s-crop").textContent = text(crop);
+        $("s-hazard").textContent = text(hazard);
+        var a = fmt(start.value), b = fmt(end.value);
+        $("s-period").textContent = (a && b) ? a + " – " + b : "—";
+        $("s-scale").textContent = (resolutionEl.disabled || !(a && b)) ? "—" : text(resolutionEl);
+        $("s-region").textContent = nutsEl.value ? (nutsNameEl.value || nutsEl.value) + " (" + nutsEl.value + ")" : "No region yet";
+    }
+    ["f-name", "f-crop", "f-hazard", "f-start", "f-end", "f-resolution"].forEach(function (id) {
+        $(id).addEventListener("input", updateSummary);
+        $(id).addEventListener("change", updateSummary);
+    });
+    start.addEventListener("change", function () { if (start.value) end.min = start.value; });
+
+    // ---- NUTS2 resolution (same GISCO file the context panel uses) -----
+    function pointInRing(p, ring) {
+        var inside = false;
+        for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+            if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi)) inside = !inside;
+        }
+        return inside;
+    }
+    function pointInPolygon(p, poly) {
+        if (!pointInRing(p, poly[0])) return false;
+        for (var k = 1; k < poly.length; k++) if (pointInRing(p, poly[k])) return false;
+        return true;
+    }
+    function pointInFeature(p, f) {
+        var g = f.geometry; if (!g) return false;
+        if (g.type === "Polygon") return pointInPolygon(p, g.coordinates);
+        if (g.type === "MultiPolygon") return g.coordinates.some(function (poly) { return pointInPolygon(p, poly); });
+        return false;
+    }
+    function nutsFeatures() {
+        if (!nutsPromise) {
+            nutsPromise = fetch("/static/data/nuts/NUTS_RG_03M_2021_4326.geojson", { headers: { Accept: "application/json" } })
+                .then(function (r) { if (!r.ok) throw new Error("NUTS fetch failed"); return r.json(); })
+                .then(function (fc) { return (fc.features || []).filter(function (f) { return String(f.properties && f.properties.LEVL_CODE) === "2"; }); });
+        }
+        return nutsPromise;
+    }
+    function setResolved(state, html) { resolved.className = "ws-resolved" + (state ? " is-" + state : ""); resolved.innerHTML = html; }
+    var okIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+
+    function resolveNuts(lat, lon) {
+        latEl.value = lat; lonEl.value = lon;
+        nutsEl.value = ""; nutsNameEl.value = "";
+        setResolved("pending", "Resolving region…");
+        updateSummary();
+        nutsFeatures().then(function (features) {
+            var m = features.find(function (f) { return pointInFeature([parseFloat(lon), parseFloat(lat)], f); });
+            showOnMap(parseFloat(lat), parseFloat(lon), m || null);
+            if (!m) { setResolved("error", "We could not resolve this location to a supported region."); checkAvailability(); return; }
+            nutsEl.value = m.properties.NUTS_ID || "";
+            nutsNameEl.value = m.properties.NAME_LATN || "";
+            setResolved("", okIcon + " Resolved to " + nutsNameEl.value + " (" + nutsEl.value + ")");
+            updateSummary();
+            checkAvailability();
+        }).catch(function () { setResolved("error", "Region lookup is unavailable right now."); });
+    }
+
+    // ---- location search (Nominatim, as elsewhere in the app) ----------
+    var searchTimer = null;
+    function concise(it) {
+        var a = it.address || {};
+        var place = a.city || a.town || a.village || a.municipality || a.county || a.suburb || "";
+        var parts = [place, a.state, a.country].filter(Boolean);
+        return parts.length ? parts.join(", ") : (it.display_name || "");
+    }
+    function showResults(items) {
+        results.innerHTML = "";
+        if (!items.length) { results.hidden = true; return; }
+        items.slice(0, 6).forEach(function (it) {
+            var li = document.createElement("li");
+            li.tabIndex = 0;
+            li.textContent = concise(it);
+            li.addEventListener("click", function () { pick(it); });
+            li.addEventListener("keydown", function (e) { if (e.key === "Enter") pick(it); });
+            results.appendChild(li);
+        });
+        results.hidden = false;
+    }
+    function pick(it) {
+        loc.value = concise(it);
+        results.hidden = true;
+        resolveNuts(it.lat, it.lon);
+    }
+    function search() {
+        var q = loc.value.trim();
+        if (q.length < 3) { results.hidden = true; return; }
+        var coords = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+        if (coords) { resolveNuts(coords[1], coords[2]); results.hidden = true; return; }
+        fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (d) { showResults(Array.isArray(d) ? d : []); })
+            .catch(function () { showResults([]); });
+    }
+    loc.addEventListener("input", function () {
+        nutsEl.value = ""; nutsNameEl.value = "";
+        setResolved("pending", "Pick a result to resolve the region.");
+        updateSummary();
+        clearTimeout(searchTimer); searchTimer = setTimeout(search, 350);
+    });
+    loc.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); clearTimeout(searchTimer); search(); } });
+    document.addEventListener("click", function (e) { if (!results.contains(e.target) && e.target !== loc) results.hidden = true; });
+
+    $("f-locate").addEventListener("click", function () {
+        if (!navigator.geolocation) { setResolved("error", "Location access is not available in this browser."); return; }
+        setResolved("pending", "Getting your position…");
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            var lat = pos.coords.latitude, lon = pos.coords.longitude;
+            fetch("https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=" + lat + "&lon=" + lon, { headers: { Accept: "application/json" } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { loc.value = (d && concise(d)) || (lat.toFixed(5) + ", " + lon.toFixed(5)); })
+                .catch(function () { loc.value = lat.toFixed(5) + ", " + lon.toFixed(5); })
+                .finally(function () { resolveNuts(lat, lon); });
+        }, function () { setResolved("error", "Location access was not available. Search for a place instead."); });
+    });
+
+    // ---- availability check (existing meta endpoint) -------------------
+    function ident(el) { var o = el.options[el.selectedIndex]; return (el.value && o) ? (o.dataset.identifier || "") : ""; }
+    var availSeq = 0;
+    function checkAvailability() {
+        var plant = ident(crop), pathogen = ident(hazard), nuts = nutsEl.value;
+        avail.className = "ws-availability";
+        if (!plant || !pathogen || !nuts) { avail.textContent = "Choose a location, crop and hazard to check data availability."; setModels([]); constrainDates(null, null); return; }
+        var seq = ++availSeq;
+        avail.textContent = "Checking data availability for " + text(crop) + " · " + text(hazard) + " in " + nuts + "…";
+        fetch("{% url 'risk-chart-pathogen-meta' %}?" + new URLSearchParams({ plant: plant, pathogen: pathogen, nutsCode: nuts }))
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
+            .then(function (res) {
+                if (seq !== availSeq) return;
+                if (res.ok) {
+                    avail.className = "ws-availability is-ok";
+                    avail.textContent = "Data available for this combination from " + res.d.available_start_date + " to " + res.d.available_end_date + ". The time period is limited to these dates.";
+                    setModels(res.d.models || []);
+                    constrainDates(res.d.available_start_date, res.d.available_end_date);
+                } else if (res.status === 404) {
+                    avail.className = "ws-availability is-bad";
+                    avail.textContent = "No data is available for this combination in " + nuts + ". Choose a supported alternative.";
+                    setModels([]);
+                    constrainDates(null, null);
+                } else {
+                    avail.className = "ws-availability is-error";
+                    avail.textContent = "The data service is unavailable. Your inputs are kept.";
+                    constrainDates(null, null);
+                }
+            })
+            .catch(function () { if (seq === availSeq) { avail.className = "ws-availability is-error"; avail.textContent = "The data service is unavailable. Your inputs are kept."; constrainDates(null, null); } });
+    }
+    crop.addEventListener("change", checkAvailability);
+    hazard.addEventListener("change", checkAvailability);
+
+    // Keep the timeframe inside the available data period. Without available
+    // data the timeframe and Review request stay disabled.
+    function isISO(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v || ""); }
+    var submitBtn = $("f-submit"), stepTime = $("step-timeframe"), resolution = $("f-resolution");
+    function setTimeframeEnabled(enabled) {
+        [start, end, resolution].forEach(function (el) { el.disabled = !enabled; });
+        stepTime.classList.toggle("is-disabled", !enabled);
+        submitBtn.disabled = !enabled;
+        submitBtn.title = enabled ? "" : "Choose a location, crop and hazard with available data first.";
+        if (!enabled) { start.value = ""; end.value = ""; updateSummary(); }
+    }
+    var modelSel = $("f-model"), modelName = $("f-model-name");
+    function syncModelSummary() {
+        var o = modelSel.options[modelSel.selectedIndex];
+        var name = (!modelSel.disabled && modelSel.value && o) ? o.textContent : "";
+        $("s-model").textContent = name || "—";
+        modelName.value = name;
+    }
+    function setModels(models) {
+        var keep = modelSel.dataset.selected || modelSel.value;
+        modelSel.innerHTML = "";
+        if (!models.length) {
+            var o = document.createElement("option"); o.value = ""; o.textContent = "Available after location, crop and hazard are chosen"; modelSel.appendChild(o);
+            modelSel.disabled = true; syncModelSummary(); return;
+        }
+        models.forEach(function (m) {
+            var o = document.createElement("option"); o.value = m.uuid || m.id; o.textContent = m.name; o.title = m.source_url || ""; modelSel.appendChild(o);
+        });
+        modelSel.disabled = false;
+        modelSel.value = keep && [].some.call(modelSel.options, function (o) { return o.value === keep; }) ? keep : modelSel.options[0].value;
+        modelSel.dataset.selected = "";
+        syncModelSummary();
+    }
+    modelSel.addEventListener("change", syncModelSummary);
+    function constrainDates(a, b) {
+        [start, end].forEach(function (el) {
+            if (a && b) { el.min = a; el.max = b; } else { el.removeAttribute("min"); el.removeAttribute("max"); }
+        });
+        setTimeframeEnabled(!!(a && b));
+        if (!a || !b) return;
+        if (!isISO(start.value) || start.value < a || start.value > b) start.value = a;
+        if (!isISO(end.value) || end.value < a || end.value > b) end.value = b;
+        if (end.value < start.value) end.value = b;
+        end.min = start.value;
+        updateSummary();
+    }
+
+    // ---- hand the confirmed context to the existing chart pages --------
+    form.addEventListener("submit", function (e) {
+        var nameEl = $("f-name");
+        if (nameEl.value.trim().length < 2) {
+            e.preventDefault();
+            nameEl.closest(".ws-field").classList.add("has-error");
+            if (!$("f-name-err")) { var p = document.createElement("p"); p.id = "f-name-err"; p.className = "ws-field-error"; p.textContent = "Enter a situation name (at least 2 characters)."; nameEl.closest(".ws-field").appendChild(p); }
+            nameEl.focus();
+            return;
+        }
+        clearDraft();
+        try {
+            var set = function (k, v) { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); };
+            set("lx_selected_location", loc.value.trim());
+            set("lx_selected_location_lat", latEl.value);
+            set("lx_selected_location_lon", lonEl.value);
+            set("lx_selected_nuts2_id", nutsEl.value);
+            set("lx_selected_nuts2_name", nutsNameEl.value);
+            set("lx_selected_crop", crop.value);
+            set("lx_selected_crop_label", crop.value ? text(crop) : "");
+            set("lx_selected_pathogen", hazard.value);
+            set("lx_selected_pathogen_label", hazard.value ? text(hazard) : "");
+            set("risk_filter_start", start.value);
+            set("risk_filter_end", end.value);
+        } catch (e) { /* storage unavailable; the server still validates the request */ }
+    });
+
+    // ---- unsaved draft in this browser --------------------------------
+    var DRAFT_KEY = "lx_assessment_draft_v1";
+    var canRestore = {% if request.method == "GET" and not request.GET.situation %}true{% else %}false{% endif %};
+    var draftFields = ["f-name", "f-purpose", "f-location", "f-lat", "f-lon", "f-nuts2", "f-nuts2-name", "f-crop", "f-hazard", "f-model", "f-start", "f-end", "f-resolution"];
+    function readDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return null; } }
+    function writeDraft() {
+        var d = {};
+        draftFields.forEach(function (id) { d[id] = $(id).value; });
+        d.save = form.querySelector('input[name="save"]').checked;
+        try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) { /* storage unavailable */ }
+    }
+    function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+    var draftTimer = null;
+    form.addEventListener("input", function () { clearTimeout(draftTimer); draftTimer = setTimeout(writeDraft, 250); });
+    form.addEventListener("change", function () { clearTimeout(draftTimer); draftTimer = setTimeout(writeDraft, 250); });
+    $("f-draft-discard").addEventListener("click", function () { clearDraft(); window.location.href = window.location.pathname; });
+
+    var restored = false;
+    var draft = canRestore ? readDraft() : null;
+    if (draft && draftFields.some(function (id) { return id !== "f-purpose" && id !== "f-resolution" && draft[id]; })) {
+        ["f-name", "f-purpose", "f-location", "f-lat", "f-lon", "f-nuts2", "f-nuts2-name", "f-crop", "f-hazard", "f-start", "f-end", "f-resolution"].forEach(function (id) {
+            if (draft[id] !== undefined && draft[id] !== null) $(id).value = draft[id];
+        });
+        modelSel.dataset.selected = draft["f-model"] || "";
+        form.querySelector('input[name="save"]').checked = !!draft.save;
+        if (nutsEl.value) setResolved("", okIcon + " Resolved to " + nutsNameEl.value + " (" + nutsEl.value + ")");
+        $("f-draft-notice").hidden = false;
+        restored = true;
+    }
+
+    updateSummary();
+    checkAvailability();
+    initMap();
+    if (latEl.value && lonEl.value) {
+        var la = parseFloat(latEl.value), lo = parseFloat(lonEl.value);
+        nutsFeatures().then(function (features) {
+            showOnMap(la, lo, features.find(function (f) { return pointInFeature([lo, la], f); }) || null);
+        }).catch(function () { showOnMap(la, lo, null); });
+    }
+})();
+</script>
+{% endblock content %}

@@ -1,4 +1,6 @@
 import json
+import logging
+import time
 
 import requests
 from django.conf import settings
@@ -7,6 +9,8 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 
 from lumenix.models import DashboardChart
+
+logger = logging.getLogger(__name__)
 
 
 def _friendly_upstream_error_message(status_code: int) -> str:
@@ -77,12 +81,38 @@ def _build_numeric_stats(points):
     return summary
 
 
-def _llm_url() -> str:
-    base = (settings.LLM_URL or "").rstrip("/")
-    endpoint = (settings.LLM_CHAT_ENDPOINT or "/v1/chat/completions").strip()
-    if not endpoint.startswith("/"):
-        endpoint = f"/{endpoint}"
-    return f"{base}{endpoint}"
+def _scaleway_chat_url() -> str:
+    return f"{settings.SCW_AI_BASE_URL.rstrip('/')}/chat/completions"
+
+
+def _scaleway_request_payload(system_prompt: str, user_prompt: str) -> dict:
+    payload = {
+        "model": settings.SCW_AI_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": settings.SCW_AI_MAX_TOKENS,
+        "temperature": settings.SCW_AI_TEMPERATURE,
+        "top_p": settings.SCW_AI_TOP_P,
+        "presence_penalty": settings.SCW_AI_PRESENCE_PENALTY,
+        "stream": True,
+        "response_format": {"type": "text"},
+    }
+
+    # Reasoning models hold back `content` until the whole chain of thought is
+    # generated, so the user stares at an empty bubble for the entire think.
+    # "none" keeps time-to-first-token low; Scaleway ignores chat_template_kwargs.
+    effort = getattr(settings, "SCW_AI_REASONING_EFFORT", "none")
+    if effort:
+        payload["reasoning_effort"] = effort
+
+    return payload
+
+
+def _delta_reasoning(delta: dict):
+    """Scaleway has used both spellings for chain-of-thought deltas."""
+    return delta.get("reasoning") or delta.get("reasoning_content")
 
 
 def _role_guidance(view_code, view_label) -> str:
@@ -126,11 +156,11 @@ def _role_guidance(view_code, view_label) -> str:
 @login_required
 @require_POST
 def chart_qa_stream(request, chart_identifier: str):
-    if not settings.LLM_URL:
-        return JsonResponse({"error": "LLM_URL is not configured."}, status=500)
+    if not settings.SCW_AI_BASE_URL:
+        return JsonResponse({"error": "SCW_AI_BASE_URL is not configured."}, status=500)
 
-    if not settings.LLM_API_KEY:
-        return JsonResponse({"error": "LLM_API_KEY is not configured."}, status=500)
+    if not settings.SCW_SECRET_KEY:
+        return JsonResponse({"error": "SCW_SECRET_KEY is not configured."}, status=500)
 
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -141,7 +171,7 @@ def chart_qa_stream(request, chart_identifier: str):
     if not question:
         return JsonResponse({"error": "Question is required."}, status=400)
 
-    max_user_chars = max(1, int(getattr(settings, "LLM_MAX_USER_CHARS", 1000)))
+    max_user_chars = max(1, int(getattr(settings, "SCW_AI_MAX_USER_CHARS", 1000)))
     question = question[:max_user_chars]
 
     chart = (
@@ -211,31 +241,34 @@ def chart_qa_stream(request, chart_identifier: str):
     )
 
     headers = {
-        "Authorization": f"Bearer {settings.LLM_API_KEY}",
+        "Authorization": f"Bearer {settings.SCW_SECRET_KEY}",
         "Content-Type": "application/json",
     }
 
-    request_payload = {
-        "model": settings.LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": settings.LLM_TEMPERATURE,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-        "stream": True,
-    }
+    request_payload = _scaleway_request_payload(system_prompt, user_prompt)
 
     def token_stream():
+        started = time.monotonic()
+        headers_at = first_reasoning_at = first_content_at = None
+        reasoning_chars = 0
+
+        def elapsed(mark):
+            return None if mark is None else round(mark - started, 3)
+
         try:
             with requests.post(
-                _llm_url(),
+                _scaleway_chat_url(),
                 headers=headers,
                 json=request_payload,
                 stream=True,
-                timeout=(10, settings.LLM_TIMEOUT_SECONDS),
+                timeout=(10, settings.SCW_AI_TIMEOUT_SECONDS),
             ) as resp:
+                headers_at = time.monotonic()
                 if resp.status_code >= 400:
+                    logger.warning(
+                        "chart_qa upstream %s for chart=%s after %ss",
+                        resp.status_code, chart_identifier, elapsed(headers_at),
+                    )
                     yield _friendly_upstream_error_message(resp.status_code)
                     return
 
@@ -256,17 +289,41 @@ def chart_qa_stream(request, chart_identifier: str):
                     except json.JSONDecodeError:
                         continue
 
-                    delta = (
-                        event.get("choices", [{}])[0]
-                        .get("delta", {})
-                        .get("content")
-                    )
-                    if delta:
-                        yield delta
+                    choice = (event.get("choices") or [{}])[0]
+                    delta = choice.get("delta") or {}
+
+                    reasoning = _delta_reasoning(delta)
+                    if reasoning:
+                        if first_reasoning_at is None:
+                            first_reasoning_at = time.monotonic()
+                        reasoning_chars += len(reasoning)
+
+                    content = delta.get("content")
+                    if content:
+                        if first_content_at is None:
+                            first_content_at = time.monotonic()
+                        yield content
         except Exception:
+            logger.exception("chart_qa stream failed for chart=%s", chart_identifier)
             yield (
                 "Ambra seems to be down at the moment. "
                 "Please try again after some time."
+            )
+        finally:
+            # The gap between first_reasoning and first_content is invisible to the
+            # browser, so log it here when diagnosing slow answers.
+            logger.info(
+                "chart_qa timing chart=%s effort=%s points=%s "
+                "headers=%ss first_reasoning=%ss first_content=%ss total=%ss "
+                "reasoning_chars=%s",
+                chart_identifier,
+                request_payload.get("reasoning_effort", "default"),
+                len(chart_points),
+                elapsed(headers_at),
+                elapsed(first_reasoning_at),
+                elapsed(first_content_at),
+                elapsed(time.monotonic()),
+                reasoning_chars,
             )
 
     return StreamingHttpResponse(token_stream(), content_type="text/plain; charset=utf-8")

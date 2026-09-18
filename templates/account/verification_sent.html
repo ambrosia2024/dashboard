@@ -1,29 +1,15 @@
-{% load static %}
-
-<!DOCTYPE html>
-
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>Email verification</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-
-        <link rel="stylesheet" href="{% static 'css/account_custom_css.css' %}" />
-    </head>
-    <body>
-        <div class="page">
-            <div class="card">
-                <h1 class="card-title">Verify your email</h1>
-                <p class="card-text">
-                    We have sent a confirmation link to your email address.
-                    Please click the link in that email to activate your account.
-                </p>
-                <p class="small">
-                    If you don't see it, check your spam or junk folder.
-                </p>
-
-                <a href="/accounts/login/" class="button-back">Back to sign in</a>
-            </div>
-        </div>
-    </body>
-</html>
+{% extends "account/_auth_base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Continue from your inbox" %}{% endblock %}
+{% block card_class %}auth-card--status{% endblock %}
+{% block card %}
+    <span class="auth-status-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+    <h1>{% trans "Continue from your inbox" %}</h1>
+    <p class="auth-lead">{% trans "Check for an Ambrosia message with the next step for your email address." %}</p>
+    <ol class="auth-steps">
+        <li>{% trans "Open the confirmation link in the message to continue." %}</li>
+        <li>{% trans "If you don't see a message, check your spam or junk folder and the address you used." %}</li>
+    </ol>
+    <a href="{% url 'account_login' %}" class="btn-primary"><span>{% trans "Back to sign in" %}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+    <p class="auth-hint">{% trans "You can return here after following the email link." %}</p>
+{% endblock %}

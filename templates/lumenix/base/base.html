@@ -23,6 +23,7 @@
     <!-- App Css-->
     <link href="{% static 'css/app.min.css'%}" id="app-style" rel="stylesheet" type="text/css" />
     <link href="{% static 'css/custom_css.css'%}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'css/workspace.css'%}" rel="stylesheet" type="text/css" />
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
@@ -214,6 +215,11 @@
         <div class="main-content">
             <div class="page-content">
                 <div class="container-fluid">
+                    {% if messages %}
+                    <div class="ws-flashes" role="status">
+                        {% for m in messages %}<div class="ws-flash{% if 'error' in m.tags %} ws-flash--error{% endif %}">{{ m }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
                     {% block content %}
                     {% endblock content %}
                 </div>
@@ -226,7 +232,7 @@
     </div>
     <!-- END layout-wrapper -->
 
-    {% include "lumenix/partials/risk_context_bubble.html" %}
+    {% block risk_context %}{% include "lumenix/partials/risk_context_bubble.html" %}{% endblock risk_context %}
 
     {% if user.is_authenticated %}
     <form id="idle-logout-form" method="post" action="{% url 'account_logout' %}" style="display:none;">

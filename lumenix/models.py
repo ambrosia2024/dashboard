@@ -472,10 +472,27 @@ class DashboardViewMode(BaseModel):
         super().save(*args, **kwargs)
 
 
+class UserRole(models.TextChoices):
+    """Self-declared role chosen on the V2 preferences screen (design 01-profile)."""
+    FARMER = "farmer", "Farmer"
+    FORESTER = "forester", "Forester"
+    ADVISOR = "advisor", "Advisor"
+    PRODUCER = "producer", "Producer"
+    DISTRIBUTOR = "distributor", "Distributor"
+    POLICY_MAKER = "policy_maker", "Policy maker"
+    TECHNICIAN = "technician", "Technician"
+    OTHER = "other", "Other"
+
+
 class UserProfile(models.Model):
     """
     Per-user account metadata. For the dashboard use case this is where we assign
     the user's fixed dashboard mode instead of trusting a self-selected view.
+
+    V2 adds the self-declared role and the technical-details preference. The
+    role is a presentation preference only: it grants no permissions and does
+    not imply model coverage. Until it is set, users are sent to the
+    preferences page after login (see EnforceProfileCompletionMiddleware).
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -490,14 +507,59 @@ class UserProfile(models.Model):
         blank=True,
         help_text="Assigned dashboard view for this user. When set, it overrides the cookie-based selector.",
     )
+    role = models.CharField(
+        max_length=32,
+        choices=UserRole.choices,
+        blank=True,
+        default="",
+        help_text="Self-declared role chosen on the preferences page. Empty until the user picks one.",
+    )
+    role_other = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Free-text role description, used when role is 'Other'.",
+    )
+    show_technical_details = models.BooleanField(
+        default=False,
+        help_text="Show model inputs and technical terms where available.",
+    )
+    preferences_saved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the user last saved the preferences page.",
+    )
 
     class Meta:
         db_table = "user_profiles"
+
+    @property
+    def role_label(self):
+        if not self.role:
+            return ""
+        if self.role == UserRole.OTHER and self.role_other:
+            return self.role_other
+        return UserRole(self.role).label
 
     def __str__(self):
         if self.dashboard_mode_id:
             return f"{self.user} ({self.dashboard_mode})"
         return str(self.user)
+
+
+# Which dashboard view mode (DashboardViewMode.code) each self-declared role
+# uses. Farmer and Forester share the Producer layout (implementation handoff);
+# roles without a dedicated mode fall back to the default view.
+ROLE_TO_VIEW_MODE = {
+    UserRole.FARMER: "producer",
+    UserRole.FORESTER: "producer",
+    UserRole.ADVISOR: "advisor",
+    UserRole.PRODUCER: "producer",
+    UserRole.DISTRIBUTOR: "distributor",
+    UserRole.POLICY_MAKER: "policy-actor",
+    UserRole.TECHNICIAN: "technician",
+    UserRole.OTHER: "default",
+}
 
 class DashboardChart(BaseModel):
     """
@@ -684,6 +746,13 @@ class AdminMenuMaster(BaseModel):
         verbose_name="Open in new tab",
         help_text="Open the route in a new browser tab (useful for external links).",
     )
+    badge = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Badge",
+        help_text="Optional small label shown next to the menu name, e.g. 'Future'.",
+    )
     order = models.PositiveIntegerField(
         default=0,
         verbose_name="Order",
@@ -782,3 +851,143 @@ class PathogenConcentrationRecord(BaseModel):
 
     def __str__(self):
         return f"{self.plant}/{self.pathogen}/{self.nuts_code} @ {self.observed_on}"
+
+
+class SavedSituation(BaseModel):
+    """
+    A named, reusable set of assessment inputs (V2 design 03-assessment),
+    stored per user. Saving a situation does not run an assessment.
+    """
+
+    class Purpose(models.TextChoices):
+        ASSESS = "assess", "Assess my situation"
+        CLIMATE_HISTORY = "climate_history", "Explore climate history"
+        CLIMATE_FUTURE = "climate_future", "Explore future climate"
+
+    class Resolution(models.TextChoices):
+        YEARLY = "yearly", "Yearly"
+        MONTHLY = "monthly", "Monthly"
+        WEEKLY = "weekly", "Weekly"
+        DAILY = "daily", "Daily"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_situations")
+    name = models.CharField(max_length=120)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices, default=Purpose.ASSESS)
+
+    location_label = models.CharField(max_length=255, blank=True, default="")
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    nuts2_code = models.CharField(max_length=16, blank=True, default="", help_text="Resolved NUTS2 code, e.g. NL42")
+    nuts2_name = models.CharField(max_length=255, blank=True, default="")
+
+    crop = models.ForeignKey(Concept, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    hazard = models.ForeignKey(Concept, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+    resolution = models.CharField(max_length=16, choices=Resolution.choices, default=Resolution.MONTHLY)
+
+    model_uuid = models.CharField(max_length=64, blank=True, default="", help_text="Chosen source model (ScioModel.external_id / provenance UUID).")
+    model_name = models.CharField(max_length=512, blank=True, default="")
+
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "saved_situations"
+        ordering = ["-last_used_at", "-updated_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.user})"
+
+    def label(self, field, lang="en"):
+        concept = getattr(self, field, None)
+        if not concept:
+            return ""
+        payload = concept.pref_label or {}
+        return payload.get(lang) or payload.get("en") or next(iter(payload.values()), "")
+
+    @property
+    def crop_label(self):
+        return self.label("crop")
+
+    @property
+    def hazard_label(self):
+        return self.label("hazard")
+
+
+class AssessmentRun(BaseModel):
+    """
+    One request with frozen inputs and a stored outcome snapshot (V2 design 04).
+    Opening a run shows its snapshot without re-fetching; "Run again" creates a
+    new run linked to this one. Not a tamper-proof audit record.
+    """
+
+    class Status(models.TextChoices):
+        COMPLETED = "completed", "Completed"
+        NO_DATA = "no_data", "No data"
+        FAILED = "failed", "Failed"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assessment_runs")
+    situation = models.ForeignKey(SavedSituation, null=True, blank=True, on_delete=models.SET_NULL, related_name="runs")
+    parent_run = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="reruns")
+
+    name = models.CharField(max_length=120)
+    purpose = models.CharField(max_length=32, choices=SavedSituation.Purpose.choices, default=SavedSituation.Purpose.ASSESS)
+    location_label = models.CharField(max_length=255, blank=True, default="")
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    nuts2_code = models.CharField(max_length=16, blank=True, default="")
+    nuts2_name = models.CharField(max_length=255, blank=True, default="")
+    crop = models.ForeignKey(Concept, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    hazard = models.ForeignKey(Concept, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    crop_label = models.CharField(max_length=255, blank=True, default="")
+    hazard_label = models.CharField(max_length=255, blank=True, default="")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    resolution = models.CharField(max_length=16, choices=SavedSituation.Resolution.choices, default=SavedSituation.Resolution.MONTHLY)
+    model_uuid = models.CharField(max_length=64, blank=True, default="")
+    model_name = models.CharField(max_length=512, blank=True, default="")
+
+    run_status = models.CharField(max_length=16, choices=Status.choices, default=Status.COMPLETED)
+    snapshot = models.JSONField(default=dict, blank=True, help_text="Stored outcome: series, stats, provenance, limitations.")
+
+    class Meta:
+        db_table = "assessment_runs"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.run_code} {self.name}"
+
+    @property
+    def run_code(self):
+        return f"AS-{self.id:03d}" if self.id else "AS-new"
+
+    @property
+    def version(self):
+        """1 for an original run, +1 for each rerun in the chain."""
+        n, r = 1, self
+        while r.parent_run_id:
+            n += 1
+            r = r.parent_run
+        return n
+
+
+class AmbraMessage(models.Model):
+    """One turn of the Ask Ambra conversation about an assessment run, kept per user."""
+
+    class Role(models.TextChoices):
+        USER = "user", "User"
+        AMBRA = "ambra", "Ambra"
+
+    run = models.ForeignKey(AssessmentRun, on_delete=models.CASCADE, related_name="ambra_messages")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ambra_messages")
+    role = models.CharField(max_length=8, choices=Role.choices)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "ambra_messages"
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:40]}"

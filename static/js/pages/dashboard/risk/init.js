@@ -1692,7 +1692,7 @@ function initC1ChartChat() {
       if (entry.role === "assistant" && entry.metrics) {
         if (entry.metrics.firstTokenMs != null) {
           lines.push(
-            `timing: thought=${fmtDuration(entry.metrics.firstTokenMs)}, answer=${fmtDuration(entry.metrics.answerMs)}, total=${fmtDuration(entry.metrics.totalMs)}`
+            `timing: waited=${fmtDuration(entry.metrics.firstTokenMs)}, answer=${fmtDuration(entry.metrics.answerMs)}, total=${fmtDuration(entry.metrics.totalMs)}`
           );
         } else {
           lines.push(`timing: total=${fmtDuration(entry.metrics.totalMs)}`);
@@ -1806,6 +1806,9 @@ function initC1ChartChat() {
 
     const qaUrl = `/api/risk-charts/${encodeURIComponent(chartIdentifier)}/qa-stream/`;
 
+    // Must be taken before fetch(): the promise only settles once the server
+    // flushes its first byte, so timing from after it hides the entire wait.
+    const startedAt = Date.now();
     const response = await fetch(qaUrl, {
       method: "POST",
       headers: {
@@ -1824,7 +1827,6 @@ function initC1ChartChat() {
       throw new Error("No streaming response body.");
     }
 
-    const startedAt = Date.now();
     let firstChunkAt = null;
     const answerMsg = addMessage("assistant", "");
     const reader = response.body.getReader();
@@ -1844,7 +1846,7 @@ function initC1ChartChat() {
     const answerMs = firstChunkAt == null ? totalMs : endedAt - firstChunkAt;
 
     if (firstChunkAt != null) {
-      answerMsg.meta.textContent = `${fmtTimestamp(answerMsg.timestamp)} • Thought ${fmtDuration(firstChunkAt - startedAt)} • Answered ${fmtDuration(answerMs)} • Total ${fmtDuration(totalMs)}`;
+      answerMsg.meta.textContent = `${fmtTimestamp(answerMsg.timestamp)} • Waited ${fmtDuration(firstChunkAt - startedAt)} • Answered ${fmtDuration(answerMs)} • Total ${fmtDuration(totalMs)}`;
     } else {
       answerMsg.meta.textContent = `${fmtTimestamp(answerMsg.timestamp)} • Total ${fmtDuration(totalMs)}`;
     }

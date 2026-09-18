@@ -7,7 +7,7 @@
         <div class="d-flex">
             <!-- LOGO -->
             <div class="navbar-brand-box">
-                <a href="{% url 'dashboard' %}" class="navbar-brand d-flex align-items-center text-decoration-none">
+                <a href="{% url 'overview' %}" class="navbar-brand d-flex align-items-center text-decoration-none">
                     <span class="logo-lg d-inline-flex align-items-center">
                         <img src="{% static 'images/ambrosia-logo.png' %}" alt="Ambrosia" class="brand-logo" />
                     </span>
@@ -20,11 +20,7 @@
             <button type="button" class="btn btn-sm px-3 font-size-16 header-item" id="vertical-menu-btn">
                 <i class="fa fa-fw fa-bars"></i>
             </button>
-            {% if user.is_authenticated %}
-            <span id="idle-timer-badge" class="header-item d-none d-lg-inline-flex align-items-center px-2 text-muted small">
-                Session: 15:00
-            </span>
-            {% endif %}
+
         </div>
 
         <div class="d-flex">
@@ -33,7 +29,6 @@
                     {% include "lumenix/partials/risk_header_filters.html" %}
                 {% endif %}
             {% endwith %}
-
             {% dashboard_mode_select %}
 
             {% comment %} Alerts & Notifications (bell) hidden per request. Kept for reference; do NOT delete.
