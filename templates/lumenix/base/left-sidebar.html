@@ -38,13 +38,22 @@
                     </ul>
                   </li>
                   {% else %}
+                  {% if node.badge %}
+                  <li class="menu-future">
+                    <a href="javascript:void(0);" aria-disabled="true" tabindex="-1" title="{{ node.name }} is a future concept and is not active yet">
+                      <i data-feather="{{ node.icon }}"></i>
+                      <span>{{ node.name }}</span>
+                      <span class="menu-badge">{{ node.badge }}</span>
+                    </a>
+                  </li>
+                  {% else %}
                   <li class="{% if node.active %}mm-active{% endif %}">
                     <a href="{{ node.url }}"{% if node.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>
                       <i data-feather="{{ node.icon }}"></i>
                       <span>{{ node.name }}</span>
-                      {% if node.badge %}<span class="menu-badge">{{ node.badge }}</span>{% endif %}
                     </a>
                   </li>
+                  {% endif %}
                   {% endif %}
                 {% endfor %}
 

@@ -44,13 +44,6 @@
         <span class="ws-tag">{{ run.get_resolution_display }}</span>
     </div>
 
-    {% if newer_runs %}
-    <div class="ws-note ws-note--warn" style="margin-bottom:18px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>This is the original result. A newer run exists: {% for n in newer_runs %}<a href="{% url 'assessment-outcome' n.id %}">{{ n.run_code }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</span>
-    </div>
-    {% endif %}
-
     <div class="ws-info" style="margin-bottom:22px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         <span><strong>Model output, not a validated risk prediction.</strong> Values are the source model's response to the region's climate input. Quantitative risk interpretation depends on confirmed model outputs.</span>
@@ -81,14 +74,14 @@
                         <div><h2>Seasonal heatmap</h2><small>Monthly mean per year, same model output</small></div>
                         <span class="ws-badge ws-badge--derived">Derived</span>
                     </div>
-                    <div id="chart-seasonal" class="ws-chart ws-chart--sm"></div>
+                    <div id="chart-seasonal" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing monthly means…</div></div>
                 </section>
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
                         <div><h2>Geographic heatmap</h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
                         <span class="ws-badge ws-badge--derived">Derived</span>
                     </div>
-                    <div id="chart-geo" class="ws-chart ws-chart--sm"></div>
+                    <div id="chart-geo" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing regional means…</div></div>
                 </section>
             </div>
 
@@ -117,7 +110,6 @@
 
             <div class="ws-actions-row">
                 <a href="{% url 'assessment-new' %}?run={{ run.id }}" class="ws-btn ws-btn-secondary">Duplicate situation</a>
-                <form method="post" action="{% url 'assessment-run-again' run.id %}">{% csrf_token %}<button type="submit" class="ws-btn ws-btn-secondary">Run again with latest data</button></form>
                 <a href="{% url 'assessment-export' run.id %}" class="ws-btn ws-btn-primary">Export CSV</a>
             </div>
         </div>
@@ -127,7 +119,7 @@
                 <h3 class="ws-side-title">Evidence &amp; limitations</h3>
                 <dl class="ws-evidence">
                     <dt>Model / source</dt><dd>{{ run.model_name|default:provenance.model_title|default:"Unavailable" }}</dd>
-                    <dt>Data retrieved</dt><dd>{% if retrieved_at %}{{ retrieved_at|date:"j M Y, H:i" }}{% else %}Unavailable{% endif %}</dd>
+                    <dt>Last synced</dt><dd>{% if retrieved_at %}{{ retrieved_at|date:"j M Y, H:i" }}{% else %}Unavailable{% endif %}<small>When the source data used here was last updated.</small></dd>
                     <dt>Coverage</dt><dd>Regional (NUTS2)</dd>
                     <dt>Period in data</dt><dd>{{ stats.first_date|default:"—" }} to {{ stats.last_date|default:"—" }}</dd>
                     <dt>Uncertainty</dt><dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small></dd>
@@ -221,7 +213,9 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
             var rows = d.rows || [], el2 = document.getElementById("chart-seasonal");
-            if (!el2 || !rows.length) return;
+            if (!el2) return;
+            el2.classList.remove("is-loading"); el2.innerHTML = "";
+            if (!rows.length) { el2.innerHTML = '<div class="ws-chart-loading">No monthly data for this period.</div>'; return; }
             var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
             var years = Array.from(new Set(rows.map(function (r) { return r.year; }))).sort();
             var vals = rows.map(function (r) { return r.value; }).filter(function (v) { return v != null; });
@@ -237,7 +231,7 @@
                              inRange: { color: ["#eaf3fd", "#376EB5", "#112b39"] } },
                 series: [{ type: "heatmap", data: rows.map(function (r) { return [r.month - 1, years.indexOf(r.year), r.value]; }), label: { show: false } }]
             });
-        }).catch(function () {});
+        }).catch(function () { var el2 = document.getElementById("chart-seasonal"); if (el2) { el2.classList.remove("is-loading"); el2.innerHTML = '<div class="ws-chart-loading">The seasonal heatmap could not be loaded.</div>'; } });
 
     // ---- geographic heatmap ---------------------------------------------
     Promise.all([
@@ -246,6 +240,7 @@
     ]).then(function (res) {
         var data = res[0], fc = res[1], el3 = document.getElementById("chart-geo");
         if (!el3) return;
+        el3.classList.remove("is-loading"); el3.innerHTML = "";
         var values = data.values || {}, selected = data.selected || "";
         document.getElementById("geo-count").textContent = data.regions || 0;
         var vals = Object.keys(values).map(function (k) { return values[k].value; }).filter(function (v) { return v != null; });

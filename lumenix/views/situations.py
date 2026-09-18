@@ -51,6 +51,8 @@ class SituationsView(LoginRequiredMixin, TemplateView):
 
         newer = selected.reruns.filter(status=1).order_by("-created_at").first() if selected else None
         stats = (selected.snapshot or {}).get("stats", {}) if selected else {}
+        fetched_ms = stats.get("fetched_at_ms")
+        synced_at = timezone.datetime.fromtimestamp(fetched_ms / 1000, tz=timezone.get_current_timezone()) if fetched_ms else None
 
         ctx.update({
             "tab": "history" if g.get("tab") == "history" else "saved",
@@ -59,6 +61,7 @@ class SituationsView(LoginRequiredMixin, TemplateView):
             "selected": selected,
             "selected_newer": newer,
             "selected_stats": stats,
+            "selected_synced_at": synced_at,
             "q": q, "status": status, "when": when,
             "statuses": AssessmentRun.Status.choices,
             "show_technical": getattr(getattr(user, "profile", None), "show_technical_details", False),

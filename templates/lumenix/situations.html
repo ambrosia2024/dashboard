@@ -92,10 +92,6 @@
                 </details>
             </div>
 
-            {% if selected_newer %}
-            <div class="ws-note ws-note--warn"><span><strong>A newer run exists.</strong> <a href="{% url 'situations' %}?tab=history&run={{ selected_newer.id }}">{{ selected_newer.run_code }}</a> was run {{ selected_newer.created_at|date:"j M Y, H:i" }}. This entry preserves the original result.</span></div>
-            {% endif %}
-
             <h3 class="ws-side-title" style="margin-top:6px;">Original assessment inputs</h3>
             <dl class="ws-evidence ws-evidence--left">
                 <dt>Location</dt><dd>{{ selected.nuts2_name }} ({{ selected.nuts2_code }})</dd>
@@ -105,6 +101,7 @@
                 <dt>Time scale</dt><dd>{{ selected.get_resolution_display }}</dd>
                 <dt>Model</dt><dd class="wrap">{{ selected.model_name|default:"—" }}</dd>
                 {% if selected_stats %}<dt>Mean · peak</dt><dd>{{ selected_stats.mean|default:"—" }} · {{ selected_stats.max|default:"—" }}</dd>{% endif %}
+                <dt>Last synced</dt><dd>{% if selected_synced_at %}{{ selected_synced_at|date:"j M Y, H:i" }}{% else %}Unavailable{% endif %}</dd>
             </dl>
             {% if show_technical %}
             <h3 class="ws-side-title" style="margin-top:18px;">System details</h3>
@@ -116,12 +113,10 @@
             {% endif %}
 
             <div class="ws-detail-actions">
-                <form method="post" action="{% url 'assessment-run-again' selected.id %}">{% csrf_token %}<button type="submit" class="ws-btn ws-btn-primary" style="width:100%;">Run again with latest data</button></form>
                 <div class="ws-detail-actions-row">
-                    <a href="{% url 'assessment-outcome' selected.id %}" class="ws-btn ws-btn-secondary">Open original result</a>
+                    <a href="{% url 'assessment-outcome' selected.id %}" class="ws-btn ws-btn-primary">Open result</a>
                     <a href="{% url 'assessment-new' %}?run={{ selected.id }}" class="ws-btn ws-btn-secondary">Duplicate settings</a>
                 </div>
-                <p class="ws-hint" style="text-align:center;margin-top:10px;">A new run preserves this original result.</p>
             </div>
         </aside>
         {% endif %}
