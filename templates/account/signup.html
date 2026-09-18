@@ -78,7 +78,7 @@
     </form>
 
     <div class="auth-card-foot">
-        <p>{% trans "Already have access?" %} <a href="{{ login_url|default:'/accounts/login/' }}">{% trans "Sign in" %}</a></p>
+        <p>{% trans "Already have an account?" %} <a href="{{ login_url|default:'/accounts/login/' }}">{% trans "Sign in" %}</a></p>
         {% if signup_closed %}
             <p>{% trans "Need help with access? Contact the team that provided your demo details." %}</p>
         {% endif %}

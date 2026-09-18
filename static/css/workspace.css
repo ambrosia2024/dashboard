@@ -613,3 +613,12 @@
 .ws-drawer-form textarea:focus { border-color: var(--ws-blue); outline: none; box-shadow: 0 0 0 3px rgba(55,110,181,.15); }
 .ws-drawer-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 body.ws-drawer-open { overflow: hidden; }
+
+.ws-chart.is-loading { display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; }
+.ws-chart-loading { display: flex; align-items: center; justify-content: center; gap: 10px; height: 100%; width: 100%; font-size: 13.5px; color: var(--ws-muted); }
+.ws-spinner { width: 18px; height: 18px; border: 2px solid #cbd5e1; border-top-color: var(--ws-blue); border-radius: 50%; animation: ws-spin .8s linear infinite; }
+@keyframes ws-spin { to { transform: rotate(360deg); } }
+
+#sidebar-menu li.menu-future > a { cursor: default; color: #8591a3 !important; }
+#sidebar-menu li.menu-future > a:hover { color: #8591a3 !important; background: transparent; }
+#sidebar-menu li.menu-future > a i { color: #b4bccb !important; stroke: #b4bccb !important; }

@@ -402,17 +402,37 @@ class AssessmentExportView(_OwnedRunMixin, View):
         return response
 
 
+def _cached_derived(run, key, compute):
+    """Derived datasets are frozen with the run: computed once, then stored in its snapshot."""
+    snap = run.snapshot or {}
+    derived = snap.get("derived") or {}
+    if key not in derived:
+        derived[key] = compute()
+        snap["derived"] = derived
+        run.snapshot = snap
+        run.save(update_fields=["snapshot"])
+    return derived[key]
+
+
 class AssessmentSeasonalView(_OwnedRunMixin, View):
     def get(self, request, *args, **kwargs):
         run = self.get_run()
-        plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
-        qs, _ = _resolve_pathogen_queryset(plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date)
-        return JsonResponse({"rows": seasonal_matrix(qs), "unit": "model output"})
+
+        def compute():
+            plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
+            qs, _ = _resolve_pathogen_queryset(plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date)
+            return {"rows": seasonal_matrix(qs), "unit": "model output"}
+
+        return JsonResponse(_cached_derived(run, "seasonal", compute))
 
 
 class AssessmentGeographicView(_OwnedRunMixin, View):
     def get(self, request, *args, **kwargs):
         run = self.get_run()
-        plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
-        values = geographic_means(plant, pathogen, run.start_date, run.end_date)
-        return JsonResponse({"values": values, "selected": run.nuts2_code, "unit": "model output", "regions": len(values)})
+
+        def compute():
+            plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
+            values = geographic_means(plant, pathogen, run.start_date, run.end_date)
+            return {"values": values, "selected": run.nuts2_code, "unit": "model output", "regions": len(values)}
+
+        return JsonResponse(_cached_derived(run, "geographic", compute))
