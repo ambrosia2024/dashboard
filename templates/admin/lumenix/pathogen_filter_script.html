@@ -46,22 +46,32 @@ Behaviour shared by the pathogen changelists:
       buildOverlay();
 
       var selects = document.querySelectorAll("select[data-admin-filter]");
-      selects.forEach(function (select) {
-        select.addEventListener("change", function () {
-          if (!select.value) { return; }
-          showLoading();
-          window.location = select.value;
-        });
-      });
+
+      function navigate(select) {
+        if (!select.value) { return; }
+        showLoading();
+        window.location = select.value;
+      }
 
       var jq = window.django && window.django.jQuery;
-      if (jq && jq.fn && jq.fn.select2) {
-        jq(selects).select2({
-          theme: "admin-autocomplete",
-          width: "100%",
-          // Short lists are quicker to pick from without a search box.
-          minimumResultsForSearch: 12,
-          dropdownCssClass: "pcr-filter-dropdown",
+      if (jq) {
+        if (jq.fn.select2) {
+          jq(selects).select2({
+            theme: "admin-autocomplete",
+            width: "100%",
+            // Short lists are quicker to pick from without a search box.
+            minimumResultsForSearch: 12,
+            dropdownCssClass: "pcr-filter-dropdown",
+          });
+        }
+        // Select2 fires `change` through jQuery's own event system, which never
+        // reaches a listener added with addEventListener - the dropdown would
+        // change but the page would not move. Binding through jQuery catches
+        // both that and a plain native change.
+        jq(selects).on("change", function () { navigate(this); });
+      } else {
+        selects.forEach(function (select) {
+          select.addEventListener("change", function () { navigate(select); });
         });
       }
 
