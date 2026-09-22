@@ -1,0 +1,87 @@
+{% extends "admin/change_list.html" %}
+{% comment %}
+Summary panel above the query specs: how many are active, parked, stale or
+never synced, and what each crop/hazard pair covers. A parked spec is skipped
+by every sync run, so the parked count is the first thing to check when data is
+missing - it is given its own card rather than hidden in a status column.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}
+{% include "admin/lumenix/pathogen_panel_style.html" %}
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+{% include "admin/lumenix/pathogen_filter_script.html" %}
+{% endblock %}
+
+{% block result_list %}
+<div class="pcr-panel">
+  <div class="pcr-cards">
+    <div class="pcr-card">
+      <span class="pcr-card-label">Query specs</span>
+      <strong>{{ summary.total }}</strong>
+      <small>{{ summary.pair_count }} crop · hazard pair{{ summary.pair_count|pluralize }}, {{ summary.regions }} region{{ summary.regions|pluralize }}</small>
+    </div>
+    <div class="pcr-card">
+      <span class="pcr-card-label">Active</span>
+      <strong>{{ summary.active }}</strong>
+      <small>included in every sync run</small>
+    </div>
+    <div class="pcr-card{% if summary.parked %} pcr-card-warn{% endif %}">
+      <span class="pcr-card-label">Parked</span>
+      <strong>{{ summary.parked }}</strong>
+      <small>
+        {% if summary.parked %}skipped by syncs — <a href="?status=0">review them</a>{% else %}none parked{% endif %}
+      </small>
+    </div>
+    <div class="pcr-card{% if summary.never %} pcr-card-warn{% endif %}">
+      <span class="pcr-card-label">Never synced</span>
+      <strong>{{ summary.never }}</strong>
+      <small>
+        {% if summary.never %}no data fetched yet — <a href="?sync=never">review them</a>{% else %}all specs have run{% endif %}
+      </small>
+    </div>
+    <div class="pcr-card">
+      <span class="pcr-card-label">Stale</span>
+      <strong>{{ summary.stale }}</strong>
+      <small>
+        {% if summary.stale %}<a href="?sync=stale">older than {{ summary.stale_days }} days</a>{% else %}none older than {{ summary.stale_days }} days{% endif %}
+      </small>
+    </div>
+    <div class="pcr-card">
+      <span class="pcr-card-label">Last sync</span>
+      <strong>{{ summary.last_sync|date:"j M Y, H:i"|default:"never" }}</strong>
+      <small>most recent spec run</small>
+    </div>
+  </div>
+
+  <p class="pcr-actions">
+    <a href="{{ generate_url }}">Bulk generate specs</a>
+    <a href="{{ bulk_delete_url }}">Bulk delete data</a>
+    <a href="{{ records_url }}">Browse the records</a>
+  </p>
+
+  {% if summary.pairs %}
+  <table class="pcr-coverage">
+    <thead>
+      <tr><th>Crop</th><th>Hazard</th><th>Regions</th><th>Requested range</th><th>Last synced</th><th>Pending</th><th>Parked</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for pair in summary.pairs %}
+      <tr>
+        <td>{{ pair.crop_label }}</td>
+        <td>{{ pair.hazard_label }}</td>
+        <td>{{ pair.regions }}</td>
+        <td>{{ pair.first|date:"Y-m-d" }} → {{ pair.last|date:"Y-m-d" }}</td>
+        <td>{{ pair.synced|date:"j M Y, H:i"|default:"never" }}</td>
+        <td>{% if pair.pending %}<span class="pcr-pill pcr-pill-warn">{{ pair.pending }}</span>{% else %}0{% endif %}</td>
+        <td>{% if pair.parked %}<span class="pcr-pill pcr-pill-bad">{{ pair.parked }}</span>{% else %}0{% endif %}</td>
+        <td><a href="?plant={{ pair.plant|urlencode }}&amp;pathogen={{ pair.pathogen|urlencode }}">Show specs</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

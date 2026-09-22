@@ -1,0 +1,88 @@
+{% comment %}
+Behaviour shared by the pathogen changelists:
+
+* the sidebar filters render as <select>s (admin/filter_select.html), so they
+  have to navigate on change;
+* the region list holds one entry per NUTS2 region, which is far too many to
+  scroll, so Select2 (loaded through the ModelAdmin's Media, as the admin's own
+  autocomplete widgets do) adds a type-ahead box to any list long enough to
+  need one;
+* a filter, a sort or a page step over millions of rows can take a few seconds,
+  so an overlay says the click landed.
+{% endcomment %}
+<script>
+  (function () {
+    var overlay;
+    var pending;
+
+    function buildOverlay() {
+      overlay = document.createElement("div");
+      overlay.className = "pcr-loading";
+      overlay.hidden = true;
+      overlay.innerHTML = '<div class="pcr-loading-box">' +
+        '<span class="pcr-spinner" aria-hidden="true"></span>' +
+        '<span>Loading results…</span></div>';
+      document.body.appendChild(overlay);
+    }
+
+    // Short delay: a fast response should not flash an overlay on the screen.
+    function showLoading() {
+      if (!overlay || pending) { return; }
+      pending = window.setTimeout(function () { overlay.hidden = false; }, 150);
+    }
+
+    function hideLoading() {
+      window.clearTimeout(pending);
+      pending = null;
+      if (overlay) { overlay.hidden = true; }
+    }
+
+    function isPlainClick(event) {
+      return !(event.defaultPrevented || event.button !== 0 ||
+               event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      buildOverlay();
+
+      var selects = document.querySelectorAll("select[data-admin-filter]");
+      selects.forEach(function (select) {
+        select.addEventListener("change", function () {
+          if (!select.value) { return; }
+          showLoading();
+          window.location = select.value;
+        });
+      });
+
+      var jq = window.django && window.django.jQuery;
+      if (jq && jq.fn && jq.fn.select2) {
+        jq(selects).select2({
+          theme: "admin-autocomplete",
+          width: "100%",
+          // Short lists are quicker to pick from without a search box.
+          minimumResultsForSearch: 12,
+          dropdownCssClass: "pcr-filter-dropdown",
+        });
+      }
+
+      // Anything that reloads the changelist: pagination, sorting, the filter
+      // links the admin still renders, the coverage panel, search and actions.
+      document.addEventListener("click", function (event) {
+        var link = event.target.closest(
+          "#changelist a, #changelist-filter a, .pcr-panel a, .paginator a"
+        );
+        if (!link || !isPlainClick(event)) { return; }
+        var href = link.getAttribute("href") || "";
+        if (!href || href.charAt(0) === "#" || link.target === "_blank") { return; }
+        showLoading();
+      });
+
+      document.querySelectorAll("#changelist-search, #changelist-form").forEach(function (form) {
+        form.addEventListener("submit", function () { showLoading(); });
+      });
+    });
+
+    // Coming back through the bfcache must not leave the overlay up.
+    window.addEventListener("pageshow", hideLoading);
+  })();
+</script>

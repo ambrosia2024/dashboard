@@ -9,42 +9,11 @@ collector or an indexed min/max, never from a scan of the record table.
 {% endcomment %}
 
 {% block extrastyle %}{{ block.super }}
-<style>
-  .pcr-panel { margin: 0 0 18px; }
-  .pcr-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px; }
-  .pcr-card { padding: 10px 12px; border: 1px solid var(--hairline-color); border-radius: 6px; background: var(--darkened-bg); }
-  .pcr-card-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--body-quiet-color); }
-  .pcr-card strong { display: block; margin: 3px 0 2px; font-size: 15px; color: var(--body-loud-color); font-weight: 600; }
-  .pcr-card small { display: block; font-size: 11px; color: var(--body-quiet-color); }
-  .pcr-card-warn { border-left: 3px solid #d98b00; }
-  .pcr-coverage { width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid var(--hairline-color); border-radius: 6px; overflow: hidden; }
-  .pcr-coverage th { text-align: left; padding: 7px 10px; background: var(--darkened-bg); color: var(--body-quiet-color); font-weight: 600; border-bottom: 1px solid var(--hairline-color); }
-  .pcr-coverage td { padding: 7px 10px; border-bottom: 1px solid var(--hairline-color); }
-  .pcr-coverage tr:last-child td { border-bottom: 0; }
-  .pcr-pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-weight: 600; }
-  .pcr-pill-warn { background: rgba(217,139,0,.18); color: #d98b00; }
-  .pcr-pill-bad { background: rgba(185,28,28,.18); color: #e06a6a; }
-  .pcr-note { margin: 6px 0 0; font-size: 12px; color: var(--body-quiet-color); }
-  .admin-filter-select { width: 100%; max-width: 100%; margin: 4px 0 2px; padding: 4px 6px; }
-  #changelist-filter .admin-filter-select { box-sizing: border-box; }
-  .pcr-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--body-quiet-color); }
-  .pcr-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .pcr-muted { color: var(--body-quiet-color); }
-  .pcr-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-</style>
+{% include "admin/lumenix/pathogen_panel_style.html" %}
 {% endblock %}
 
 {% block extrahead %}{{ block.super }}
-<script>
-  // The filter sidebar renders selects instead of link lists; navigate on change.
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("select[data-admin-filter]").forEach(function (select) {
-      select.addEventListener("change", function () {
-        if (select.value) { window.location = select.value; }
-      });
-    });
-  });
-</script>
+{% include "admin/lumenix/pathogen_filter_script.html" %}
 {% endblock %}
 
 {% block result_list %}
