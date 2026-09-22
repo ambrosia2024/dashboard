@@ -622,3 +622,34 @@ body.ws-drawer-open { overflow: hidden; }
 #sidebar-menu li.menu-future > a { cursor: default; color: #8591a3 !important; }
 #sidebar-menu li.menu-future > a:hover { color: #8591a3 !important; background: transparent; }
 #sidebar-menu li.menu-future > a i { color: #b4bccb !important; stroke: #b4bccb !important; }
+
+/* --- Plain-language tips on the evidence panel ---------------------------- */
+.ws-info-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; margin-left: 6px; padding: 0; vertical-align: middle;
+    border: 1px solid #b7c7dc; border-radius: 50%; background: #fff;
+    color: var(--ws-blue); font-size: 10px; font-weight: 700; font-style: italic; font-family: Georgia, serif;
+    cursor: pointer; line-height: 1;
+}
+.ws-info-btn:hover, .ws-info-btn[aria-expanded="true"] { background: var(--ws-blue); color: #fff; border-color: var(--ws-blue); }
+.ws-tip {
+    margin: 10px 0 4px; padding: 12px 14px;
+    border: 1px solid #c9ddf3; border-radius: 10px; background: #f4f8fd;
+    font-size: 13px; font-weight: 400; line-height: 1.55; color: var(--ws-label); text-align: left;
+}
+.ws-tip strong { color: var(--ws-ink); }
+.ws-tip > strong { display: block; margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ws-blue); }
+.ws-tip p { margin: 0 0 8px; }
+.ws-tip p:last-child { margin-bottom: 0; }
+
+/* Leaflet gives map shapes a tabindex; browsers then draw a rectangular focus
+   ring around the clicked region's bounding box. The region outline itself
+   already shows the selection. */
+.ws-chart .leaflet-interactive:focus,
+.ws-summary-map .leaflet-interactive:focus,
+.leaflet-container:focus { outline: none; }
+
+.ws-chart-head h2 .ws-info-btn { margin-left: 4px; vertical-align: 2px; }
+.ws-chart-card .ws-tip { margin: 0 0 12px; }
+
+.ws-tip-role { padding: 8px 10px; border-left: 3px solid var(--ws-blue); background: #fff; border-radius: 0 6px 6px 0; }
