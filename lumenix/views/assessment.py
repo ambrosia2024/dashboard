@@ -433,6 +433,7 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
             "retrieved_at": retrieved_at,
             "role_hints": role_hints_for(self.request.user)[0],
             "role_word": role_hints_for(self.request.user)[1],
+            "role_article": "an" if role_hints_for(self.request.user)[1][:1] in "aeiou" else "a",
             "newer_runs": run.reruns.filter(status=1).order_by("-created_at")[:3],
             "chart_status": CHART_STATUS,
             "show_technical": getattr(getattr(self.request.user, "profile", None), "show_technical_details", False),
