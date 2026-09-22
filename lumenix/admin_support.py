@@ -26,14 +26,19 @@ import datetime as dt
 import json
 import re
 
+from django.conf import settings
 from django.contrib import admin
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Count, Max, Min, Q
+from django.utils import timezone
 from django.utils.functional import cached_property
 
 CACHE_SECONDS = 300
+
+# A spec that has not been synced in this long is worth a second look.
+STALE_SYNC_DAYS = 30
 
 # Below this, an exact COUNT runs off an index in well under a second, so prefer
 # the true number: page links built from a rough estimate would otherwise make
@@ -50,11 +55,31 @@ DATE_TERM_RE = re.compile(r"^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$")
 # ---------------------------------------------------------------------------
 
 
+def planner_row_estimate(queryset) -> int | None:
+    """
+    How many rows PostgreSQL expects a queryset to return. `EXPLAIN` plans the
+    query without running it, so the answer costs a fraction of a millisecond
+    whatever the table size. None when the estimate is unavailable.
+    """
+    if connection.vendor != "postgresql" or not hasattr(queryset, "query"):
+        return None
+    try:
+        sql, params = queryset.query.sql_with_params()
+        with connection.cursor() as cursor:
+            cursor.execute(f"EXPLAIN (FORMAT JSON) {sql}", params)
+            plan = cursor.fetchone()[0]
+        if isinstance(plan, str):
+            plan = json.loads(plan)
+        return int(plan[0]["Plan"]["Plan Rows"])
+    except Exception:
+        # Empty querysets, unsupported SQL, a planner hiccup.
+        return None
+
+
 class EstimatedCountPaginator(Paginator):
     """
-    Paginator that asks PostgreSQL's planner how many rows a query will return
-    instead of counting them. `EXPLAIN` only plans the query, so this is a
-    fraction of a millisecond whatever the table size.
+    Paginator that asks the planner how many rows a query will return instead
+    of counting them.
 
     Small result sets still get a real count, so an operator who has filtered
     down to one region and year sees an exact number. `estimated` says which
@@ -65,27 +90,10 @@ class EstimatedCountPaginator(Paginator):
 
     @cached_property
     def count(self):
-        queryset = self.object_list
-        query = getattr(queryset, "query", None)
-        if query is None or connection.vendor != "postgresql":
+        estimate = planner_row_estimate(self.object_list)
+        if estimate is None or estimate < EXACT_COUNT_BELOW:
+            # Fall back to the accurate (and possibly slow) count, never a guess.
             return super().count
-
-        try:
-            sql, params = query.sql_with_params()
-            with connection.cursor() as cursor:
-                cursor.execute(f"EXPLAIN (FORMAT JSON) {sql}", params)
-                plan = cursor.fetchone()[0]
-            if isinstance(plan, str):
-                plan = json.loads(plan)
-            estimate = int(plan[0]["Plan"]["Plan Rows"])
-        except Exception:
-            # Empty querysets, unsupported SQL, a planner hiccup: fall back to
-            # the accurate (and possibly slow) count rather than guessing.
-            return super().count
-
-        if estimate < EXACT_COUNT_BELOW:
-            return super().count
-
         self.estimated = True
         return estimate
 
@@ -106,6 +114,40 @@ def table_row_estimate(model) -> int | None:
     if not row or row[0] is None or row[0] < 0:
         return None
     return int(row[0])
+
+
+# ---------------------------------------------------------------------------
+# Select2 on the filter dropdowns
+# ---------------------------------------------------------------------------
+
+# The admin serves minified assets unless DEBUG is on; follow it so a page does
+# not end up loading jQuery twice under two different names.
+_MIN = "" if settings.DEBUG else ".min"
+
+
+class Select2FilterAdminMixin:
+    """
+    Gives the filter dropdowns a type-ahead box.
+
+    Select2 has to run after jQuery but before the admin's `noConflict` call in
+    jquery.init.js, so all three files are declared together and Django's media
+    merge interleaves them with the admin's own scripts - the same arrangement
+    the admin uses for its autocomplete widgets. The initialisation lives in
+    templates/admin/lumenix/pathogen_filter_script.html.
+    """
+
+    class Media:
+        css = {
+            "screen": (
+                f"admin/css/vendor/select2/select2{_MIN}.css",
+                "admin/css/autocomplete.css",
+            )
+        }
+        js = (
+            f"admin/js/vendor/jquery/jquery{_MIN}.js",
+            f"admin/js/vendor/select2/select2.full{_MIN}.js",
+            "admin/js/jquery.init.js",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -396,3 +438,135 @@ def coverage_summary(model) -> dict:
         "parked": sum(row["parked"] for row in rows),
         "pending": sum(row["pending"] for row in rows),
     }
+
+
+# ---------------------------------------------------------------------------
+# Query specs
+# ---------------------------------------------------------------------------
+
+
+# Per-spec counts below this run for real: the composite index makes a count of
+# a few thousand rows trivial, and the planner never estimates below 1, so an
+# empty scope would otherwise be reported as "1 record".
+SPEC_EXACT_COUNT_BELOW = 5_000
+
+
+def spec_record_count(spec) -> tuple[int, bool] | None:
+    """
+    How many records a spec's scope holds, as (value, is_estimate).
+
+    Large scopes are planned rather than counted, so a page of 50 specs costs
+    milliseconds instead of 50 counts over a multi-million-row table. Results
+    are cached, so paging back and forth is free.
+    """
+    key = (
+        f"admin:spec:records:{spec.plant}:{spec.pathogen}:{spec.nuts_code}"
+        f":{spec.start_date}:{spec.end_date}"
+    )
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    from lumenix.models import PathogenConcentrationRecord
+
+    queryset = PathogenConcentrationRecord.objects.filter(
+        plant=spec.plant,
+        pathogen=spec.pathogen,
+        nuts_code=spec.nuts_code,
+        observed_on__gte=spec.start_date,
+        observed_on__lte=spec.end_date,
+    )
+    estimate = planner_row_estimate(queryset)
+    if estimate is None:
+        return None
+    result = (estimate, True) if estimate >= SPEC_EXACT_COUNT_BELOW else (queryset.count(), False)
+    cache.set(key, result, CACHE_SECONDS)
+    return result
+
+
+def spec_summary() -> dict:
+    """
+    Counts for the query-spec panel. One aggregate over a few hundred rows, so
+    it runs live and reflects an action the moment it finishes.
+    """
+    from lumenix.models import PathogenQuerySpec
+
+    stale_before = timezone.now() - dt.timedelta(days=STALE_SYNC_DAYS)
+    totals = PathogenQuerySpec.objects.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(status=1)),
+        parked=Count("id", filter=Q(status=0)),
+        removed=Count("id", filter=Q(status=2)),
+        never=Count("id", filter=Q(last_synced_at__isnull=True)),
+        stale=Count("id", filter=Q(last_synced_at__lt=stale_before)),
+        last_sync=Max("last_synced_at"),
+    )
+    rows = coverage_rows()
+    return {
+        **totals,
+        "stale_days": STALE_SYNC_DAYS,
+        "pairs": [
+            {
+                **row,
+                "crop_label": (row["plant"] or "").replace("_", " ").title(),
+                "hazard_label": (row["pathogen"] or "").replace("_", " ").title(),
+            }
+            for row in rows
+        ],
+        "pair_count": len(rows),
+        "regions": len(spec_values("nuts_code")),
+    }
+
+
+class CountryFilter(SelectFilter):
+    title = "country"
+    parameter_name = "country"
+
+    def lookups(self, request, model_admin):
+        labels = country_labels()
+        codes = sorted({code[:2] for code in spec_values("nuts_code") if code})
+        return [(code, f"{code} · {labels[code]}" if labels.get(code) else code) for code in codes]
+
+    def queryset(self, request, queryset):
+        return queryset.filter(nuts_code__startswith=self.value()) if self.value() else queryset
+
+
+class SpecSyncFilter(SelectFilter):
+    title = "sync state"
+    parameter_name = "sync"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("never", "Never synced"),
+            ("stale", f"Synced over {STALE_SYNC_DAYS} days ago"),
+            ("recent", f"Synced in the last {STALE_SYNC_DAYS} days"),
+        ]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        cutoff = timezone.now() - dt.timedelta(days=STALE_SYNC_DAYS)
+        if value == "never":
+            return queryset.filter(last_synced_at__isnull=True)
+        if value == "stale":
+            return queryset.filter(last_synced_at__lt=cutoff)
+        if value == "recent":
+            return queryset.filter(last_synced_at__gte=cutoff)
+        return queryset
+
+
+class SpecStatusFilter(SelectFilter):
+    """Status, spelled out: a parked spec is simply skipped by every sync run."""
+
+    title = "status"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("1", "Active — included in syncs"),
+            ("0", "Parked — skipped by syncs"),
+            ("2", "Deleted"),
+        ]
+
+    def queryset(self, request, queryset):
+        value = self.value() or ""
+        return queryset.filter(status=int(value)) if value.isdigit() else queryset

@@ -7,19 +7,21 @@ from django import forms
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib import admin, messages
-from django.db.models import Count, JSONField
+from django.db.models import Count, JSONField, Max, Min
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
+from django.utils import timezone
+from django.utils.timesince import timesince
 from django_json_widget.widgets import JSONEditorWidget
-# from django.utils import timezone
 
 from .admin_support import (
-    DATE_TERM_RE, NUTS_CODE_RE, CropFilter, EstimatedCountPaginator, HazardFilter, ModelValueFilter,
-    RecordStatusFilter, RegionFilter, TimeSpanFilter, YearFilter, coverage_summary, region_labels,
-    spec_values,
+    DATE_TERM_RE, NUTS_CODE_RE, STALE_SYNC_DAYS, CountryFilter, CropFilter, EstimatedCountPaginator,
+    HazardFilter, ModelValueFilter, RecordStatusFilter, RegionFilter, Select2FilterAdminMixin,
+    SpecStatusFilter, SpecSyncFilter, TimeSpanFilter, YearFilter, country_labels, coverage_summary,
+    region_labels, spec_record_count, spec_summary, spec_values,
 )
 from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
@@ -650,12 +652,37 @@ class SidebarChartLinkAdmin(admin.ModelAdmin):
 
 
 @admin.register(PathogenQuerySpec)
-class PathogenQuerySpecAdmin(admin.ModelAdmin):
+class PathogenQuerySpecAdmin(Select2FilterAdminMixin, admin.ModelAdmin):
+    """
+    The control table for the pathogen sync: one row per crop · hazard · region
+    · date range that the sync will fetch.
+
+    The changelist is arranged around the question that actually gets asked -
+    "why is there no data for X?" - so every row carries its sync state and a
+    record estimate, and a parked spec is labelled as skipped rather than left
+    as a status code to decode.
+    """
+
     form = PathogenQuerySpecAdminForm
-    list_display = ("name", "plant", "pathogen", "nuts_code", "start_date", "end_date", "last_synced_at", "status")
-    list_filter = ("status", "nuts_code", "plant", "pathogen")
+    change_list_template = "admin/lumenix/pathogenqueryspec/change_list.html"
+    show_facets = admin.ShowFacets.NEVER
+    list_per_page = 50
+    ordering = ("plant", "pathogen", "nuts_code")
+    list_display = (
+        "region_display", "crop_display", "hazard_display",
+        "range_display", "records_display", "synced_display", "state_display",
+    )
+    list_display_links = ("region_display",)
+    # Dropdowns, not the default link lists: there is one spec per NUTS2 region.
+    list_filter = (CropFilter, HazardFilter, CountryFilter, RegionFilter, SpecSyncFilter, SpecStatusFilter)
     search_fields = ("name", "plant", "pathogen", "nuts_code")
-    actions = ("sync_selected_specs", "delete_selected_specs_and_records", "delete_selected_specs_only")
+    search_help_text = (
+        "Search a region code or name (NL22, Gelderland), a country (NL), a crop or a hazard."
+    )
+    actions = (
+        "sync_selected_specs", "activate_selected_specs", "park_selected_specs",
+        "delete_selected_specs_only", "delete_selected_specs_and_records",
+    )
     readonly_fields = ("last_synced_at",)
     exclude = ("deleted_at",)
     fieldsets = (
@@ -676,6 +703,130 @@ class PathogenQuerySpecAdmin(admin.ModelAdmin):
         ),
     )
 
+    # ---- columns ---------------------------------------------------------
+
+    @admin.display(description="Region", ordering="nuts_code")
+    def region_display(self, obj):
+        label = region_labels().get(obj.nuts_code, "")
+        if label:
+            return format_html('<strong>{}</strong> <span class="pcr-muted">{}</span>', obj.nuts_code, label)
+        return format_html("<strong>{}</strong>", obj.nuts_code)
+
+    @admin.display(description="Crop", ordering="plant")
+    def crop_display(self, obj):
+        return (obj.plant or "").replace("_", " ").replace("-", " ").title()
+
+    @admin.display(description="Hazard", ordering="pathogen")
+    def hazard_display(self, obj):
+        return (obj.pathogen or "").replace("_", " ").replace("-", " ").title()
+
+    @admin.display(description="Requested range", ordering="start_date")
+    def range_display(self, obj):
+        if not obj.start_date or not obj.end_date:
+            return format_html('<span class="pcr-muted">{}</span>', "not set")
+        years = obj.end_date.year - obj.start_date.year + 1
+        return format_html(
+            '{} → {}<br><span class="pcr-muted">{} · {} years</span>',
+            obj.start_date.isoformat(), obj.end_date.isoformat(),
+            obj.get_time_scale_display(), years,
+        )
+
+    @admin.display(description="Records")
+    def records_display(self, obj):
+        """How much data this scope actually holds, linked into the records."""
+        counted = spec_record_count(obj)
+        if counted is None:
+            return format_html('<span class="pcr-muted">{}</span>', "unknown")
+        value, estimated = counted
+        if not value:
+            return format_html('<span class="pcr-muted">{}</span>', "none")
+        url = reverse("admin:lumenix_pathogenconcentrationrecord_changelist")
+        return format_html(
+            '<a class="pcr-num" href="{}?plant={}&amp;pathogen={}&amp;nuts_code={}">{}{}</a>',
+            url, obj.plant, obj.pathogen, obj.nuts_code,
+            "≈ " if estimated else "", f"{value:,}".replace(",", " "),
+        )
+
+    @admin.display(description="Last synced", ordering="last_synced_at")
+    def synced_display(self, obj):
+        if not obj.last_synced_at:
+            return format_html('<span class="pcr-muted">{}</span>', "never")
+        stamp = obj.last_synced_at
+        try:
+            stamp = timezone.localtime(stamp)
+        except ValueError:  # naive datetime, USE_TZ off
+            pass
+        return format_html(
+            '{}<br><span class="pcr-muted">{} ago</span>',
+            stamp.strftime("%d %b %Y, %H:%M"), timesince(obj.last_synced_at),
+        )
+
+    @admin.display(description="State", ordering="status")
+    def state_display(self, obj):
+        if obj.status == 0:
+            return format_html(
+                '<span class="pcr-pill pcr-pill-bad" title="{}">{}</span>',
+                "Parked specs are skipped by every sync run.", "Parked",
+            )
+        if obj.status == 2:
+            return format_html('<span class="pcr-muted">{}</span>', "Deleted")
+        if not obj.last_synced_at:
+            return format_html('<span class="pcr-pill pcr-pill-warn">{}</span>', "Never synced")
+        if obj.last_synced_at < timezone.now() - timedelta(days=STALE_SYNC_DAYS):
+            return format_html('<span class="pcr-pill pcr-pill-warn">{}</span>', "Stale")
+        return format_html('<span class="pcr-pill pcr-pill-ok">{}</span>', "Synced")
+
+    # ---- search and page -------------------------------------------------
+
+    def get_search_results(self, request, queryset, search_term):
+        """Also match a region by name, so "Gelderland" finds the NL22 spec."""
+        base = queryset
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        term = (search_term or "").strip().lower()
+        if len(term) > 2:
+            codes = [code for code, label in region_labels().items() if term in (label or "").lower()]
+            if codes:
+                queryset = queryset | base.filter(nuts_code__in=codes)
+        return queryset, may_have_duplicates
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = {
+            **(extra_context or {}),
+            "summary": spec_summary(),
+            "generate_url": reverse("admin:pathogen-bulk-generate"),
+            "bulk_delete_url": reverse("admin:pathogen-bulk-delete"),
+            "records_url": reverse("admin:lumenix_pathogenconcentrationrecord_changelist"),
+        }
+        return super().changelist_view(request, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        # Django's built-in delete_selected would sit next to the two delete
+        # actions below and, unlike them, says nothing about the records the
+        # spec produced.
+        actions.pop("delete_selected", None)
+        return actions
+
+    def _confirm(self, request, queryset, *, action, title, lead, warning):
+        """Intermediate confirmation page shared by the destructive actions."""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": title,
+            "lead": lead,
+            "warning": warning,
+            "opts": self.model._meta,
+            "specs": queryset.order_by("plant", "pathogen", "nuts_code")[:50],
+            "spec_count": queryset.count(),
+            "action": action,
+            "selected": request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME),
+            "select_across": "1" if request.POST.get("select_across") in ("1", "on", "true") else "0",
+            "back_url": request.get_full_path(),
+            "media": self.media,
+        }
+        return TemplateResponse(request, "admin/lumenix/spec_delete_confirm.html", context)
+
+    # ---- actions ---------------------------------------------------------
+
     @admin.action(description="Sync selected pathogen datasets")
     def sync_selected_specs(self, request, queryset):
         if not _pathogen_sync_queue_available():
@@ -686,7 +837,8 @@ class PathogenQuerySpecAdmin(admin.ModelAdmin):
             )
             return
 
-        spec_ids = list(queryset.values_list("pk", flat=True))
+        parked = queryset.filter(status=0).count()
+        spec_ids = list(queryset.exclude(status=2).values_list("pk", flat=True))
         if not spec_ids:
             self.message_user(request, "No pathogen datasets were queued.", level=messages.WARNING)
             return
@@ -707,9 +859,67 @@ class PathogenQuerySpecAdmin(admin.ModelAdmin):
             f"Queued {len(spec_ids)} pathogen dataset(s) in one serial background batch.",
             level=messages.SUCCESS,
         )
+        if parked:
+            self.message_user(
+                request,
+                f"{parked} of them are parked, so scheduled runs will keep skipping them. "
+                f"Activate them to have the sync pick them up on its own.",
+                level=messages.WARNING,
+            )
 
-    @admin.action(description="Delete selected specs and matching pathogen records")
+    @admin.action(description="Activate (include in future syncs)")
+    def activate_selected_specs(self, request, queryset):
+        updated = queryset.update(status=1, deleted_at=None)
+        self.message_user(
+            request, f"Activated {updated} pathogen query spec(s).", level=messages.SUCCESS
+        )
+
+    @admin.action(description="Park (skip in future syncs)")
+    def park_selected_specs(self, request, queryset):
+        updated = queryset.update(status=0)
+        self.message_user(
+            request,
+            f"Parked {updated} pathogen query spec(s). Scheduled syncs will skip them until they are activated again.",
+            level=messages.WARNING,
+        )
+
+    @admin.action(description="Delete selected specs only (keep the records)", permissions=["delete"])
+    def delete_selected_specs_only(self, request, queryset):
+        if not request.POST.get("confirm_delete"):
+            return self._confirm(
+                request, queryset,
+                action="delete_selected_specs_only",
+                title="Delete pathogen query specs",
+                lead="The records already fetched for these specs are kept; only the sync definitions go.",
+                warning="Without its spec, a scope will not be refreshed by any future sync run.",
+            )
+        deleted = queryset.count()
+        queryset.delete()
+        self.message_user(request, f"Deleted {deleted} pathogen query spec(s).", level=messages.SUCCESS)
+        return None
+
+    @admin.action(description="Delete selected specs and their records", permissions=["delete"])
     def delete_selected_specs_and_records(self, request, queryset):
+        if not request.POST.get("confirm_delete"):
+            counted = [spec_record_count(spec) for spec in queryset]
+            total = sum(item[0] for item in counted if item)
+            exact = all(item and not item[1] for item in counted)
+            return self._confirm(
+                request, queryset,
+                action="delete_selected_specs_and_records",
+                title="Delete pathogen query specs and their records",
+                lead=format_html(
+                    "This also deletes {}<strong>{}</strong> pathogen concentration record(s) "
+                    "in the scopes below.",
+                    "" if exact else "roughly ", f"{total:,}".replace(",", " "),
+                ),
+                warning=(
+                    "The records can only be restored by fetching them from the source again, "
+                    "which takes hours for a large range. A big delete also holds a lock on the "
+                    "record table while it runs."
+                ),
+            )
+
         total_specs = 0
         total_records = 0
         for spec in queryset:
@@ -724,19 +934,14 @@ class PathogenQuerySpecAdmin(admin.ModelAdmin):
             total_specs += 1
         self.message_user(
             request,
-            f"Deleted {total_specs} pathogen query spec(s) and {total_records} matching pathogen record(s).",
+            f"Deleted {total_specs} pathogen query spec(s) and {total_records:,} matching pathogen record(s).",
             level=messages.SUCCESS,
         )
-
-    @admin.action(description="Delete selected specs only")
-    def delete_selected_specs_only(self, request, queryset):
-        deleted = queryset.count()
-        queryset.delete()
-        self.message_user(request, f"Deleted {deleted} pathogen query spec(s).", level=messages.SUCCESS)
+        return None
 
 
 @admin.register(PathogenConcentrationRecord)
-class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
+class PathogenConcentrationRecordAdmin(Select2FilterAdminMixin, admin.ModelAdmin):
     """
     Read-only view over a multi-million-row synced table (13.2M rows in
     production for one crop/hazard pair).
@@ -769,8 +974,8 @@ class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
     # Non-empty so the search box renders; get_search_results does the work.
     search_fields = ("nuts_code",)
     search_help_text = (
-        "Search a region (NL22), a country (NL), a crop or hazard name, "
-        "or a date (2003, 2003-05, 2003-05-17)."
+        "Search a region by code or name (NL11, Groningen), a country (NL, Nederland), "
+        "a crop or hazard name, or a date (2003, 2003-05, 2003-05-17)."
     )
     actions = ("delete_selected_records",)
     readonly_fields = (
@@ -862,14 +1067,33 @@ class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
             if canonical:
                 return queryset.filter(**{field: canonical}), False
 
+        synced = spec_values("nuts_code")
         if NUTS_CODE_RE.match(term):
-            codes = spec_values("nuts_code")
             upper = term.upper()
-            if upper in codes:
+            if upper in synced:
                 return queryset.filter(nuts_code=upper), False
-            prefixed = [code for code in codes if code.startswith(upper)]
+            prefixed = [code for code in synced if code.startswith(upper)]
             if prefixed:
                 return queryset.filter(nuts_code__in=prefixed), False
+
+        # A region or country by name: "Groningen", "Nederland".
+        regions = [code for code, label in region_labels().items() if lowered in (label or "").lower()]
+        if regions:
+            codes = sorted(set(regions) & set(synced))
+            if codes:
+                return queryset.filter(nuts_code__in=codes), False
+            self.message_user(
+                request,
+                f'"{term}" matches a region, but no records are synced for it yet.',
+                level=messages.WARNING,
+            )
+            return queryset.none(), False
+
+        countries = [code for code, label in country_labels().items() if lowered in (label or "").lower()]
+        if countries:
+            codes = sorted(code for code in synced if code[:2] in countries)
+            if codes:
+                return queryset.filter(nuts_code__in=codes), False
 
         self.message_user(
             request,
@@ -891,21 +1115,48 @@ class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-    @admin.action(description="Delete selected pathogen concentration records")
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        # Django's built-in delete_selected duplicates the action below, and its
+        # confirmation page builds a list of every selected object - fine for a
+        # dozen rows, fatal for a selection out of millions.
+        actions.pop("delete_selected", None)
+        return actions
+
+    @admin.action(description="Delete selected records", permissions=["delete"])
     def delete_selected_records(self, request, queryset):
+        """Delete after an explicit confirmation that summarises the selection."""
         count = queryset.count()
         if count > self.MAX_BULK_DELETE:
             self.message_user(
                 request,
                 f"{count:,} records selected. Deleting more than {self.MAX_BULK_DELETE:,} rows here "
-                f"would hold a lock for a long time — delete the query specs instead.",
+                f"would hold a lock for a long time - delete the query specs instead.",
                 level=messages.ERROR,
             )
-            return
-        queryset.delete()
-        self.message_user(
-            request, f"Deleted {count:,} pathogen concentration record(s).", level=messages.SUCCESS
-        )
+            return None
+
+        if request.POST.get("confirm_delete"):
+            queryset.delete()
+            self.message_user(
+                request, f"Deleted {count:,} pathogen concentration record(s).", level=messages.SUCCESS
+            )
+            return None
+
+        span = queryset.aggregate(first=Min("observed_on"), last=Max("observed_on"))
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Delete pathogen concentration records",
+            "opts": self.model._meta,
+            "count": count,
+            "first": span["first"],
+            "last": span["last"],
+            "selected": request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME),
+            "select_across": "1" if request.POST.get("select_across") in ("1", "on", "true") else "0",
+            "back_url": request.get_full_path(),
+            "media": self.media,
+        }
+        return TemplateResponse(request, "admin/lumenix/pathogen_delete_confirm.html", context)
 
 
 admin.site.site_header = "Ambrosia Dashboard Admin"

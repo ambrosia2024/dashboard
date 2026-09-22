@@ -822,9 +822,10 @@ class PathogenConcentrationRecord(BaseModel):
     Local cache of daily pathogen concentration query results from the source API.
     """
 
-    # Lookups always filter plant + pathogen + nuts_code (+ date range), which the
-    # composite unique constraint below serves; single-column indexes on those
-    # three fields only added bulk.
+    # The app's lookups filter plant + pathogen + nuts_code (+ date range), which
+    # the composite unique constraint below serves; single-column indexes on those
+    # three fields only added bulk. The admin filters by region without a crop,
+    # which needs the region-first index in Meta.indexes instead.
     plant = models.SlugField(max_length=100)
     pathogen = models.SlugField(max_length=100)
     nuts_code = models.CharField(max_length=32)
@@ -851,6 +852,14 @@ class PathogenConcentrationRecord(BaseModel):
                 fields=["plant", "pathogen", "nuts_code", "observed_on"],
                 name="uq_pathogen_record_scope_day",
             ),
+        ]
+        indexes = [
+            # Region first, then the date the admin and the charts sort by.
+            # Without it, filtering by region has to walk the whole observed_on
+            # index backwards: 28k buffer reads to return 50 rows locally, and
+            # far worse in production. The unique constraint above cannot serve
+            # these queries because it leads with plant.
+            models.Index(fields=["nuts_code", "-observed_on"], name="idx_pcr_region_observed"),
         ]
 
     def __str__(self):

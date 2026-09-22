@@ -1,0 +1,45 @@
+{% comment %}
+Styling for the summary panels above the pathogen changelists. Shared by the
+record and query-spec pages so the two stay visually identical. Colours come
+from the admin's own theme variables, so dark mode needs no second rule set.
+{% endcomment %}
+<style>
+  .pcr-panel { margin: 0 0 18px; }
+  .pcr-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .pcr-card { padding: 10px 12px; border: 1px solid var(--hairline-color); border-radius: 6px; background: var(--darkened-bg); }
+  .pcr-card-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--body-quiet-color); }
+  .pcr-card strong { display: block; margin: 3px 0 2px; font-size: 15px; color: var(--body-loud-color); font-weight: 600; }
+  .pcr-card small { display: block; font-size: 11px; color: var(--body-quiet-color); }
+  .pcr-card-warn { border-left: 3px solid #d98b00; }
+  .pcr-coverage { width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid var(--hairline-color); border-radius: 6px; overflow: hidden; }
+  .pcr-coverage th { text-align: left; padding: 7px 10px; background: var(--darkened-bg); color: var(--body-quiet-color); font-weight: 600; border-bottom: 1px solid var(--hairline-color); }
+  .pcr-coverage td { padding: 7px 10px; border-bottom: 1px solid var(--hairline-color); }
+  .pcr-coverage tr:last-child td { border-bottom: 0; }
+  .pcr-pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-weight: 600; }
+  .pcr-pill-ok { background: rgba(34,134,58,.18); color: #4caf6d; }
+  .pcr-pill-warn { background: rgba(217,139,0,.18); color: #d98b00; }
+  .pcr-pill-bad { background: rgba(185,28,28,.18); color: #e06a6a; }
+  .pcr-note { margin: 6px 0 0; font-size: 12px; color: var(--body-quiet-color); }
+  .pcr-actions { margin: 0 0 12px; font-size: 12.5px; }
+  .pcr-actions a { margin-right: 14px; }
+  .admin-filter-select { width: 100%; max-width: 100%; margin: 4px 0 2px; padding: 4px 6px; }
+  #changelist-filter .admin-filter-select { box-sizing: border-box; }
+  .pcr-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--body-quiet-color); }
+  .pcr-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .pcr-muted { color: var(--body-quiet-color); }
+  .pcr-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  /* Loading overlay: a filter or a page step over millions of rows is not instant. */
+  .pcr-loading { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; }
+  .pcr-loading[hidden] { display: none; }
+  .pcr-loading-box { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border: 1px solid var(--hairline-color); border-radius: 8px; background: var(--body-bg); color: var(--body-fg); font-size: 14px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+  .pcr-spinner { width: 16px; height: 16px; border: 2px solid var(--hairline-color); border-top-color: var(--link-fg); border-radius: 50%; animation: pcr-spin .7s linear infinite; }
+  @keyframes pcr-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .pcr-spinner { animation-duration: 2.4s; } }
+
+  /* Select2 sits on top of the admin's own filter styling. */
+  #changelist-filter .select2-container { margin: 4px 0 2px; }
+  #changelist-filter .select2-selection--single { min-height: 28px; }
+  .pcr-filter-dropdown { z-index: 2100; }
+  .pcr-filter-dropdown .select2-results__group { font-size: 12px; }
+</style>
