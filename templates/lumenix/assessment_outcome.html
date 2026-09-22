@@ -56,11 +56,18 @@
             {% else %}
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
-                    <div><h2>Pathogen concentration vs time</h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily model output</small></div>
+                    <div><h2>Pathogen concentration vs time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily model output</small></div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
                         <span class="ws-badge ws-badge--live">Source data</span>
                     </div>
+                </div>
+                <div id="tip-series" class="ws-tip" hidden>
+                    <strong>In plain words</strong>
+                    <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen.</p>
+                    <p>The shaded band shows the lowest and highest day inside each period. The highest point was <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical value is around <strong>{{ stats.mean }}</strong>.</p>
+                    <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
+                    <p>The numbers are on the model's own scale, not a measured amount, and they are not a guarantee.</p>
                 </div>
                 <div id="chart-series" class="ws-chart"></div>
                 <div class="ws-stats">
@@ -74,15 +81,28 @@
             <div class="ws-chart-grid">
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
-                        <div><h2>Seasonal heatmap</h2><small>Monthly mean per year, same model output</small></div>
+                        <div><h2>Seasonal heatmap <button type="button" class="ws-info-btn" aria-label="What does this heatmap show?" data-tip="tip-seasonal">i</button></h2><small>Monthly mean per year, same model output</small></div>
                         <span class="ws-badge ws-badge--derived">Derived</span>
+                    </div>
+                    <div id="tip-seasonal" class="ws-tip" hidden>
+                        <strong>In plain words</strong>
+                        <p>Each row is one year, each column one month. The darker the blue, the more that month favoured the pathogen.</p>
+                        <p id="tip-seasonal-data">The month-by-month pattern comes from the same daily values as the chart above.</p>
+                        <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.seasonal }}</p>
                     </div>
                     <div id="chart-seasonal" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing monthly means…</div></div>
                 </section>
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
-                        <div><h2>Geographic heatmap</h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
+                        <div><h2>Geographic heatmap <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-geo">i</button></h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
                         <span class="ws-badge ws-badge--derived">Derived</span>
+                    </div>
+                    <div id="tip-geo" class="ws-tip" hidden>
+                        <strong>In plain words</strong>
+                        <p>Each region is coloured by how favourable its weather was for this pathogen over your period: darker means more favourable. Grey regions have no data yet. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined. Hover a region to see its value.</p>
+                        <p id="tip-geo-data">Regional values come from the same daily records for your period.</p>
+                        <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.geo }}</p>
+                        <p>The map does not take into account how much of the crop is actually grown in each region.</p>
                     </div>
                     <div id="chart-geo" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing regional means…</div></div>
                 </section>
@@ -125,9 +145,31 @@
                     <dt>Last synced</dt><dd>{% if retrieved_at %}{{ retrieved_at|date:"j M Y, H:i" }}{% else %}Unavailable{% endif %}<small>When the source data used here was last updated.</small></dd>
                     <dt>Coverage</dt><dd>Regional (NUTS2)</dd>
                     <dt>Period in data</dt><dd>{{ stats.first_date|default:"—" }} to {{ stats.last_date|default:"—" }}</dd>
-                    <dt>Uncertainty</dt><dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small></dd>
+                    <dt>Uncertainty
+                        <button type="button" class="ws-info-btn" aria-label="What does uncertainty mean here?" data-tip="tip-uncertainty">i</button>
+                    </dt>
+                    <dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small>
+                        <div id="tip-uncertainty" class="ws-tip" hidden>
+                            <strong>In plain words</strong>
+                            <p>Uncertainty would tell you how far off these numbers might be, like "probably within ± so much". The model behind this output does not give that, so we cannot show it.</p>
+                            <p>"Not supplied" does not mean the numbers are exact. It means we do not know how exact they are.</p>
+                            <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.uncertainty }}</p>
+                        </div>
+                    </dd>
                     {% if variability %}
-                    <dt>Variability</dt><dd>±{{ variability.stddev }} ({{ variability.cv_pct }}% of mean) · range {{ variability.min }}–{{ variability.max }}{% if variability.years > 1 %}<small>Yearly peaks {{ variability.yearly_peak_min }}–{{ variability.yearly_peak_max }} across {{ variability.years }} years.</small>{% endif %}<small>Spread of the model output itself, computed from the data. Not a model uncertainty estimate.</small></dd>
+                    <dt>Variability
+                        <button type="button" class="ws-info-btn" aria-label="What does variability mean here?" data-tip="tip-variability">i</button>
+                    </dt>
+                    <dd>±{{ variability.stddev }} ({{ variability.cv_pct }}% of mean) · range {{ variability.min }}–{{ variability.max }}{% if variability.years > 1 %}<small>Yearly peaks {{ variability.yearly_peak_min }}–{{ variability.yearly_peak_max }} across {{ variability.years }} years.</small>{% endif %}<small>Spread of the model output itself, computed from the data. Not a model uncertainty estimate.</small>
+                        <div id="tip-variability" class="ws-tip" hidden>
+                            <strong>In plain words</strong>
+                            <p>The value is usually around <strong>{{ stats.mean }}</strong>. It goes as low as <strong>{{ variability.min }}</strong> and as high as <strong>{{ variability.max }}</strong>, and most days it stays within about <strong>{{ variability.stddev }}</strong> of the usual value.</p>
+                            <p>That is a swing of about <strong>{{ variability.cv_pct }}%</strong>: {% if variability.cv_pct < 10 %}small, so the pressure is fairly steady{% elif variability.cv_pct < 25 %}moderate, so some periods are clearly riskier than others{% else %}large, so the risk changes a lot through the period{% endif %}.</p>
+                            {% if variability.years > 1 %}<p>The worst month of each year ranged from <strong>{{ variability.yearly_peak_min }}</strong> to <strong>{{ variability.yearly_peak_max }}</strong> over {{ variability.years }} years, so some years are worse than others.</p>{% endif %}
+                            <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.variability }}</p>
+                            <p>This only says how much the value moves. It says nothing about how accurate the model is; see Uncertainty above.</p>
+                        </div>
+                    </dd>
                     {% endif %}
                     {% if show_technical %}
                     <dt>Model ID</dt><dd class="wrap mono">{{ run.model_uuid|default:"—" }}</dd>
@@ -239,6 +281,16 @@
             if (!rows.length) { el2.innerHTML = '<div class="ws-chart-loading">No monthly data for this period.</div>'; return; }
             var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
             var years = Array.from(new Set(rows.map(function (r) { return r.year; }))).sort();
+            (function () {
+                var sums = {}, counts = {};
+                rows.forEach(function (r) { if (r.value == null) return; sums[r.month] = (sums[r.month] || 0) + r.value; counts[r.month] = (counts[r.month] || 0) + 1; });
+                var avg = Object.keys(sums).map(function (m) { return { m: +m, v: sums[m] / counts[m] }; }).sort(function (a, b) { return b.v - a.v; });
+                var tipEl = document.getElementById("tip-seasonal-data");
+                if (tipEl && avg.length >= 2) {
+                    var hi = avg.slice(0, 3).map(function (x) { return months[x.m - 1]; }).join(", "), lo = avg.slice(-2).map(function (x) { return months[x.m - 1]; }).join(" and ");
+                    tipEl.innerHTML = "Across the " + years.length + " year" + (years.length > 1 ? "s" : "") + " shown, the highest months are <strong>" + hi + "</strong> (about " + avg[0].v.toFixed(2) + " on average) and the lowest are <strong>" + lo + "</strong> (about " + avg[avg.length - 1].v.toFixed(2) + "). A consistent dark band in the same months means the seasonal pattern repeats every year.";
+                }
+            })();
             var vals = rows.map(function (r) { return r.value; }).filter(function (v) { return v != null; });
             var c = echarts.init(el2);
             window.addEventListener("resize", function () { c.resize(); });
@@ -266,6 +318,15 @@
         document.getElementById("geo-count").textContent = data.regions || 0;
         var vals = Object.keys(values).map(function (k) { return values[k].value; }).filter(function (v) { return v != null; });
         var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+        (function () {
+            var tipEl = document.getElementById("tip-geo-data"), mine = values[selected] ? values[selected].value : null;
+            if (!tipEl || mine == null || !vals.length) return;
+            var sorted = vals.slice().sort(function (a, b) { return b - a; }), rank = sorted.indexOf(mine) + 1, pct = Math.round(100 * rank / sorted.length);
+            var names = {}; (fc.features || []).forEach(function (f) { names[f.properties.NUTS_ID] = f.properties.NAME_LATN || f.properties.NUTS_ID; });
+            var hiId = Object.keys(values).reduce(function (a, k) { return (values[k].value != null && (a === null || values[k].value > values[a].value)) ? k : a; }, null);
+            var loId = Object.keys(values).reduce(function (a, k) { return (values[k].value != null && (a === null || values[k].value < values[a].value)) ? k : a; }, null);
+            tipEl.innerHTML = "Your region averages <strong>" + mine.toFixed(2) + "</strong>, which ranks <strong>" + rank + " of " + sorted.length + "</strong> synced regions (" + (pct <= 33 ? "among the higher" : pct <= 66 ? "around the middle" : "among the lower") + " values). The highest is " + (names[hiId] || hiId) + " at " + values[hiId].value.toFixed(2) + " and the lowest is " + (names[loId] || loId) + " at " + values[loId].value.toFixed(2) + ".";
+        })();
         function colour(v) {
             if (v == null) return "#e5e7eb";
             var t = hi > lo ? (v - lo) / (hi - lo) : 0.5;
@@ -290,6 +351,21 @@
         if (sel) { map.fitBounds(L.geoJSON(sel).getBounds().pad(2.5)); }
         setTimeout(function () { map.invalidateSize(); }, 100);
     }).catch(function () {});
+
+    // ---- plain-language tips on the evidence panel ------------------------
+    document.querySelectorAll(".ws-info-btn").forEach(function (btn) {
+        var tip = document.getElementById(btn.dataset.tip);
+        if (!tip) return;
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var open = tip.hidden;
+            document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; });
+            document.querySelectorAll(".ws-info-btn").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+            tip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+    });
+    document.addEventListener("click", function (e) { if (!e.target.closest(".ws-tip")) document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; }); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; }); });
 
     // ---- Ask Ambra: persisted conversation + drawer -----------------------
     var csrf = document.querySelector("#tech-form [name=csrfmiddlewaretoken]").value;

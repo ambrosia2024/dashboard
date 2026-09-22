@@ -324,6 +324,70 @@ CHART_STATUS = [
 ]
 
 
+# One sentence per chart, written for the reader's self-declared role. Plain
+# language on purpose; "default" is used for Other / no role.
+ROLE_HINTS = {
+    "series": {
+        "farmer": "Look for the months where the line climbs: those are the periods when this pathogen is favoured by the weather on your crop, so extra hygiene, irrigation water checks and harvest timing matter most then.",
+        "forester": "The line shows when conditions favour the pathogen in your area; use the high periods to time inspections and handling of harvested produce.",
+        "advisor": "Use the high periods as the windows to advise growers on prevention, and the band to show them how much a single month can swing.",
+        "producer": "High periods are when incoming raw material from this region is most likely to carry the pathogen, so tighten intake checks and processing controls then.",
+        "distributor": "High periods are when produce from this region needs the most care in cold chain and turnover; low periods carry less pressure.",
+        "policy_maker": "The line shows when and how strongly this region is exposed over time; compare years to see whether the pressure is rising, which supports planning of monitoring and advice.",
+        "technician": "Values are the model's daily output aggregated per period; the band is the per-period min–max of the daily values. Compare with observed data before drawing quantitative conclusions.",
+        "default": "The higher the line, the more the weather in that period favours this pathogen on this crop in this region.",
+    },
+    "seasonal": {
+        "farmer": "Dark columns are the months to be most careful every year; if the dark band is widening in later rows, the risky season is getting longer.",
+        "forester": "Dark columns are the months that favour the pathogen year after year; plan inspections around them.",
+        "advisor": "Use the consistent dark months to build a seasonal advice calendar, and point growers to years where the pattern shifted.",
+        "producer": "Dark months are when raw material from this region carries the most pressure, so plan supplier checks and sourcing around them.",
+        "distributor": "Dark months are when produce from this region needs the shortest storage and fastest turnover.",
+        "policy_maker": "A dark band that widens or darkens towards the later years is the signal that the seasonal risk window is growing under climate change.",
+        "technician": "Each cell is the calendar-month mean of daily model output; a widening dark band across rows indicates a lengthening high-output season.",
+        "default": "Dark months are the risky months; if the dark band grows over the years, the risky season is getting longer.",
+    },
+    "geo": {
+        "farmer": "Compare your region with your neighbours: a darker colour means the weather there favours this pathogen more than around you.",
+        "forester": "Compare your area with surrounding regions to see whether local conditions are more or less favourable to the pathogen.",
+        "advisor": "Use the map to see which of your clients' regions face the highest pressure, and to explain why advice can differ between regions.",
+        "producer": "Darker regions are sources where incoming produce needs the most attention; lighter regions carry less pressure for this hazard.",
+        "distributor": "Darker regions are where produce needs the most care in transit; use it to prioritise cold-chain attention by origin.",
+        "policy_maker": "Darker regions are where this hazard is most favoured by climate; use it to target monitoring, guidance and resources.",
+        "technician": "Each region's value is the period mean of its own daily model output; regions are only comparable on the model's output scale, not by production volume.",
+        "default": "Darker regions are where the weather favours this pathogen more; your region is outlined so you can compare it with its neighbours.",
+    },
+    "variability": {
+        "farmer": "A big swing means some months are much riskier than others, so timing matters; a small swing means the pressure is steady all year.",
+        "forester": "A big swing means the risky periods are distinct; a small swing means the pressure barely changes through the year.",
+        "advisor": "The swing tells you how much timing-based advice can help: large swing, strong seasonal advice; small swing, year-round measures.",
+        "producer": "A large swing means intake risk changes a lot through the year; a small swing means controls should be constant.",
+        "distributor": "A large swing means handling care depends strongly on the season; a small swing means it does not.",
+        "policy_maker": "The size of the swing shows how seasonal this hazard is in the region, which shapes whether measures should be seasonal or permanent.",
+        "technician": "Standard deviation and range of the daily model output over the period; the yearly-peak range shows inter-annual variation of the seasonal maximum.",
+        "default": "This is how much the value goes up and down. A big swing means some periods are much riskier than others.",
+    },
+    "uncertainty": {
+        "farmer": "Treat the numbers as an indication of when risk is higher or lower, not as exact values you can plan to the decimal.",
+        "forester": "Use the results for timing and comparison, not as exact measurements.",
+        "advisor": "When you pass these results on, say clearly that the model gives no margin of error.",
+        "producer": "Use the results to compare periods and regions, not as a guaranteed level for acceptance decisions.",
+        "distributor": "Use the results to compare periods and origins; they are not exact measurements.",
+        "policy_maker": "Decisions based on these outputs should allow for an unknown margin of error; ask for validated model runs before setting thresholds.",
+        "technician": "No confidence intervals, ensemble spread or validation error are supplied by the source model; treat outputs as point estimates of unknown precision.",
+        "default": "The model gives no margin of error, so use these numbers to compare and to see trends, not as exact values.",
+    },
+}
+
+ROLE_LABELS = {"farmer": "farmer", "forester": "forester", "advisor": "advisor", "producer": "producer", "distributor": "distributor", "policy_maker": "policy maker", "technician": "technician"}
+
+
+def role_hints_for(user):
+    role = getattr(getattr(user, "profile", None), "role", "") or ""
+    key = role if role in ROLE_LABELS else "default"
+    return {chart: texts.get(key, texts["default"]) for chart, texts in ROLE_HINTS.items()}, ROLE_LABELS.get(key, "")
+
+
 class _OwnedRunMixin(LoginRequiredMixin):
     def get_run(self):
         return get_object_or_404(
@@ -367,6 +431,8 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
             "provenance": snap.get("provenance") or {},
             "variability": snap.get("variability") or {},
             "retrieved_at": retrieved_at,
+            "role_hints": role_hints_for(self.request.user)[0],
+            "role_word": role_hints_for(self.request.user)[1],
             "newer_runs": run.reruns.filter(status=1).order_by("-created_at")[:3],
             "chart_status": CHART_STATUS,
             "show_technical": getattr(getattr(self.request.user, "profile", None), "show_technical_details", False),
