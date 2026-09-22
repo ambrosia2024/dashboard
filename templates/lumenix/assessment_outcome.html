@@ -64,7 +64,7 @@
                 </div>
                 <div id="tip-series" class="ws-tip" hidden>
                     <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen.</p>
-                    <p>The shaded band shows the lowest and highest day inside each period. The highest point was <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical value is around <strong>{{ stats.mean }}</strong>.</p>
+                    <p>The shaded band shows the lowest and highest day inside each period. At a monthly scale the band is narrow because days within a month are similar; at a yearly scale it shows the whole within-year swing. Drag the slider under the chart to zoom into a few years. The highest point was <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical value is around <strong>{{ stats.mean }}</strong>.</p>
                     <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
                     <p>The numbers are on the model's own scale, not a measured amount, and they are not a guarantee.</p>
                 </div>
@@ -239,8 +239,8 @@
         function bandSeries(show) {
             if (!hasBand || !show) return [];
             return [
-                { name: "min", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { opacity: 0 }, data: series.map(function (r) { return r.value_min; }), tooltip: { show: false } },
-                { name: "range", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { opacity: 0 }, areaStyle: { color: "rgba(55,110,181,.16)" },
+                { name: "min", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { width: 1, color: "rgba(55,110,181,.45)" }, data: series.map(function (r) { return r.value_min; }), tooltip: { show: false } },
+                { name: "range", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { width: 1, color: "rgba(55,110,181,.45)" }, areaStyle: { color: "rgba(55,110,181,.30)" },
                   data: series.map(function (r) { return (r.value_max != null && r.value_min != null) ? +(r.value_max - r.value_min).toFixed(4) : null; }), tooltip: { show: false } }
             ];
         }
@@ -249,8 +249,13 @@
                       itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.06)" }, z: 3,
                       data: series.map(function (r) { return r.value; }) }];
         }
+        var long = series.length > 120;
         chart.setOption({
-            grid: { left: 56, right: 20, top: 24, bottom: 40 },
+            grid: { left: 56, right: 20, top: 24, bottom: long ? 78 : 40 },
+            dataZoom: long ? [
+                { type: "inside", start: 0, end: 100 },
+                { type: "slider", height: 22, bottom: 8, start: 0, end: 100, borderColor: "#dce3ed", fillerColor: "rgba(55,110,181,.12)", handleStyle: { color: "#376EB5" }, textStyle: { color: "#64748b", fontSize: 11 } }
+            ] : [],
             tooltip: { trigger: "axis", formatter: function (p) {
                 var r = series[p[0].dataIndex] || {};
                 return "<strong>" + r.date + "</strong><br>Mean: <strong>" + r.value + "</strong> " + unit +
