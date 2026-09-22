@@ -1,0 +1,27 @@
+{% comment %}
+Dropdown replacement for the admin's default list-filter template, which prints
+one link per value. Used by lumenix.admin_support.SelectFilter, where a filter
+can hold 300 regions or 125 years. Filters that set `optgroups` are grouped.
+{% endcomment %}
+{% load i18n %}
+<details data-filter-title="{{ title }}" open>
+  <summary>
+    {% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}
+  </summary>
+  <select class="admin-filter-select" data-admin-filter
+          aria-label="{% blocktranslate with filter_title=title %}Filter by {{ filter_title }}{% endblocktranslate %}">
+    {% if spec.optgroups %}
+      {% for group_label, group_choices in spec.optgroups %}
+        {% if group_label %}<optgroup label="{{ group_label }}">{% endif %}
+        {% for choice in group_choices %}
+          <option value="{{ choice.query_string|iriencode }}"{% if choice.selected %} selected{% endif %}>{{ choice.display }}</option>
+        {% endfor %}
+        {% if group_label %}</optgroup>{% endif %}
+      {% endfor %}
+    {% else %}
+      {% for choice in choices %}
+        <option value="{{ choice.query_string|iriencode }}"{% if choice.selected %} selected{% endif %}>{{ choice.display }}</option>
+      {% endfor %}
+    {% endif %}
+  </select>
+</details>

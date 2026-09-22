@@ -1,6 +1,6 @@
 # lumenix/admin.py
 
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlparse
 
 from django import forms
@@ -11,11 +11,16 @@ from django.db.models import Count, JSONField
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
-from django.urls import path
+from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django_json_widget.widgets import JSONEditorWidget
 # from django.utils import timezone
 
+from .admin_support import (
+    DATE_TERM_RE, NUTS_CODE_RE, CropFilter, EstimatedCountPaginator, HazardFilter, ModelValueFilter,
+    RecordStatusFilter, RegionFilter, TimeSpanFilter, YearFilter, coverage_summary, region_labels,
+    spec_values,
+)
 from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
@@ -732,9 +737,41 @@ class PathogenQuerySpecAdmin(admin.ModelAdmin):
 
 @admin.register(PathogenConcentrationRecord)
 class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
-    list_display = ("plant", "pathogen", "nuts_code", "observed_on", "pathogen_model_value", "temperature_c", "status", "updated_at")
-    list_filter = ("status", "plant", "pathogen", "nuts_code")
-    search_fields = ("plant", "pathogen", "nuts_code", "source_time", "source_period", "provenance_model_title")
+    """
+    Read-only view over a multi-million-row synced table (13.2M rows in
+    production for one crop/hazard pair).
+
+    Everything here exists to keep the changelist cheap, so do not add a
+    plain-field `list_filter`, a `date_hierarchy`, facet counts, or a sortable
+    column without an index: each of those runs a whole-table query and costs
+    seconds. See lumenix/admin_support.py for the paginator and the filters.
+    """
+
+    change_list_template = "admin/lumenix/pathogenconcentrationrecord/change_list.html"
+    paginator = EstimatedCountPaginator
+    show_full_result_count = False          # drops a second COUNT(*) per page
+    show_facets = admin.ShowFacets.NEVER    # facets are one COUNT per choice
+    list_per_page = 50
+    list_max_show_all = 200                 # never offer "show all" for millions
+    ordering = ("-observed_on",)            # newest first, served by the date index
+    list_display = (
+        "observed_on", "crop_display", "hazard_display", "region_display",
+        "value_display", "temperature_display", "source_display", "status_display",
+    )
+    list_display_links = ("observed_on",)
+    # Only the indexed column is sortable; sorting 13M rows by anything else
+    # means a full sort on every click.
+    sortable_by = ("observed_on",)
+    list_filter = (
+        CropFilter, HazardFilter, RegionFilter,
+        YearFilter, TimeSpanFilter, ModelValueFilter, RecordStatusFilter,
+    )
+    # Non-empty so the search box renders; get_search_results does the work.
+    search_fields = ("nuts_code",)
+    search_help_text = (
+        "Search a region (NL22), a country (NL), a crop or hazard name, "
+        "or a date (2003, 2003-05, 2003-05-17)."
+    )
     actions = ("delete_selected_records",)
     readonly_fields = (
         "plant", "pathogen", "nuts_code", "observed_on", "source_time", "source_period",
@@ -743,18 +780,132 @@ class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
         "deleted_at", "created_at", "updated_at",
     )
 
-    @admin.display(description="Pathogen model value")
-    def pathogen_model_value(self, obj):
-        return obj.pathogen_model_value
+    MAX_BULK_DELETE = 200_000
+
+    # ---- columns ---------------------------------------------------------
+
+    @admin.display(description="Crop", ordering="plant")
+    def crop_display(self, obj):
+        return (obj.plant or "").replace("_", " ").title()
+
+    @admin.display(description="Hazard", ordering="pathogen")
+    def hazard_display(self, obj):
+        return (obj.pathogen or "").replace("_", " ").title()
+
+    @admin.display(description="Region", ordering="nuts_code")
+    def region_display(self, obj):
+        label = region_labels().get(obj.nuts_code)
+        if not label:
+            return obj.nuts_code
+        return format_html('<span class="pcr-code">{}</span> {}', obj.nuts_code, label)
+
+    @admin.display(description="Model value")
+    def value_display(self, obj):
+        if obj.pathogen_model_value is None:
+            return format_html('<span class="pcr-muted">{}</span>', "missing")
+        return format_html('<span class="pcr-num">{}</span>', f"{obj.pathogen_model_value:.3f}")
+
+    @admin.display(description="Temperature")
+    def temperature_display(self, obj):
+        if obj.temperature_c is None:
+            return format_html('<span class="pcr-muted">{}</span>', "—")
+        return format_html('<span class="pcr-num">{} °C</span>', f"{obj.temperature_c:.1f}")
+
+    @admin.display(description="Source model")
+    def source_display(self, obj):
+        title = obj.provenance_model_title or ""
+        if not title:
+            return format_html('<span class="pcr-muted">{}</span>', "unknown")
+        short = title if len(title) <= 34 else f"{title[:32]}…"
+        return format_html('<span title="{}">{}</span>', title, short)
+
+    @admin.display(description="Status")
+    def status_display(self, obj):
+        colour = {1: "#1a7f43", 0: "#9a6700", 2: "#b91c1c"}.get(obj.status, "#64748b")
+        return format_html(
+            '<span class="pcr-dot" style="background:{}"></span>{}', colour, obj.get_status_display()
+        )
+
+    # ---- search ----------------------------------------------------------
+
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Translate the term into one exact filter instead of running LIKE
+        '%term%' across several columns of a huge table. An unrecognised term
+        returns nothing and says so, which is faster and clearer than a scan.
+        """
+        term = (search_term or "").strip()
+        if not term:
+            return queryset, False
+
+        match = DATE_TERM_RE.match(term)
+        if match:
+            year = int(match.group(1))
+            month = int(match.group(2)) if match.group(2) else None
+            day = int(match.group(3)) if match.group(3) else None
+            try:
+                if month and day:
+                    return queryset.filter(observed_on=date(year, month, day)), False
+                if month:
+                    first = date(year, month, 1)
+                    last = date(year + (month == 12), (month % 12) + 1, 1) - timedelta(days=1)
+                    return queryset.filter(observed_on__gte=first, observed_on__lte=last), False
+                return queryset.filter(
+                    observed_on__gte=date(year, 1, 1), observed_on__lte=date(year, 12, 31)
+                ), False
+            except ValueError:
+                pass
+
+        lowered = term.lower()
+        for column, field in (("plant", "plant"), ("pathogen", "pathogen")):
+            canonical = next((v for v in spec_values(column) if v.lower() == lowered), None)
+            if canonical:
+                return queryset.filter(**{field: canonical}), False
+
+        if NUTS_CODE_RE.match(term):
+            codes = spec_values("nuts_code")
+            upper = term.upper()
+            if upper in codes:
+                return queryset.filter(nuts_code=upper), False
+            prefixed = [code for code in codes if code.startswith(upper)]
+            if prefixed:
+                return queryset.filter(nuts_code__in=prefixed), False
+
+        self.message_user(
+            request,
+            f'Nothing matches "{term}". {self.search_help_text}',
+            level=messages.WARNING,
+        )
+        return queryset.none(), False
+
+    # ---- page ------------------------------------------------------------
+
+    def changelist_view(self, request, extra_context=None):
+        context = {
+            **(extra_context or {}),
+            "coverage": coverage_summary(self.model),
+            "spec_changelist_url": reverse("admin:lumenix_pathogenqueryspec_changelist"),
+        }
+        return super().changelist_view(request, extra_context=context)
 
     def has_add_permission(self, request):
         return False
 
     @admin.action(description="Delete selected pathogen concentration records")
     def delete_selected_records(self, request, queryset):
-        deleted = queryset.count()
+        count = queryset.count()
+        if count > self.MAX_BULK_DELETE:
+            self.message_user(
+                request,
+                f"{count:,} records selected. Deleting more than {self.MAX_BULK_DELETE:,} rows here "
+                f"would hold a lock for a long time — delete the query specs instead.",
+                level=messages.ERROR,
+            )
+            return
         queryset.delete()
-        self.message_user(request, f"Deleted {deleted} pathogen concentration record(s).", level=messages.SUCCESS)
+        self.message_user(
+            request, f"Deleted {count:,} pathogen concentration record(s).", level=messages.SUCCESS
+        )
 
 
 admin.site.site_header = "Ambrosia Dashboard Admin"
