@@ -738,8 +738,8 @@ class PathogenConcentrationRecordAdmin(admin.ModelAdmin):
     actions = ("delete_selected_records",)
     readonly_fields = (
         "plant", "pathogen", "nuts_code", "observed_on", "source_time", "source_period",
-        "pathogen_model_value", "temperature_c", "outcome", "provenance_model_id", "provenance_model_title",
-        "provenance_variable_name", "provenance_fetched_at_ms", "source_payload", "status",
+        "pathogen_model_value", "temperature_c", "provenance_model_id", "provenance_model_title",
+        "provenance_variable_name", "provenance_fetched_at_ms", "status",
         "deleted_at", "created_at", "updated_at",
     )
 

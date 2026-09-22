@@ -270,12 +270,10 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
                     "source_period": (item.get("period") or "").strip(),
                     "pathogen_model_value": pathogen_model_value,
                     "temperature_c": item.get("variable"),
-                    "outcome": outcome,
                     "provenance_model_id": provenance.get("model_id") or "",
                     "provenance_model_title": provenance.get("model_title") or "",
                     "provenance_variable_name": provenance.get("variable_name") or "",
                     "provenance_fetched_at_ms": provenance.get("fetched_at"),
-                    "source_payload": item,
                     "status": 1,
                     "deleted_at": None,
                 }

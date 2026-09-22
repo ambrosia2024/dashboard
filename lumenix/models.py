@@ -822,20 +822,24 @@ class PathogenConcentrationRecord(BaseModel):
     Local cache of daily pathogen concentration query results from the source API.
     """
 
-    plant = models.SlugField(max_length=100, db_index=True)
-    pathogen = models.SlugField(max_length=100, db_index=True)
-    nuts_code = models.CharField(max_length=32, db_index=True)
+    # Lookups always filter plant + pathogen + nuts_code (+ date range), which the
+    # composite unique constraint below serves; single-column indexes on those
+    # three fields only added bulk.
+    plant = models.SlugField(max_length=100)
+    pathogen = models.SlugField(max_length=100)
+    nuts_code = models.CharField(max_length=32)
     observed_on = models.DateField(db_index=True)
     source_time = models.CharField(max_length=64, blank=True, default="")
     source_period = models.CharField(max_length=64, blank=True, default="")
     pathogen_model_value = models.FloatField(null=True, blank=True)
     temperature_c = models.FloatField(null=True, blank=True)
-    outcome = models.JSONField(default=list, blank=True)
+    # The per-day model curve ("outcome") and the raw API item ("source_payload")
+    # were stored here until 2026-09: ~4 KB per row that nothing read, i.e. 94% of
+    # the table. Only the curve's final value (pathogen_model_value) is kept.
     provenance_model_id = models.CharField(max_length=128, blank=True, default="")
     provenance_model_title = models.CharField(max_length=512, blank=True, default="")
     provenance_variable_name = models.CharField(max_length=128, blank=True, default="")
     provenance_fetched_at_ms = models.BigIntegerField(null=True, blank=True)
-    source_payload = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "pathogen_concentration_records"
