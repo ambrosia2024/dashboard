@@ -27,7 +27,7 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from lumenix.models import AssessmentRun, NutsRegion, PathogenConcept, PlantConcept, SavedSituation
-from lumenix.services.assessment import build_snapshot, geographic_means, seasonal_matrix
+from lumenix.services.assessment import aggregate_series, build_snapshot, geographic_means, seasonal_matrix, variability
 from lumenix.views.pathogen_api import _models_for_queryset, _resolve_pathogen_queryset
 
 # Input rules (server-side; the browser hints are a convenience only).
@@ -333,13 +333,29 @@ class _OwnedRunMixin(LoginRequiredMixin):
         )
 
 
+def _ensure_variability(run):
+    """Runs stored before variability existed get it computed once and saved into their snapshot."""
+    snap = run.snapshot or {}
+    if "variability" in snap and snap.get("series") and "value_min" in (snap["series"][0] if snap["series"] else {}):
+        return snap
+    if not run.crop or not run.hazard:
+        return snap
+    plant, pathogen = concept_identifier(run.crop), concept_identifier(run.hazard)
+    qs, _ = _resolve_pathogen_queryset(plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date)
+    snap["variability"] = variability(qs)
+    snap["series"] = aggregate_series(qs, run.resolution)
+    run.snapshot = snap
+    run.save(update_fields=["snapshot"])
+    return snap
+
+
 class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
     template_name = "lumenix/assessment_outcome.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         run = self.get_run()
-        snap = run.snapshot or {}
+        snap = _ensure_variability(run)
         stats = snap.get("stats") or {}
         fetched_ms = stats.get("fetched_at_ms")
         retrieved_at = timezone.datetime.fromtimestamp(fetched_ms / 1000, tz=timezone.get_current_timezone()) if fetched_ms else None
@@ -349,6 +365,7 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
             "snapshot_json": json.dumps(snap),
             "stats": stats,
             "provenance": snap.get("provenance") or {},
+            "variability": snap.get("variability") or {},
             "retrieved_at": retrieved_at,
             "newer_runs": run.reruns.filter(status=1).order_by("-created_at")[:3],
             "chart_status": CHART_STATUS,

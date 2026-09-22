@@ -7,7 +7,7 @@ crop + hazard (+ region) and a period. No values are invented: when there is
 nothing to aggregate the functions return empty results.
 """
 
-from django.db.models import Avg, Count, Max, Min
+from django.db.models import Avg, Count, Max, Min, StdDev
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, TruncYear
 
 from lumenix.models import PathogenConcentrationRecord
@@ -26,18 +26,55 @@ def aggregate_series(qs, resolution):
     rows = (
         qs.annotate(period=trunc("observed_on"))
         .values("period")
-        .annotate(value=Avg("pathogen_model_value"), temperature_c=Avg("temperature_c"), days=Count("id"))
+        .annotate(
+            value=Avg("pathogen_model_value"),
+            value_min=Min("pathogen_model_value"),
+            value_max=Max("pathogen_model_value"),
+            temperature_c=Avg("temperature_c"),
+            days=Count("id"),
+        )
         .order_by("period")
     )
     return [
         {
             "date": r["period"].date().isoformat() if hasattr(r["period"], "date") else r["period"].isoformat(),
             "value": round(r["value"], 4) if r["value"] is not None else None,
+            "value_min": round(r["value_min"], 4) if r["value_min"] is not None else None,
+            "value_max": round(r["value_max"], 4) if r["value_max"] is not None else None,
             "temperature_c": round(r["temperature_c"], 2) if r["temperature_c"] is not None else None,
             "days": r["days"],
         }
         for r in rows
     ]
+
+
+def variability(qs):
+    """
+    Spread of the model output over the period, computed from the stored daily
+    values. This describes how much the output swings; it is NOT a model
+    uncertainty estimate (the source supplies none).
+    """
+    agg = qs.aggregate(mean=Avg("pathogen_model_value"), sd=StdDev("pathogen_model_value"), low=Min("pathogen_model_value"), high=Max("pathogen_model_value"))
+    if agg["mean"] is None:
+        return {}
+    yearly = list(
+        qs.annotate(y=TruncYear("observed_on")).values("y").annotate(peak=Max("pathogen_model_value"), low=Min("pathogen_model_value")).order_by("y")
+    )
+    peaks = [r["peak"] for r in yearly if r["peak"] is not None]
+    lows = [r["low"] for r in yearly if r["low"] is not None]
+    sd = agg["sd"] or 0.0
+    return {
+        "stddev": round(sd, 4),
+        "cv_pct": round(100 * sd / agg["mean"], 1) if agg["mean"] else None,
+        "min": round(agg["low"], 4),
+        "max": round(agg["high"], 4),
+        "years": len(yearly),
+        "yearly_peak_min": round(min(peaks), 4) if peaks else None,
+        "yearly_peak_max": round(max(peaks), 4) if peaks else None,
+        "yearly_peak_mean": round(sum(peaks) / len(peaks), 4) if peaks else None,
+        "yearly_low_mean": round(sum(lows) / len(lows), 4) if lows else None,
+        "basis": "daily model output values in the requested period and region",
+    }
 
 
 def series_stats(qs):
@@ -113,10 +150,12 @@ def build_snapshot(qs, resolution):
         "unit": "model output",
         "series": aggregate_series(qs, resolution),
         "stats": series_stats(qs),
+        "variability": variability(qs),
         "provenance": provenance(qs),
         "limitations": [
             "Values are the source model's output for the region's climate input, not a validated risk prediction.",
             "Results represent the supported NUTS2 region, not an individual field.",
             "Uncertainty is not supplied by the source; do not interpret its absence as low uncertainty.",
+            "The variability figures describe the spread of the model output itself; they are not an uncertainty estimate.",
         ],
     }

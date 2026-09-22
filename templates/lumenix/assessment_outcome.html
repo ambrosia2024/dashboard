@@ -57,7 +57,10 @@
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
                     <div><h2>Pathogen concentration vs time</h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily model output</small></div>
-                    <span class="ws-badge ws-badge--live">Source data</span>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
+                        <span class="ws-badge ws-badge--live">Source data</span>
+                    </div>
                 </div>
                 <div id="chart-series" class="ws-chart"></div>
                 <div class="ws-stats">
@@ -123,6 +126,9 @@
                     <dt>Coverage</dt><dd>Regional (NUTS2)</dd>
                     <dt>Period in data</dt><dd>{{ stats.first_date|default:"—" }} to {{ stats.last_date|default:"—" }}</dd>
                     <dt>Uncertainty</dt><dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small></dd>
+                    {% if variability %}
+                    <dt>Variability</dt><dd>±{{ variability.stddev }} ({{ variability.cv_pct }}% of mean) · range {{ variability.min }}–{{ variability.max }}{% if variability.years > 1 %}<small>Yearly peaks {{ variability.yearly_peak_min }}–{{ variability.yearly_peak_max }} across {{ variability.years }} years.</small>{% endif %}<small>Spread of the model output itself, computed from the data. Not a model uncertainty estimate.</small></dd>
+                    {% endif %}
                     {% if show_technical %}
                     <dt>Model ID</dt><dd class="wrap mono">{{ run.model_uuid|default:"—" }}</dd>
                     <dt>Variable</dt><dd class="wrap">{{ provenance.variable_name|default:"—" }}</dd>
@@ -144,7 +150,7 @@
                 <div class="ws-ambra-quick">
                     <button type="button" class="ws-btn-link" data-q="Summarise this assessment and its limitations">Summarise limitations</button>
                     <button type="button" class="ws-btn-link" data-q="When is the model output highest and what does that mean for the period?">When is it highest?</button>
-                    <button type="button" class="ws-btn-link" data-q="Is there any uncertainty information for these values?">Any uncertainty?</button>
+                    <button type="button" class="ws-btn-link" data-q="How much does the output vary, and is that the same as uncertainty?">How much does it vary?</button>
                 </div>
             </section>
         </aside>
@@ -168,7 +174,7 @@
             <button type="button" class="ws-btn-link" data-q="Summarise this assessment and its limitations">Summarise limitations</button>
             <button type="button" class="ws-btn-link" data-q="What is the trend over the period?">What is the trend?</button>
             <button type="button" class="ws-btn-link" data-q="When is the model output highest and what does that mean for the period?">When is it highest?</button>
-            <button type="button" class="ws-btn-link" data-q="Is there any uncertainty information for these values?">Any uncertainty?</button>
+            <button type="button" class="ws-btn-link" data-q="How much does the output vary, and is that the same as uncertainty?">How much does it vary?</button>
         </div>
         <textarea id="ambra-q" rows="3" maxlength="1000" placeholder="Ask about this outcome — trend, peaks, seasonality, limitations…"></textarea>
         <div class="ws-drawer-foot">
@@ -192,20 +198,35 @@
     if (el && series.length) {
         var chart = echarts.init(el);
         window.addEventListener("resize", function () { chart.resize(); });
+        var hasBand = series.some(function (r) { return r.value_min != null && r.value_max != null; });
+        function bandSeries(show) {
+            if (!hasBand || !show) return [];
+            return [
+                { name: "min", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { opacity: 0 }, data: series.map(function (r) { return r.value_min; }), tooltip: { show: false } },
+                { name: "range", type: "line", stack: "band", showSymbol: false, silent: true, lineStyle: { opacity: 0 }, areaStyle: { color: "rgba(55,110,181,.16)" },
+                  data: series.map(function (r) { return (r.value_max != null && r.value_min != null) ? +(r.value_max - r.value_min).toFixed(4) : null; }), tooltip: { show: false } }
+            ];
+        }
+        function mainSeries() {
+            return [{ name: "mean", type: "line", smooth: true, showSymbol: series.length < 80, lineStyle: { width: 2, color: BLUE },
+                      itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.06)" }, z: 3,
+                      data: series.map(function (r) { return r.value; }) }];
+        }
         chart.setOption({
             grid: { left: 56, right: 20, top: 24, bottom: 40 },
             tooltip: { trigger: "axis", formatter: function (p) {
                 var r = series[p[0].dataIndex] || {};
-                return "<strong>" + r.date + "</strong><br>Model value: <strong>" + r.value + "</strong> " + unit +
+                return "<strong>" + r.date + "</strong><br>Mean: <strong>" + r.value + "</strong> " + unit +
+                       (r.value_min != null ? "<br>Range in period: " + r.value_min + " – " + r.value_max : "") +
                        (r.temperature_c == null ? "" : "<br>Temperature: " + r.temperature_c + " °C") +
                        (r.days ? "<br>" + r.days + " daily values" : "");
             } },
             xAxis: { type: "category", data: series.map(function (r) { return r.date; }), boundaryGap: false },
             yAxis: { type: "value", name: unit, nameTextStyle: { color: "#64748b" } },
-            series: [{ type: "line", smooth: true, showSymbol: series.length < 80, lineStyle: { width: 2, color: BLUE },
-                       itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.12)" },
-                       data: series.map(function (r) { return r.value; }) }]
+            series: bandSeries(true).concat(mainSeries())
         });
+        var bt = document.getElementById("band-toggle");
+        if (bt) { if (!hasBand) { bt.disabled = true; bt.checked = false; } bt.addEventListener("change", function () { chart.setOption({ series: bandSeries(bt.checked).concat(mainSeries()) }, { replaceMerge: ["series"] }); }); }
     }
 
     // ---- seasonal heatmap -----------------------------------------------
