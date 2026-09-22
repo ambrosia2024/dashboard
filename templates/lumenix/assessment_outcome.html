@@ -63,10 +63,9 @@
                     </div>
                 </div>
                 <div id="tip-series" class="ws-tip" hidden>
-                    <strong>In plain words</strong>
                     <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen.</p>
                     <p>The shaded band shows the lowest and highest day inside each period. The highest point was <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical value is around <strong>{{ stats.mean }}</strong>.</p>
-                    <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
+                    <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
                     <p>The numbers are on the model's own scale, not a measured amount, and they are not a guarantee.</p>
                 </div>
                 <div id="chart-series" class="ws-chart"></div>
@@ -85,10 +84,9 @@
                         <span class="ws-badge ws-badge--derived">Derived</span>
                     </div>
                     <div id="tip-seasonal" class="ws-tip" hidden>
-                        <strong>In plain words</strong>
-                        <p>Each row is one year, each column one month. The darker the blue, the more that month favoured the pathogen.</p>
+                            <p>Each row is one year, each column one month. The darker the blue, the more that month favoured the pathogen.</p>
                         <p id="tip-seasonal-data">The month-by-month pattern comes from the same daily values as the chart above.</p>
-                        <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.seasonal }}</p>
+                        <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.seasonal }}</p>
                     </div>
                     <div id="chart-seasonal" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing monthly means…</div></div>
                 </section>
@@ -98,10 +96,9 @@
                         <span class="ws-badge ws-badge--derived">Derived</span>
                     </div>
                     <div id="tip-geo" class="ws-tip" hidden>
-                        <strong>In plain words</strong>
-                        <p>Each region is coloured by how favourable its weather was for this pathogen over your period: darker means more favourable. Grey regions have no data yet. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined. Hover a region to see its value.</p>
+                            <p>Each region is coloured by how favourable its weather was for this pathogen over your period: darker means more favourable. Grey regions have no data yet. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined. Hover a region to see its value.</p>
                         <p id="tip-geo-data">Regional values come from the same daily records for your period.</p>
-                        <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.geo }}</p>
+                        <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.geo }}</p>
                         <p>The map does not take into account how much of the crop is actually grown in each region.</p>
                     </div>
                     <div id="chart-geo" class="ws-chart ws-chart--sm is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Computing regional means…</div></div>
@@ -150,10 +147,9 @@
                     </dt>
                     <dd class="is-warn">Not supplied<small>Do not interpret as low uncertainty.</small>
                         <div id="tip-uncertainty" class="ws-tip" hidden>
-                            <strong>In plain words</strong>
-                            <p>Uncertainty would tell you how far off these numbers might be, like "probably within ± so much". The model behind this output does not give that, so we cannot show it.</p>
+                                    <p>Uncertainty would tell you how far off these numbers might be, like "probably within ± so much". The model behind this output does not give that, so we cannot show it.</p>
                             <p>"Not supplied" does not mean the numbers are exact. It means we do not know how exact they are.</p>
-                            <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.uncertainty }}</p>
+                            <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.uncertainty }}</p>
                         </div>
                     </dd>
                     {% if variability %}
@@ -162,11 +158,10 @@
                     </dt>
                     <dd>±{{ variability.stddev }} ({{ variability.cv_pct }}% of mean) · range {{ variability.min }}–{{ variability.max }}{% if variability.years > 1 %}<small>Yearly peaks {{ variability.yearly_peak_min }}–{{ variability.yearly_peak_max }} across {{ variability.years }} years.</small>{% endif %}<small>Spread of the model output itself, computed from the data. Not a model uncertainty estimate.</small>
                         <div id="tip-variability" class="ws-tip" hidden>
-                            <strong>In plain words</strong>
-                            <p>The value is usually around <strong>{{ stats.mean }}</strong>. It goes as low as <strong>{{ variability.min }}</strong> and as high as <strong>{{ variability.max }}</strong>, and most days it stays within about <strong>{{ variability.stddev }}</strong> of the usual value.</p>
+                                    <p>The value is usually around <strong>{{ stats.mean }}</strong>. It goes as low as <strong>{{ variability.min }}</strong> and as high as <strong>{{ variability.max }}</strong>, and most days it stays within about <strong>{{ variability.stddev }}</strong> of the usual value.</p>
                             <p>That is a swing of about <strong>{{ variability.cv_pct }}%</strong>: {% if variability.cv_pct < 10 %}small, so the pressure is fairly steady{% elif variability.cv_pct < 25 %}moderate, so some periods are clearly riskier than others{% else %}large, so the risk changes a lot through the period{% endif %}.</p>
                             {% if variability.years > 1 %}<p>The worst month of each year ranged from <strong>{{ variability.yearly_peak_min }}</strong> to <strong>{{ variability.yearly_peak_max }}</strong> over {{ variability.years }} years, so some years are worse than others.</p>{% endif %}
-                            <p class="ws-tip-role"><strong>{% if role_word %}For you as a {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.variability }}</p>
+                            <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.variability }}</p>
                             <p>This only says how much the value moves. It says nothing about how accurate the model is; see Uncertainty above.</p>
                         </div>
                     </dd>
@@ -356,16 +351,12 @@
     document.querySelectorAll(".ws-info-btn").forEach(function (btn) {
         var tip = document.getElementById(btn.dataset.tip);
         if (!tip) return;
-        btn.addEventListener("click", function (e) {
-            e.stopPropagation();
-            var open = tip.hidden;
-            document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; });
-            document.querySelectorAll(".ws-info-btn").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
-            tip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false");
+        // Each (i) toggles only its own box; boxes stay open until clicked again.
+        btn.addEventListener("click", function () {
+            tip.hidden = !tip.hidden;
+            btn.setAttribute("aria-expanded", tip.hidden ? "false" : "true");
         });
     });
-    document.addEventListener("click", function (e) { if (!e.target.closest(".ws-tip")) document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; }); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") document.querySelectorAll(".ws-tip").forEach(function (t) { t.hidden = true; }); });
 
     // ---- Ask Ambra: persisted conversation + drawer -----------------------
     var csrf = document.querySelector("#tech-form [name=csrfmiddlewaretoken]").value;
