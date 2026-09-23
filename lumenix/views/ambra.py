@@ -24,6 +24,8 @@ MAX_QUESTION = 1000
 def _run_context(run):
     snap = run.snapshot or {}
     series = (snap.get("series") or [])[:500]
+    stats = snap.get("stats") or {}
+    scale = run.get_resolution_display().lower()
     return {
         "assessment": run.run_code,
         "name": run.name,
@@ -38,6 +40,18 @@ def _run_context(run):
         "variability_of_output": snap.get("variability") or "not computed",
         "note": "model output, not a validated risk prediction",
         "chart_kind": "line: model output over time",
+        # Each point is a period mean, so the highest point is not the highest
+        # day. Both are supplied, plainly labelled, so an answer about "the
+        # highest value" cannot contradict the figures shown beside the chart.
+        "chart_points_are": f"{scale} means of the daily model output",
+        "highest_point_caveat": (
+            f"the largest chart point is the highest {scale} mean, not the highest single day"
+        ),
+        "mean_of_daily_values": stats.get("mean"),
+        "highest_single_day": stats.get("max"),
+        "highest_single_day_on": stats.get("peak_date"),
+        "lowest_single_day": stats.get("min"),
+        "days_of_data": stats.get("days"),
         "chart_points": [{"date": r.get("date"), "value": r.get("value"), "temperature_c": r.get("temperature_c")} for r in series],
     }
 

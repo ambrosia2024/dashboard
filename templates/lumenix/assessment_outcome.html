@@ -71,18 +71,19 @@
                 </div>
                 <div id="chart-series" class="ws-chart"></div>
                 <div class="ws-stats">
-                    <div><small>Mean</small><strong>{{ stats.mean|default:"—" }}</strong></div>
-                    <div><small>Peak</small><strong>{{ stats.max|default:"—" }}</strong><small>{{ stats.peak_date|default:"" }}</small></div>
-                    <div><small>Lowest</small><strong>{{ stats.min|default:"—" }}</strong></div>
+                    <div><small>Mean</small><strong>{{ stats.mean|default:"—" }}</strong><small>over all days</small></div>
+                    <div><small>Peak day</small><strong>{{ stats.max|default:"—" }}</strong><small>{{ stats.peak_date|default:"" }}</small></div>
+                    <div><small>Lowest day</small><strong>{{ stats.min|default:"—" }}</strong></div>
                     <div><small>Days of data</small><strong>{{ stats.days }}</strong></div>
                 </div>
+                <p class="ws-stats-note">These figures describe the individual days. The line above plots {{ run.get_resolution_display|lower }} means, so its highest point is lower than the peak day — averaging a period flattens its worst day.</p>
             </section>
 
             <div class="ws-chart-grid">
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
                         <div><h2>Seasonal heatmap <button type="button" class="ws-info-btn" aria-label="What does this heatmap show?" data-tip="tip-seasonal">i</button></h2><small>Monthly mean per year, same model output</small></div>
-                        <span class="ws-badge ws-badge--derived">Derived</span>
+                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-seasonal" data-title="Seasonal heatmap" aria-label="Show Seasonal heatmap full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
                     </div>
                     <div id="tip-seasonal" class="ws-tip" hidden>
                             <p>Each row is one year, each column one month. The darker the blue, the more that month favoured the pathogen.</p>
@@ -94,7 +95,7 @@
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
                         <div><h2>Geographic heatmap <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-geo">i</button></h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
-                        <span class="ws-badge ws-badge--derived">Derived</span>
+                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-geo" data-title="Geographic heatmap" aria-label="Show Geographic heatmap full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
                     </div>
                     <div id="tip-geo" class="ws-tip" hidden>
                             <p>Each region is coloured by how favourable its weather was for this pathogen over your period: darker means more favourable. Grey regions have no data yet. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined. Hover a region to see its value.</p>
@@ -223,6 +224,19 @@
     </form>
 </aside>
 
+<div id="ws-modal" class="ws-modal" hidden>
+    <div class="ws-modal__backdrop" data-close></div>
+    <div class="ws-modal__panel" role="dialog" aria-modal="true" aria-labelledby="ws-modal-title">
+        <div class="ws-modal__head">
+            <h2 id="ws-modal-title"></h2>
+            <button type="button" class="ws-icon-btn" data-close aria-label="Close">
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>
+            </button>
+        </div>
+        <div class="ws-modal__body" id="ws-modal-body"></div>
+    </div>
+</div>
+
 <script>
 (function () {
     var $ = function (id) { return document.getElementById(id); };
@@ -230,6 +244,61 @@
     var series = snap.series || [];
     var unit = snap.unit || "model output";
     var BLUE = "#376EB5";
+
+    // ---- full-screen view for a chart -----------------------------------
+    // The chart element itself is moved into the dialog and back, so the
+    // ECharts instance and the Leaflet map survive; each one registers how it
+    // wants to be re-measured once it has its new size.
+    var resizers = {};
+    function onResized(id, fn) { resizers[id] = fn; }
+
+    (function () {
+        var modal = $("ws-modal"), body = $("ws-modal-body"), heading = $("ws-modal-title");
+        var node = null, anchor = null, openId = "";
+
+        function remeasure() { if (resizers[openId]) { resizers[openId](); } }
+
+        function open(btn) {
+            node = document.getElementById(btn.getAttribute("data-expand"));
+            if (!node || openId) { return; }
+            openId = node.id;
+            heading.textContent = btn.getAttribute("data-title") || "";
+            anchor = document.createComment("chart placeholder");
+            node.parentNode.insertBefore(anchor, node);
+            body.appendChild(node);
+            node.classList.add("is-expanded");
+            modal.hidden = false;
+            document.body.classList.add("ws-modal-open");
+            requestAnimationFrame(function () { modal.classList.add("is-open"); });
+            window.setTimeout(remeasure, 60);
+            window.setTimeout(remeasure, 260);   // again once the panel has finished growing
+        }
+
+        function close() {
+            if (!openId) { return; }
+            modal.classList.remove("is-open");
+            window.setTimeout(function () {
+                modal.hidden = true;
+                document.body.classList.remove("ws-modal-open");
+                node.classList.remove("is-expanded");
+                anchor.parentNode.insertBefore(node, anchor);
+                anchor.parentNode.removeChild(anchor);
+                var id = openId;
+                openId = ""; node = null; anchor = null;
+                // Twice: once now, once after the card's layout has settled, so
+                // the canvas cannot be left at its full-screen size.
+                if (resizers[id]) { resizers[id](); window.setTimeout(resizers[id], 120); }
+            }, 200);
+        }
+
+        document.addEventListener("click", function (e) {
+            var btn = e.target.closest("[data-expand]");
+            if (btn) { open(btn); return; }
+            if (e.target.closest("[data-close]")) { close(); }
+        });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape") { close(); } });
+        window.addEventListener("resize", function () { if (openId) { remeasure(); } });
+    })();
 
     // ---- main series ----------------------------------------------------
     var el = document.getElementById("chart-series");
@@ -295,6 +364,7 @@
             var vals = rows.map(function (r) { return r.value; }).filter(function (v) { return v != null; });
             var c = echarts.init(el2);
             window.addEventListener("resize", function () { c.resize(); });
+            onResized("chart-seasonal", function () { c.resize(); });
             c.setOption({
                 grid: { left: 56, right: 16, top: 12, bottom: 78 },
                 tooltip: { position: "top", formatter: function (p) { return "<strong>" + months[p.data[0]] + " " + years[p.data[1]] + "</strong><br>Mean: " + p.data[2] + " " + unit; } },
@@ -351,6 +421,7 @@
         var sel = feats.find(function (f) { return f.properties.NUTS_ID === selected; });
         if (sel) { map.fitBounds(L.geoJSON(sel).getBounds().pad(2.5)); }
         setTimeout(function () { map.invalidateSize(); }, 100);
+        onResized("chart-geo", function () { map.invalidateSize(); });
     }).catch(function () {});
 
     // ---- plain-language tips on the evidence panel ------------------------

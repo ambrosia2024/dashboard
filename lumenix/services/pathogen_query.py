@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 import requests
@@ -10,6 +11,23 @@ from django.utils import timezone
 from django.conf import settings
 
 from lumenix.models import PathogenConcentrationRecord, PathogenQuerySpec
+
+def identifier_variants(value):
+    """
+    Every spelling of a crop/hazard identifier we might hold.
+
+    The vocabulary gives hyphenated identifiers ("listeria-monocytogenes"), but
+    query specs carry the source API's spaced form ("listeria monocytogenes")
+    and their records inherit it, so an exact match finds nothing and the page
+    reports no data for a region the admin clearly shows. Matching all three
+    separators keeps a lookup working whichever spelling reached the table.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    base = re.sub(r"[\s_-]+", "-", raw)
+    return sorted({raw, base, base.replace("-", " "), base.replace("-", "_")})
+
 
 URL = settings.SCIO_PATHOGEN_QUERY_URL
 DEFAULT_CHUNK_DAYS = max(1, int(getattr(settings, "SCIO_PATHOGEN_SYNC_CHUNK_DAYS", 7)))

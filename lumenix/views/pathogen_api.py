@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_POST
 
 from lumenix.models import PathogenConcentrationRecord
+from lumenix.services.pathogen_query import identifier_variants
 
 
 def _parse_request_date(value: str):
@@ -24,8 +25,8 @@ def _parse_request_date(value: str):
 
 def _resolve_pathogen_queryset(plant, pathogen, nuts_code, start_date=None, end_date=None):
     base_qs = PathogenConcentrationRecord.active_objects.filter(
-        plant=plant,
-        pathogen=pathogen,
+        plant__in=identifier_variants(plant),
+        pathogen__in=identifier_variants(pathogen),
     )
     if start_date:
         base_qs = base_qs.filter(observed_on__gte=start_date)
