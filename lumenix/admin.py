@@ -1590,6 +1590,7 @@ class AdminMenuMasterAdmin(admin.ModelAdmin):
         "parent",
         "menu_route",
         "menu_icon",
+        "note",
         "open_in_new_tab",
         "order",
         "status",

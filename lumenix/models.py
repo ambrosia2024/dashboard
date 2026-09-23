@@ -751,7 +751,16 @@ class AdminMenuMaster(BaseModel):
         blank=True,
         default="",
         verbose_name="Badge",
-        help_text="Optional small label shown next to the menu name, e.g. 'Future'.",
+        help_text="Optional small label shown next to the menu name, e.g. 'Future'. "
+                  "A badge also greys the item out and makes it unclickable.",
+    )
+    note = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        verbose_name="Note",
+        help_text="Optional qualifier shown in grey brackets after the menu name, "
+                  "e.g. 'demo'. Unlike a badge it leaves the item clickable.",
     )
     order = models.PositiveIntegerField(
         default=0,
