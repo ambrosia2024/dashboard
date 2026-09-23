@@ -421,7 +421,36 @@
         var sel = feats.find(function (f) { return f.properties.NUTS_ID === selected; });
         if (sel) { map.fitBounds(L.geoJSON(sel).getBounds().pad(2.5)); }
         setTimeout(function () { map.invalidateSize(); }, 100);
-        onResized("chart-geo", function () { map.invalidateSize(); });
+
+        // Scroll-wheel zoom, armed by clicking the map and dropped when the
+        // pointer leaves it: a page scroll that happens to pass over the map
+        // should scroll the page, not zoom Europe. Full screen has no page
+        // behind it, so there it is simply on.
+        var hint = document.createElement("div"), hintTimer;
+        hint.className = "ws-map-hint";
+        hint.textContent = "Click the map to zoom with the scroll wheel";
+        el3.appendChild(hint);
+
+        function armScroll() { map.scrollWheelZoom.enable(); el3.classList.add("is-scroll-armed"); }
+        function disarmScroll() {
+            if (el3.classList.contains("is-expanded")) { return; }
+            map.scrollWheelZoom.disable();
+            el3.classList.remove("is-scroll-armed");
+        }
+        map.on("click", armScroll);
+        el3.addEventListener("mouseleave", disarmScroll);
+        el3.addEventListener("wheel", function () {
+            if (map.scrollWheelZoom.enabled()) { return; }
+            el3.classList.add("show-hint");
+            window.clearTimeout(hintTimer);
+            hintTimer = window.setTimeout(function () { el3.classList.remove("show-hint"); }, 1600);
+        }, { passive: true });
+
+        onResized("chart-geo", function () {
+            map.invalidateSize();
+            if (el3.classList.contains("is-expanded")) { armScroll(); }
+            else { map.scrollWheelZoom.disable(); el3.classList.remove("is-scroll-armed"); }
+        });
     }).catch(function () {});
 
     // ---- plain-language tips on the evidence panel ------------------------
