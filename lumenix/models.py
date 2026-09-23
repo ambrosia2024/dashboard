@@ -759,8 +759,8 @@ class AdminMenuMaster(BaseModel):
         blank=True,
         default="",
         verbose_name="Note",
-        help_text="Optional qualifier shown in grey brackets after the menu name, "
-                  "e.g. 'demo'. Unlike a badge it leaves the item clickable.",
+        help_text="Optional label shown next to the menu name, e.g. 'Demo'. Looks "
+                  "like a badge but leaves the item clickable.",
     )
     order = models.PositiveIntegerField(
         default=0,
