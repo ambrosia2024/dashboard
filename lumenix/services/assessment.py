@@ -8,6 +8,8 @@ nothing to aggregate the functions return empty results.
 """
 
 from django.db.models import Avg, Count, Max, Min, StdDev
+
+from lumenix.services.pathogen_query import identifier_variants
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, TruncYear
 
 from lumenix.models import PathogenConcentrationRecord
@@ -121,7 +123,12 @@ def geographic_means(plant, pathogen, start_date, end_date):
     """{nuts_code: mean model value} for every synced region of this crop + hazard in the period."""
     rows = (
         PathogenConcentrationRecord.active_objects.filter(
-            plant=plant, pathogen=pathogen, observed_on__gte=start_date, observed_on__lte=end_date
+            # Same spelling tolerance as the main lookup: specs store the source
+            # API's spaced identifiers, the vocabulary gives hyphenated ones.
+            plant__in=identifier_variants(plant),
+            pathogen__in=identifier_variants(pathogen),
+            observed_on__gte=start_date,
+            observed_on__lte=end_date,
         )
         .values("nuts_code")
         .annotate(value=Avg("pathogen_model_value"), days=Count("id"))

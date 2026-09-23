@@ -463,6 +463,7 @@
 .ws-badge--live { background: #e7f6ec; color: #1a7f43; }
 .ws-badge--derived { background: var(--ws-blue-soft); color: #1769c4; }
 .ws-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--ws-border); }
+.ws-stats-note { margin: 8px 2px 0; font-size: 12px; line-height: 1.5; color: var(--ws-muted, #64748b); }
 .ws-stats div { display: flex; flex-direction: column; gap: 2px; }
 .ws-stats small { font-size: 11.5px; color: var(--ws-muted); text-transform: uppercase; letter-spacing: .04em; }
 .ws-stats strong { font-size: 18px; color: var(--ws-ink); }
@@ -653,3 +654,43 @@ body.ws-drawer-open { overflow: hidden; }
 .ws-chart-card .ws-tip { margin: 0 0 12px; }
 
 .ws-tip-role { padding: 8px 10px; border-left: 3px solid var(--ws-blue); background: #fff; border-radius: 0 6px 6px 0; }
+
+/* ---- full-screen chart view ---------------------------------------------
+   The expand button sits beside the card's badge; opening moves the chart
+   element itself into the dialog, so nothing is re-rendered from scratch. */
+.ws-head-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ws-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; padding: 0;
+    border: 1px solid var(--ws-border); border-radius: 7px; background: #fff;
+    color: var(--ws-muted); cursor: pointer;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.ws-icon-btn:hover { color: var(--ws-blue); border-color: #b7c7dc; background: var(--ws-blue-soft); }
+.ws-icon-btn:focus-visible { outline: 2px solid var(--ws-blue); outline-offset: 2px; }
+
+body.ws-modal-open { overflow: hidden; }
+
+.ws-modal { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ws-modal[hidden] { display: none; }
+.ws-modal__backdrop { position: absolute; inset: 0; background: rgba(17, 43, 57, .55); opacity: 0; transition: opacity .2s ease; }
+.ws-modal__panel {
+    position: relative; display: flex; flex-direction: column;
+    width: min(1180px, 100%); max-height: calc(100vh - 48px);
+    padding: 18px 22px 22px; border-radius: 12px; background: #fff;
+    box-shadow: 0 24px 60px rgba(17, 43, 57, .28);
+    opacity: 0; transform: scale(.97) translateY(6px);
+    transition: opacity .2s ease, transform .2s ease;
+}
+.ws-modal.is-open .ws-modal__backdrop { opacity: 1; }
+.ws-modal.is-open .ws-modal__panel { opacity: 1; transform: none; }
+.ws-modal__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.ws-modal__head h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--ws-ink); }
+/* flex-basis auto, not 0: in a column flex container a 0 basis would beat
+   the height below and collapse the chart to nothing. */
+.ws-modal__body { flex: 1 1 auto; min-height: 0; height: min(76vh, 760px); }
+.ws-modal__body .ws-chart.is-expanded { height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ws-modal__backdrop, .ws-modal__panel { transition: none; }
+}
