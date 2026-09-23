@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='adminmenumaster',
             name='note',
-            field=models.CharField(blank=True, default='', help_text="Optional qualifier shown in grey brackets after the menu name, e.g. 'demo'. Unlike a badge it leaves the item clickable.", max_length=40, verbose_name='Note'),
+            field=models.CharField(blank=True, default='', help_text="Optional label shown next to the menu name, e.g. 'Demo'. Looks like a badge but leaves the item clickable.", max_length=40, verbose_name='Note'),
         ),
         migrations.AlterField(
             model_name='adminmenumaster',
