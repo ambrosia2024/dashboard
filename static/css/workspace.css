@@ -707,3 +707,11 @@ body.ws-modal-open { overflow: hidden; }
 .ws-chart.is-scroll-armed { box-shadow: inset 0 0 0 2px var(--ws-blue-soft); }
 .ws-chart.is-expanded .ws-map-hint { display: none; }
 @media (prefers-reduced-motion: reduce) { .ws-map-hint { transition: none; } }
+
+/* A note qualifies a menu item without disabling it, unlike .menu-badge. */
+#sidebar-menu .menu-note {
+    margin-left: 6px;
+    color: #8591a3;
+    font-size: 11.5px;
+    font-weight: 400;
+}

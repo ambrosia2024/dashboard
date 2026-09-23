@@ -106,6 +106,7 @@ def admin_menu_tree(context):
             "is_parent": is_parent,
             "open_in_new_tab": node.open_in_new_tab,
             "badge": (node.badge or "").strip(),
+            "note": (node.note or "").strip(),
             "active": any_child_active or _is_active(url, current_path, current_get),
             "children": children,
             "_has_query": "?" in (node.menu_route or ""),
