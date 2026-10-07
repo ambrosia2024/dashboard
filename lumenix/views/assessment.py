@@ -27,7 +27,10 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from lumenix.models import AssessmentRun, NutsRegion, PathogenConcept, PlantConcept, SavedSituation
-from lumenix.services.assessment import aggregate_series, build_snapshot, geographic_means, seasonal_matrix, variability
+from lumenix.services.assessment import (
+    SNAPSHOT_SCHEMA, aggregate_series, build_snapshot, geographic_means, monthly_window_means,
+    seasonal_matrix, variability,
+)
 from lumenix.views.pathogen_api import _models_for_queryset, _resolve_pathogen_queryset
 
 # Input rules (server-side; the browser hints are a convenience only).
@@ -399,20 +402,29 @@ class _OwnedRunMixin(LoginRequiredMixin):
         )
 
 
-def _ensure_variability(run):
-    """Runs stored before variability existed get it computed once and saved into their snapshot."""
+def _ensure_snapshot_schema(run):
+    """
+    Runs stored under an older snapshot schema are rebuilt once from the records
+    the first time they are opened - schema 1 plotted the model curve's end
+    value, schema 2 the AUC growth-potential index. Cached derived datasets
+    (seasonal, geographic) are dropped so they recompute on the same basis.
+
+    If the index has not been backfilled yet for this run's scope, the old
+    snapshot is kept rather than freezing an empty chart.
+    """
     snap = run.snapshot or {}
-    if "variability" in snap and snap.get("series") and "value_min" in (snap["series"][0] if snap["series"] else {}):
+    if snap.get("schema") == SNAPSHOT_SCHEMA:
         return snap
     if not run.crop or not run.hazard:
         return snap
     plant, pathogen = concept_identifier(run.crop), concept_identifier(run.hazard)
     qs, _ = _resolve_pathogen_queryset(plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date)
-    snap["variability"] = variability(qs)
-    snap["series"] = aggregate_series(qs, run.resolution)
-    run.snapshot = snap
+    rebuilt = build_snapshot(qs, run.resolution)
+    if rebuilt["stats"]["days"] and rebuilt["stats"]["mean"] is None:
+        return snap  # records exist but carry no index yet: backfill pending
+    run.snapshot = rebuilt
     run.save(update_fields=["snapshot"])
-    return snap
+    return rebuilt
 
 
 class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
@@ -421,7 +433,7 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         run = self.get_run()
-        snap = _ensure_variability(run)
+        snap = _ensure_snapshot_schema(run)
         stats = snap.get("stats") or {}
         fetched_ms = stats.get("fetched_at_ms")
         retrieved_at = timezone.datetime.fromtimestamp(fetched_ms / 1000, tz=timezone.get_current_timezone()) if fetched_ms else None
@@ -500,6 +512,81 @@ def _cached_derived(run, key, compute):
     return derived[key]
 
 
+class AssessmentGrowthComparisonView(_OwnedRunMixin, View):
+    """
+    Mean growth-potential index per calendar month over two year windows - the
+    WP4 baseline-versus-future comparison. Windows are user-chosen but must
+    cover several years each: a single year shows weather, not climate (picking
+    one year per side gives the wrong sign of change roughly 10% of the time).
+    """
+
+    MIN_WINDOW_YEARS = 5
+
+    def get(self, request, *args, **kwargs):
+        run = self.get_run()
+        try:
+            (b1, b2), (f1, f2) = self._windows(request, run)
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        plant = concept_identifier(run.crop) if run.crop else ""
+        pathogen = concept_identifier(run.hazard) if run.hazard else ""
+        qs, _ = _resolve_pathogen_queryset(
+            plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date
+        )
+
+        def window(start, end):
+            months = monthly_window_means(qs, start, end)
+            values = [r["value"] for r in months if r["value"] is not None]
+            return {
+                "start": start,
+                "end": end,
+                "months": months,
+                "mean": round(sum(values) / len(values), 4) if values else None,
+            }
+
+        return JsonResponse({"baseline": window(b1, b2), "future": window(f1, f2)})
+
+    def _windows(self, request, run):
+        lo, hi = run.start_date.year, run.end_date.year
+
+        # Standard 30-year climate normals when the run covers them; otherwise
+        # split the run's own span in half. A short run cannot host two windows.
+        if lo <= 1991 and hi >= 2095:
+            defaults = (1991, 2020, 2066, 2095)
+        else:
+            span = hi - lo + 1
+            if span < 2 * self.MIN_WINDOW_YEARS:
+                raise ValueError(
+                    f"This run covers only {span} year(s) ({lo}–{hi}); the comparison needs "
+                    f"at least {2 * self.MIN_WINDOW_YEARS} — two windows of {self.MIN_WINDOW_YEARS}."
+                )
+            mid = lo + span // 2
+            defaults = (lo, mid - 1, mid, hi)
+
+        def year_param(name, default):
+            raw = (request.GET.get(name) or "").strip()
+            if not raw:
+                return default
+            if not raw.isdigit() or not 1900 <= int(raw) <= 2100:
+                raise ValueError(f"{name} must be a year between 1900 and 2100.")
+            return int(raw)
+
+        b1 = year_param("base_start", defaults[0])
+        b2 = year_param("base_end", defaults[1])
+        f1 = year_param("future_start", defaults[2])
+        f2 = year_param("future_end", defaults[3])
+        for start, end, label in ((b1, b2, "baseline"), (f1, f2, "future")):
+            if end < start:
+                raise ValueError(f"The {label} window ends before it starts.")
+            if end - start + 1 < self.MIN_WINDOW_YEARS:
+                raise ValueError(
+                    f"The {label} window must cover at least {self.MIN_WINDOW_YEARS} years - "
+                    f"a single year shows weather, not climate."
+                )
+        return (b1, b2), (f1, f2)
+
+
 class AssessmentSeasonalView(_OwnedRunMixin, View):
     def get(self, request, *args, **kwargs):
         run = self.get_run()
@@ -507,7 +594,7 @@ class AssessmentSeasonalView(_OwnedRunMixin, View):
         def compute():
             plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
             qs, _ = _resolve_pathogen_queryset(plant, pathogen, run.nuts2_code, start_date=run.start_date, end_date=run.end_date)
-            return {"rows": seasonal_matrix(qs), "unit": "model output"}
+            return {"rows": seasonal_matrix(qs), "unit": "growth-potential index (AUC)"}
 
         return JsonResponse(_cached_derived(run, "seasonal", compute))
 
@@ -519,6 +606,6 @@ class AssessmentGeographicView(_OwnedRunMixin, View):
         def compute():
             plant, pathogen = concept_identifier(run.crop) if run.crop else "", concept_identifier(run.hazard) if run.hazard else ""
             values = geographic_means(plant, pathogen, run.start_date, run.end_date)
-            return {"values": values, "selected": run.nuts2_code, "unit": "model output", "regions": len(values)}
+            return {"values": values, "selected": run.nuts2_code, "unit": "growth-potential index (AUC)", "regions": len(values)}
 
         return JsonResponse(_cached_derived(run, "geographic", compute))

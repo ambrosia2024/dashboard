@@ -104,3 +104,83 @@ class GrowthPotentialMathTests(SimpleTestCase):
         self.assertIsNone(interpolate(samples, 10.1), "no extrapolation above the sampled range")
         self.assertIsNone(interpolate(samples, float("nan")))
         self.assertIsNone(interpolate(samples, None))
+
+
+from datetime import date
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+
+class GrowthComparisonEndpointTests(TestCase):
+    """The baseline-versus-future endpoint, on synthetic records with known AUC."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from lumenix.models import AssessmentRun, PathogenConcentrationRecord
+
+        from lumenix.models import UserProfile
+
+        # A complete profile, or EnforceProfileCompletionMiddleware redirects
+        # every page to the profile/preferences flow instead of answering.
+        cls.user = get_user_model().objects.create_user(
+            "tester", password="x", first_name="Test", last_name="User"
+        )
+        UserProfile.objects.update_or_create(user=cls.user, defaults={"role": "farmer"})
+
+        from lumenix.models import Concept, Vocabulary
+
+        vocab = Vocabulary.objects.create(id="plants")
+        crop = Concept.objects.create(
+            vocabulary=vocab, uri="https://example.org/vocab#concept/plant/lettuce"
+        )
+        hazard = Concept.objects.create(
+            vocabulary=vocab, uri="https://example.org/vocab#concept/pathogen/salmonella"
+        )
+        rows = []
+        # June 1st of every year 2000-2019: index 10 in the first decade, 30 in
+        # the second, so the window means are unambiguous.
+        for year in range(2000, 2020):
+            rows.append(PathogenConcentrationRecord(
+                plant="lettuce", pathogen="salmonella", nuts_code="ZZ99",
+                observed_on=date(year, 6, 1), pathogen_model_value=5.0,
+                growth_potential_auc=10.0 if year < 2010 else 30.0, status=1,
+            ))
+        PathogenConcentrationRecord.objects.bulk_create(rows)
+        cls.assessment = AssessmentRun.objects.create(
+            user=cls.user, name="t", nuts2_code="ZZ99", nuts2_name="Testland",
+            crop=crop, hazard=hazard,
+            start_date=date(2000, 1, 1), end_date=date(2019, 12, 31),
+            resolution="yearly", run_status="completed", snapshot={},
+        )
+
+    def test_split_defaults_and_window_means(self):
+        self.client.force_login(self.user)
+        data = self.client.get(reverse("assessment-growth-comparison", args=[self.assessment.id])).json()
+        self.assertEqual((data["baseline"]["start"], data["baseline"]["end"]), (2000, 2009))
+        self.assertEqual((data["future"]["start"], data["future"]["end"]), (2010, 2019))
+        june_base = next(m for m in data["baseline"]["months"] if m["month"] == 6)
+        june_fut = next(m for m in data["future"]["months"] if m["month"] == 6)
+        self.assertEqual(june_base["value"], 10.0)
+        self.assertEqual(june_fut["value"], 30.0)
+        self.assertIsNone(next(m for m in data["baseline"]["months"] if m["month"] == 1)["value"])
+
+    def test_short_window_is_refused(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            reverse("assessment-growth-comparison", args=[self.assessment.id]),
+            {"base_start": "2000", "base_end": "2002"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("at least 5 years", resp.json()["error"])
+
+    def test_snapshot_upgrade_waits_for_backfill(self):
+        from lumenix.models import PathogenConcentrationRecord
+        from lumenix.views.assessment import _ensure_snapshot_schema
+
+        PathogenConcentrationRecord.objects.filter(nuts_code="ZZ99").update(growth_potential_auc=None)
+        self.assessment.snapshot = {"schema": 1, "series": [{"date": "2000-01-01", "value": 5.0}]}
+        self.assessment.save(update_fields=["snapshot"])
+        snap = _ensure_snapshot_schema(self.assessment)
+        self.assertEqual(snap.get("schema"), 1, "old snapshot must survive until the index is backfilled")
