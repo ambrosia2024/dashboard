@@ -12,7 +12,7 @@
 //   intensity, or dynamically scaling the map's heat layer.
 
 (function () {
-    const src = "/static/data/nuts/NUTS_RG_03M_2021_4326.geojson";
+    const src = "/static/data/nuts/NUTS_RG_03M_2024_4326.geojson";
 
     // simple seasonal dummy used for now (peak late summer/autumn)
     function seasonal(base, month, noise = 0.25) {

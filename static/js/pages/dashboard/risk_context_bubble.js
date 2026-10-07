@@ -145,7 +145,7 @@
 
   async function getNuts2Features() {
     if (!NUTS2_FEATURES_PROMISE) {
-      NUTS2_FEATURES_PROMISE = fetch("/static/data/nuts/NUTS_RG_03M_2021_4326.geojson", {
+      NUTS2_FEATURES_PROMISE = fetch("/static/data/nuts/NUTS_RG_03M_2024_4326.geojson", {
         headers: { Accept: "application/json" }
       })
         .then((r) => {

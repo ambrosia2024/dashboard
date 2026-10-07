@@ -267,7 +267,7 @@
     }
     function nutsFeatures() {
         if (!nutsPromise) {
-            nutsPromise = fetch("/static/data/nuts/NUTS_RG_03M_2021_4326.geojson", { headers: { Accept: "application/json" } })
+            nutsPromise = fetch("/static/data/nuts/NUTS_RG_03M_2024_4326.geojson", { headers: { Accept: "application/json" } })
                 .then(function (r) { if (!r.ok) throw new Error("NUTS fetch failed"); return r.json(); })
                 .then(function (fc) { return (fc.features || []).filter(function (f) { return String(f.properties && f.properties.LEVL_CODE) === "2"; }); });
         }

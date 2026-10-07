@@ -193,7 +193,7 @@ def region_labels() -> dict[str, str]:
 
         labels = {
             region.notation: _strip_code_prefix(region.notation, region.pref_label)
-            for region in NutsRegion.objects.filter(level=2).only("notation", "pref_label")
+            for region in NutsRegion.objects.filter(status=1, level=2).only("notation", "pref_label")
         }
         cache.set(key, labels, CACHE_SECONDS)
     return labels
@@ -208,7 +208,7 @@ def country_labels() -> dict[str, str]:
 
         labels = {
             region.notation: _strip_code_prefix(region.notation, region.pref_label)
-            for region in NutsRegion.objects.filter(level=0).only("notation", "pref_label")
+            for region in NutsRegion.objects.filter(status=1, level=0).only("notation", "pref_label")
         }
         cache.set(key, labels, CACHE_SECONDS)
     return labels

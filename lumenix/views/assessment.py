@@ -187,7 +187,9 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
             errors["location"] = "Choose a location so the supported region (NUTS2) can be resolved."
         elif not NUTS2_RE.match(nuts2_code):
             errors["location"] = "The resolved region code is not valid. Search for the location again."
-        elif NutsRegion.objects.filter(level=2).exists() and not NutsRegion.objects.filter(level=2, notation=nuts2_code).exists():
+        elif NutsRegion.objects.filter(status=1, level=2).exists() and not NutsRegion.objects.filter(
+            status=1, level=2, notation=nuts2_code
+        ).exists():
             errors["location"] = "The resolved region is not a known NUTS2 region. Search for the location again."
 
         crop = PlantConcept.objects.filter(pk=data.get("crop") or 0, ambrosia_supported=True).first()
