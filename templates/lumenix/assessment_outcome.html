@@ -46,7 +46,7 @@
 
     <div class="ws-info" style="margin-bottom:22px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <span><strong>Model output, not a validated risk prediction.</strong> Values are the source model's response to the region's climate input. Quantitative risk interpretation depends on confirmed model outputs.</span>
+        <span><strong>Model output, not a validated risk prediction.</strong> Demonstrator output based on a packaged/fresh-cut product model; not validated for growth on living plants. Values are the model's growth response to the region's climate input.</span>
     </div>
 
     <div class="ws-outcome">
@@ -56,16 +56,17 @@
             {% else %}
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
-                    <div><h2>Pathogen concentration vs time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily model output</small></div>
+                    <div><h2>Modelled growth potential over time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily growth-potential index (AUC)</small></div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
                         <span class="ws-badge ws-badge--live">Source data</span>
                     </div>
                 </div>
                 <div id="tip-series" class="ws-tip" hidden>
-                    <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen.</p>
-                    <p><strong>How the band is made:</strong> the data has one value per day. For each {{ run.get_resolution_display|lower }} period, the days in it are grouped and three numbers are taken: their average, which is the line; the smallest day, which is the bottom of the band; and the largest day, which is the top. Nothing is smoothed or estimated. Hover a point to see the three numbers for that period.</p>
-                    <p>At a monthly scale the band is narrow because days within a month are similar; at a yearly scale it spans the whole seasonal swing. Drag the slider under the chart to zoom into a few years. The highest point was <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical value is around <strong>{{ stats.mean }}</strong>.</p>
+                    <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen; 0 means the day was too cold for any growth.</p>
+                    <p><strong>What one day's number is:</strong> the growth model is run for 48 hours at that day's temperature, and the index is how much simulated growth accumulates above the starting level in that window. It reacts strongly to warmth — a warm day can score thirty times a cool one — which is what makes days, seasons and regions comparable.</p>
+                    <p><strong>How the band is made:</strong> for each {{ run.get_resolution_display|lower }} period the days in it are grouped and three numbers are taken: their average, which is the line; the smallest day, which is the bottom of the band; and the largest day, which is the top. Nothing is smoothed or estimated. Hover a point to see the three numbers for that period.</p>
+                    <p>Drag the slider under the chart to zoom into a few years. The highest single day scored <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical day is around <strong>{{ stats.mean }}</strong>.</p>
                     <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
                     <p>The numbers are on the model's own scale, not a measured amount, and they are not a guarantee.</p>
                 </div>
@@ -77,6 +78,31 @@
                     <div><small>Days of data</small><strong>{{ stats.days }}</strong></div>
                 </div>
                 <p class="ws-stats-note">These figures describe the individual days. The line above plots {{ run.get_resolution_display|lower }} means, so its highest point is lower than the peak day — averaging a period flattens its worst day.</p>
+            </section>
+
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>Projected change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this comparison show?" data-tip="tip-compare">i</button></h2><small>Mean modelled growth-potential index (AUC) per calendar month, baseline versus future window</small></div>
+                    <span class="ws-badge ws-badge--derived">Derived</span>
+                </div>
+                <div id="tip-compare" class="ws-tip" hidden>
+                    <p>Each line averages the index per calendar month over one window of years, so the gap between the lines is the projected change for each part of the growing season. Both windows come from the same climate projection — they are two periods, not two scenarios.</p>
+                    <p>A window must cover at least 5 years: comparing single years shows weather, not climate — one year against another gives the wrong direction of change roughly one time in ten.</p>
+                    <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> where the orange line sits above the blue one, that month is projected to become more favourable for {{ run.hazard_label|lower }} than it has been.</p>
+                </div>
+                <div class="ws-cmp-controls">
+                    <label>Baseline climate conditions
+                        <input type="number" id="cmp-b1" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}"> – <input type="number" id="cmp-b2" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}">
+                    </label>
+                    <label>Future climate conditions
+                        <input type="number" id="cmp-f1" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}"> – <input type="number" id="cmp-f2" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}">
+                    </label>
+                    <button type="button" class="ws-btn ws-btn-secondary" id="cmp-update">Update</button>
+                    <span id="cmp-msg" class="ws-cmp-msg" role="status"></span>
+                </div>
+                <div id="chart-compare" class="ws-chart is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Comparing climate windows…</div></div>
+                <p class="ws-stats-note" id="cmp-summary"></p>
+                <p class="ws-stats-note">Demonstrator output based on a packaged/fresh-cut product model; not validated for growth on living plants.</p>
             </section>
 
             <div class="ws-chart-grid">
@@ -340,6 +366,69 @@
         var bt = document.getElementById("band-toggle");
         if (bt) { if (!hasBand) { bt.disabled = true; bt.checked = false; } bt.addEventListener("change", function () { chart.setOption({ series: bandSeries(bt.checked).concat(mainSeries()) }, { replaceMerge: ["series"] }); }); }
     }
+
+    // ---- baseline vs future comparison ------------------------------------
+    (function () {
+        var el = $("chart-compare");
+        if (!el) { return; }
+        var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        var cmp = null;
+        var msg = $("cmp-msg"), summary = $("cmp-summary");
+
+        function windowLabel(w) { return w.start + "–" + w.end; }
+
+        function render(d) {
+            el.classList.remove("is-loading"); el.innerHTML = "";
+            $("cmp-b1").value = d.baseline.start; $("cmp-b2").value = d.baseline.end;
+            $("cmp-f1").value = d.future.start; $("cmp-f2").value = d.future.end;
+            msg.textContent = "";
+            if (!cmp) { cmp = echarts.init(el); window.addEventListener("resize", function () { cmp.resize(); }); }
+            cmp.setOption({
+                grid: { left: 56, right: 16, top: 34, bottom: 36 },
+                legend: { top: 0, textStyle: { color: "#64748b" } },
+                tooltip: { trigger: "axis", valueFormatter: function (v) { return v == null ? "no data" : v.toFixed(2); } },
+                xAxis: { type: "category", data: MONTHS, boundaryGap: false },
+                yAxis: { type: "value", name: "mean index (AUC)", nameTextStyle: { color: "#64748b" } },
+                series: [
+                    { name: "Baseline climate conditions (" + windowLabel(d.baseline) + ")", type: "line", smooth: true,
+                      lineStyle: { width: 2.5, color: BLUE }, itemStyle: { color: BLUE },
+                      data: d.baseline.months.map(function (r) { return r.value; }) },
+                    { name: "Future climate conditions (" + windowLabel(d.future) + ")", type: "line", smooth: true,
+                      lineStyle: { width: 2.5, color: "#D97706" }, itemStyle: { color: "#D97706" },
+                      data: d.future.months.map(function (r) { return r.value; }) }
+                ]
+            }, true);
+            if (d.baseline.mean != null && d.future.mean != null && d.baseline.mean > 0.01) {
+                var pct = 100 * (d.future.mean / d.baseline.mean - 1);
+                summary.textContent = "Across all months, the mean index moves from " + d.baseline.mean.toFixed(2) +
+                    " (" + windowLabel(d.baseline) + ") to " + d.future.mean.toFixed(2) + " (" + windowLabel(d.future) + "), " +
+                    (pct >= 0 ? "+" : "") + pct.toFixed(0) + "%.";
+            } else {
+                summary.textContent = "";
+            }
+        }
+
+        function load(params) {
+            var url = "{% url 'assessment-growth-comparison' run.id %}";
+            if (params) { url += "?" + new URLSearchParams(params).toString(); }
+            fetch(url, { headers: { Accept: "application/json" } })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (!res.ok) { msg.textContent = res.d.error || "The comparison could not be computed."; return; }
+                    render(res.d);
+                })
+                .catch(function () {
+                    el.classList.remove("is-loading");
+                    el.innerHTML = '<div class="ws-chart-loading">The comparison could not be loaded.</div>';
+                });
+        }
+
+        $("cmp-update").addEventListener("click", function () {
+            load({ base_start: $("cmp-b1").value, base_end: $("cmp-b2").value,
+                   future_start: $("cmp-f1").value, future_end: $("cmp-f2").value });
+        });
+        load(null);
+    })();
 
     // ---- seasonal heatmap -----------------------------------------------
     fetch("{% url 'assessment-seasonal' run.id %}", { headers: { Accept: "application/json" } })

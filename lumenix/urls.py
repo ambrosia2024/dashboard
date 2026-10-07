@@ -12,7 +12,7 @@ from .views.situations import (
 )
 from .views.assessment import (
     AssessmentCreateView, AssessmentExportView, AssessmentGeographicView, AssessmentOutcomeView,
-    AssessmentRunAgainView, AssessmentSeasonalView, FutureConceptView,
+    AssessmentGrowthComparisonView, AssessmentRunAgainView, AssessmentSeasonalView, FutureConceptView,
 )
 
 urlpatterns = [
@@ -32,6 +32,7 @@ urlpatterns = [
     path("situations/<int:situation_id>/duplicate/", SituationDuplicateView.as_view(), name="situation-duplicate"),
     path("situations/<int:situation_id>/delete/", SituationDeleteView.as_view(), name="situation-delete"),
     path("api/assessments/<int:run_id>/seasonal/", AssessmentSeasonalView.as_view(), name="assessment-seasonal"),
+    path("api/assessments/<int:run_id>/growth-comparison/", AssessmentGrowthComparisonView.as_view(), name="assessment-growth-comparison"),
     path("api/assessments/<int:run_id>/geographic/", AssessmentGeographicView.as_view(), name="assessment-geographic"),
     path("guidance/", FutureConceptView.as_view(), {"concept": "guidance"}, name="guidance"),
     path("supply-chain/", FutureConceptView.as_view(), {"concept": "supply-chain"}, name="supply-chain"),

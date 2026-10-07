@@ -38,12 +38,12 @@ def _run_context(run):
         "unit": snap.get("unit", "model output"),
         "uncertainty": "not supplied by the model; do not present variability as uncertainty",
         "variability_of_output": snap.get("variability") or "not computed",
-        "note": "model output, not a validated risk prediction",
-        "chart_kind": "line: model output over time",
+        "note": "demonstrator output from a packaged/fresh-cut product model; not a validated risk prediction",
+        "chart_kind": "line: modelled growth potential over time",
         # Each point is a period mean, so the highest point is not the highest
         # day. Both are supplied, plainly labelled, so an answer about "the
         # highest value" cannot contradict the figures shown beside the chart.
-        "chart_points_are": f"{scale} means of the daily model output",
+        "chart_points_are": f"{scale} means of the daily growth-potential index (AUC)",
         "highest_point_caveat": (
             f"the largest chart point is the highest {scale} mean, not the highest single day"
         ),
