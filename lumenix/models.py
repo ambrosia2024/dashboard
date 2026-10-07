@@ -826,6 +826,46 @@ class PathogenQuerySpec(BaseModel):
             raise ValidationError({"end_date": "End date must be on or after start date."})
 
 
+class GrowthPotentialLookup(BaseModel):
+    """
+    A(T) samples for one crop + hazard model, harvested from the source API.
+
+    The source model is deterministic in temperature: the same T always yields
+    the same 72-hour curve (verified cross-region to 0.04%). So instead of
+    storing millions of curves, we keep a few thousand (temperature, AUC)
+    samples per model and interpolate. AUC follows the WP4 FSKX spec: the
+    left Riemann sum of max(0, y(t) - y0) up to t_eval_hours.
+
+    t_eval is calibration data, not code: 48 h keeps cold days above zero while
+    halving the saturation plateau warm days spend inside the source's fixed
+    72-hour horizon. Changing it means re-running build_growth_potential_lookup.
+    """
+
+    plant = models.SlugField(max_length=100)
+    pathogen = models.SlugField(max_length=100, help_text="Spelled as stored on the records/specs.")
+    model_id = models.CharField(max_length=256, blank=True, default="")
+    model_title = models.CharField(max_length=512, blank=True, default="")
+    y0 = models.FloatField(help_text="Standardised initial model level, read from the curves.")
+    horizon_hours = models.FloatField(help_text="Length of the curve the source API returns.")
+    t_eval_hours = models.FloatField(default=48.0)
+    samples = models.JSONField(help_text="Sorted [temperature_c, auc] pairs at t_eval_hours.")
+    t_min = models.FloatField()
+    t_max = models.FloatField()
+    sample_count = models.IntegerField(default=0)
+    built_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "growth_potential_lookups"
+        verbose_name = "Growth potential lookup"
+        verbose_name_plural = "Growth potential lookups"
+        constraints = [
+            models.UniqueConstraint(fields=["plant", "pathogen"], name="uq_growth_lookup_pair"),
+        ]
+
+    def __str__(self):
+        return f"A(T) {self.plant} · {self.pathogen} (t_eval {self.t_eval_hours:g}h, {self.sample_count} samples)"
+
+
 class PathogenConcentrationRecord(BaseModel):
     """
     Local cache of daily pathogen concentration query results from the source API.
@@ -843,6 +883,9 @@ class PathogenConcentrationRecord(BaseModel):
     source_period = models.CharField(max_length=64, blank=True, default="")
     pathogen_model_value = models.FloatField(null=True, blank=True)
     temperature_c = models.FloatField(null=True, blank=True)
+    # Fixed-window AUC growth-potential index (WP4 FSKX spec), computed from the
+    # model curve at ingest or backfilled from temperature_c via the lookup.
+    growth_potential_auc = models.FloatField(null=True, blank=True)
     # The per-day model curve ("outcome") and the raw API item ("source_payload")
     # were stored here until 2026-09: ~4 KB per row that nothing read, i.e. 94% of
     # the table. Only the curve's final value (pathogen_model_value) is kept.

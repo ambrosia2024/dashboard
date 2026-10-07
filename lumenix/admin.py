@@ -26,7 +26,8 @@ from .admin_support import (
 from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
-                     PathogenQuerySpec, PathogenConcentrationRecord, AdminMenuMaster, SavedSituation, AssessmentRun)
+                     PathogenQuerySpec, PathogenConcentrationRecord, GrowthPotentialLookup, AdminMenuMaster,
+                     SavedSituation, AssessmentRun)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
 from .services.pathogen_query import sync_pathogen_query_spec
@@ -940,6 +941,26 @@ class PathogenQuerySpecAdmin(Select2FilterAdminMixin, admin.ModelAdmin):
         return None
 
 
+@admin.register(GrowthPotentialLookup)
+class GrowthPotentialLookupAdmin(admin.ModelAdmin):
+    """Read-only view of the sampled A(T) tables; rebuild via the management command."""
+
+    list_display = ("plant", "pathogen", "t_eval_hours", "range_display", "sample_count", "built_at", "status")
+    readonly_fields = (
+        "plant", "pathogen", "model_id", "model_title", "y0", "horizon_hours",
+        "t_eval_hours", "samples", "t_min", "t_max", "sample_count", "built_at",
+        "created_at", "updated_at",
+    )
+    exclude = ("deleted_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="Sampled range")
+    def range_display(self, obj):
+        return f"{obj.t_min:.1f} … {obj.t_max:.1f} °C"
+
+
 @admin.register(PathogenConcentrationRecord)
 class PathogenConcentrationRecordAdmin(Select2FilterAdminMixin, admin.ModelAdmin):
     """
@@ -980,7 +1001,7 @@ class PathogenConcentrationRecordAdmin(Select2FilterAdminMixin, admin.ModelAdmin
     actions = ("delete_selected_records",)
     readonly_fields = (
         "plant", "pathogen", "nuts_code", "observed_on", "source_time", "source_period",
-        "pathogen_model_value", "temperature_c", "provenance_model_id", "provenance_model_title",
+        "pathogen_model_value", "growth_potential_auc", "temperature_c", "provenance_model_id", "provenance_model_title",
         "provenance_variable_name", "provenance_fetched_at_ms", "status",
         "deleted_at", "created_at", "updated_at",
     )

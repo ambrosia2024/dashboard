@@ -12,6 +12,24 @@ from django.conf import settings
 
 from lumenix.models import PathogenConcentrationRecord, PathogenQuerySpec
 
+
+def curve_auc(curve, t_eval_hours, y0=None):
+    """
+    Left Riemann sum of max(0, y(t) - y0) up to t_eval_hours - the WP4 FSKX
+    growth-potential index, applied to the API's [[t_hours, y], ...] curve.
+    Lives here (not in services.growth_potential, which re-exports it) so the
+    sync has no import cycle.
+    """
+    if not curve or len(curve) < 2:
+        return None
+    base = curve[0][1] if y0 is None else y0
+    total = 0.0
+    for (t1, y1), (t2, _y2) in zip(curve, curve[1:]):
+        if t1 >= t_eval_hours:
+            break
+        total += max(0.0, y1 - base) * (min(t2, t_eval_hours) - t1)
+    return total
+
 def identifier_variants(value):
     """
     Every spelling of a crop/hazard identifier we might hold.
@@ -68,6 +86,20 @@ def _api_error_detail(response):
                 return str(value)
         return str(data)
     return str(data)
+
+
+def _t_eval_hours(spec):
+    """The pair's calibrated evaluation window, or the project default."""
+    from lumenix.models import GrowthPotentialLookup
+    from lumenix.services.growth_potential import DEFAULT_T_EVAL_HOURS
+
+    lookup = (
+        GrowthPotentialLookup.active_objects
+        .filter(plant=spec.plant, pathogen=spec.pathogen)
+        .values_list("t_eval_hours", flat=True)
+        .first()
+    )
+    return lookup or DEFAULT_T_EVAL_HOURS
 
 
 def fetch_pathogen_concentration(payload: dict) -> dict:
@@ -287,6 +319,9 @@ def sync_pathogen_query_spec(spec: PathogenQuerySpec) -> dict:
                     "source_time": (item.get("time") or "").strip(),
                     "source_period": (item.get("period") or "").strip(),
                     "pathogen_model_value": pathogen_model_value,
+                    # Exact, from the curve in hand; the backfill only covers
+                    # rows synced before this field existed.
+                    "growth_potential_auc": curve_auc(outcome, _t_eval_hours(spec)),
                     "temperature_c": item.get("variable"),
                     "provenance_model_id": provenance.get("model_id") or "",
                     "provenance_model_title": provenance.get("model_title") or "",
