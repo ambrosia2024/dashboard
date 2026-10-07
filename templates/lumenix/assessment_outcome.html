@@ -87,7 +87,8 @@
                 </div>
                 <div id="tip-compare" class="ws-tip" hidden>
                     <p>Each line averages the index per calendar month over one window of years, so the gap between the lines is the projected change for each part of the growing season. Both windows come from the same climate projection — they are two periods, not two scenarios.</p>
-                    <p>A window must cover at least 5 years: comparing single years shows weather, not climate — one year against another gives the wrong direction of change roughly one time in ten.</p>
+                    <p>A window must cover at least 5 years: comparing single years shows weather, not climate — one year against another gives the wrong direction of change roughly one time in ten. Beyond that the windows are yours to choose: any two slices of the run's years, in any order — "baseline" and "future" are labels, the chart simply compares window A with window B.</p>
+                    <p><strong>Reading a flat warm month:</strong> the index has a ceiling — within its 48-hour window a very warm day cannot score much higher than a warm one. If a summer month shows little change, read it as "already near the maximum", not "unaffected". The clearest climate signal is usually in winter and the shoulder months, where the model reacts steeply to every degree.</p>
                     <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> where the orange line sits above the blue one, that month is projected to become more favourable for {{ run.hazard_label|lower }} than it has been.</p>
                 </div>
                 <div class="ws-cmp-controls">
