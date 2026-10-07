@@ -61,12 +61,8 @@ def interpolate(samples, temperature):
     return a1 + (a2 - a1) * (temperature - t1) / (t2 - t1)
 
 
-def build_lookup(plant, pathogen, probes=DEFAULT_PROBES, t_eval_hours=DEFAULT_T_EVAL_HOURS):
-    """
-    Harvest (temperature, AUC) samples from the source API and store them as
-    the A(T) lookup for one crop + hazard. Returns the saved lookup.
-    """
-    samples = {}
+def _harvest(plant, pathogen, probes, t_eval_hours, samples):
+    """Fetch probes and fold their (temperature, AUC) pairs into `samples`."""
     y0 = None
     horizon = None
     provenance = {}
@@ -90,13 +86,15 @@ def build_lookup(plant, pathogen, probes=DEFAULT_PROBES, t_eval_hours=DEFAULT_T_
                 horizon = curve[-1][0]
             value = curve_auc(curve, t_eval_hours, y0)
             if value is not None:
-                # One sample per 0.01 C is plenty; later probes keep the first.
+                # One sample per 0.01 C is plenty; earlier samples win.
                 samples.setdefault(round(temperature, 2), value)
         logger.info("growth lookup probe %s %s..%s -> %s samples so far", nuts_code, start, end, len(samples))
+    return y0, horizon, provenance
 
+
+def _save_lookup(plant, pathogen, samples, t_eval_hours, y0, horizon, provenance):
     if len(samples) < 50:
         raise RuntimeError(f"Only {len(samples)} usable samples for {plant} x {pathogen}; refusing to build a lookup.")
-
     ordered = sorted(samples.items())
     lookup, _ = GrowthPotentialLookup.objects.update_or_create(
         plant=plant,
@@ -117,6 +115,67 @@ def build_lookup(plant, pathogen, probes=DEFAULT_PROBES, t_eval_hours=DEFAULT_T_
         },
     )
     return lookup
+
+
+def build_lookup(plant, pathogen, probes=DEFAULT_PROBES, t_eval_hours=DEFAULT_T_EVAL_HOURS):
+    """
+    Harvest (temperature, AUC) samples from the source API and store them as
+    the A(T) lookup for one crop + hazard. Returns the saved lookup.
+    """
+    samples = {}
+    y0, horizon, provenance = _harvest(plant, pathogen, probes, t_eval_hours, samples)
+    return _save_lookup(plant, pathogen, samples, t_eval_hours, y0, horizon, provenance)
+
+
+def extend_lookup(plant, pathogen, max_windows=12, rounds=6):
+    """
+    Widen an existing lookup to cover temperatures the table actually holds.
+
+    The rows a backfill left NULL say exactly where to sample: group them into
+    (region, year) windows, fetch those, merge the new samples in, and repeat
+    until nothing is left outside the range (or `rounds` is exhausted - each
+    round covers up to `max_windows` region-years). Returns (lookup, windows
+    probed in total).
+    """
+    lookup = lookup_for(plant, pathogen)
+    if lookup is None:
+        raise RuntimeError(f"No growth-potential lookup for {plant} x {pathogen}. Run a full build first.")
+
+    probed_total = 0
+    for _round in range(rounds):
+        lookup, probed = _extend_once(plant, pathogen, lookup, max_windows)
+        probed_total += probed
+        if not probed:
+            break
+    return lookup, probed_total
+
+
+def _extend_once(plant, pathogen, lookup, max_windows):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT nuts_code, extract(year FROM observed_on)::int AS yr, count(*)
+            FROM pathogen_concentration_records
+            WHERE plant = %s AND pathogen = %s AND temperature_c <> 'NaN'::float8
+              AND (temperature_c < %s OR temperature_c > %s)
+            GROUP BY 1, 2 ORDER BY count(*) DESC, 1, 2 LIMIT %s
+            """,
+            [plant, pathogen, lookup.t_min, lookup.t_max, max_windows],
+        )
+        windows = cursor.fetchall()
+    if not windows:
+        return lookup, 0
+
+    probes = [(code, f"{year}-01-01", f"{year}-12-31") for code, year, _count in windows]
+    samples = {t: a for t, a in lookup.samples}
+    y0, horizon, provenance = _harvest(plant, pathogen, probes, lookup.t_eval_hours, samples)
+    lookup = _save_lookup(
+        plant, pathogen, samples, lookup.t_eval_hours,
+        y0 if y0 is not None else lookup.y0,
+        horizon if horizon is not None else lookup.horizon_hours,
+        provenance or {"model_id": lookup.model_id, "model_title": lookup.model_title},
+    )
+    return lookup, len(probes)
 
 
 def lookup_for(plant, pathogen):
