@@ -63,3 +63,44 @@ class ScalewayReasoningTests(SimpleTestCase):
         self.assertEqual(_delta_reasoning({"reasoning": "a"}), "a")
         self.assertEqual(_delta_reasoning({"reasoning_content": "b"}), "b")
         self.assertIsNone(_delta_reasoning({"content": "c"}))
+
+
+class GrowthPotentialMathTests(SimpleTestCase):
+    """The WP4 FSKX index: left Riemann sum of max(0, y - y0) up to t_eval."""
+
+    def test_curve_auc_matches_hand_computation(self):
+        from lumenix.services.growth_potential import curve_auc
+
+        curve = [[0.0, 4.0], [10.0, 4.5], [20.0, 5.0], [30.0, 5.0]]
+        # left sum: 0.0*10 + 0.5*10 + 1.0*10
+        self.assertAlmostEqual(curve_auc(curve, 30.0), 15.0)
+
+    def test_curve_auc_truncates_at_t_eval(self):
+        from lumenix.services.growth_potential import curve_auc
+
+        curve = [[0.0, 4.0], [10.0, 4.5], [20.0, 5.0], [30.0, 5.0]]
+        # 0.0*10 + 0.5*5: the second step is clipped at t_eval=15
+        self.assertAlmostEqual(curve_auc(curve, 15.0), 2.5)
+
+    def test_decay_below_y0_contributes_nothing(self):
+        from lumenix.services.growth_potential import curve_auc
+
+        curve = [[0.0, 4.0], [10.0, 3.0], [20.0, 2.0]]
+        self.assertAlmostEqual(curve_auc(curve, 20.0), 0.0)
+
+    def test_degenerate_curves_return_none(self):
+        from lumenix.services.growth_potential import curve_auc
+
+        self.assertIsNone(curve_auc([], 48.0))
+        self.assertIsNone(curve_auc([[0.0, 4.0]], 48.0))
+
+    def test_interpolation_is_linear_and_bounded(self):
+        from lumenix.services.growth_potential import interpolate
+
+        samples = [[0.0, 0.0], [10.0, 100.0]]
+        self.assertAlmostEqual(interpolate(samples, 2.5), 25.0)
+        self.assertAlmostEqual(interpolate(samples, 0.0), 0.0)
+        self.assertIsNone(interpolate(samples, -0.1), "no extrapolation below the sampled range")
+        self.assertIsNone(interpolate(samples, 10.1), "no extrapolation above the sampled range")
+        self.assertIsNone(interpolate(samples, float("nan")))
+        self.assertIsNone(interpolate(samples, None))
