@@ -231,7 +231,7 @@ $(document).ready(function () {
     }
 
     function fetchNUTSRegions(lat, lon) {
-        var nutsUrl = "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2021_4326_LEVL_2.geojson";
+        var nutsUrl = "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2024_4326_LEVL_2.geojson";
 
         $.getJSON(nutsUrl, function (geojsonData) {
             nutsLayer.clearLayers();
