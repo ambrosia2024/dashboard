@@ -319,7 +319,7 @@ class FutureConceptView(LoginRequiredMixin, TemplateView):
 
 # All seven catalogue charts, and what this outcome can honestly show for them.
 CHART_STATUS = [
-    ("c2_pathogen_over_time", "Pathogen concentration vs time", "real", "Source model output for your region and period."),
+    ("c2_pathogen_over_time", "Modelled growth potential over time", "real", "Daily growth-potential index for your region and period."),
     ("c5_seasonal_heatmap", "Seasonal heatmap", "derived", "Monthly means of the same model output."),
     ("c6_geographic_risk_heatmap", "Geographic heatmap", "derived", "Period mean per NUTS2 region for the same crop and hazard."),
     ("c1_toxin_over_time", "Toxin concentration vs time", "n/a", "Not applicable: this hazard has no toxin model."),
