@@ -55,7 +55,7 @@ INDICES = {
         t_min=6.0,
         t_opt=36.0,
         t_max=45.5,
-        source="EFSA cardinal temperatures for E. coli on fresh produce, as used by WP2",
+        source="EFSA thresholds for E. coli in fresh produce",
     ),
 }
 

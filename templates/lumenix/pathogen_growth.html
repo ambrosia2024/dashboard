@@ -24,7 +24,7 @@
 
     <div class="ws-info" style="margin-bottom:18px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <span><strong>A growth rate, not a risk.</strong> 1 means the temperature is at the optimum for growth (<span class="gm-topt">{{ index.t_opt }}</span> °C); 0 means too cold or too hot for any growth (at or below <span class="gm-tmin">{{ index.t_min }}</span> °C, at or above <span class="gm-tmax">{{ index.t_max }}</span> °C). How the growth rate translates into food-safety risk is still an open question in WP2. <a href="#gm-made">What the map is made of</a> · <a href="#gm-method" data-open-method>How it is calculated</a></span>
+        <span><strong>A growth rate, not a risk.</strong> 1 means the temperature is at the optimum for growth (<span class="gm-topt">{{ index.t_opt }}</span> °C); 0 means too cold or too hot for any growth (at or below <span class="gm-tmin">{{ index.t_min }}</span> °C, at or above <span class="gm-tmax">{{ index.t_max }}</span> °C). How the growth rate translates into food-safety risk is still an open question. <a href="#gm-made">What the map is made of</a> · <a href="#gm-method" data-open-method>How it is calculated</a></span>
     </div>
 
     <section class="ws-card ws-chart-card">
@@ -129,7 +129,7 @@
                     <div>
                         <dt><span class="ws-badge ws-gm-badge--assumed">Assumed</span></dt>
                         <dd><ul>
-                            <li><span class="gm-label">{{ index.label }}</span> grows between <span class="gm-tmin">{{ index.t_min }}</span> and <span class="gm-tmax">{{ index.t_max }}</span> °C, fastest at <span class="gm-topt">{{ index.t_opt }}</span> °C (EFSA values, as used by WP2).</li>
+                            <li><span class="gm-label">{{ index.label }}</span> grows between <span class="gm-tmin">{{ index.t_min }}</span> and <span class="gm-tmax">{{ index.t_max }}</span> °C, fastest at <span class="gm-topt">{{ index.t_opt }}</span> °C (EFSA thresholds).</li>
                             <li>The daily mean temperature drives growth, not the daily maximum.</li>
                             <li>No effect of humidity, and no minimum number of warm days in a row.</li>
                         </ul></dd>
@@ -179,15 +179,16 @@
             <li>Model: the cardinal temperature model with inflection (Rosso et al., 1993), μ(T) = μ<sub>opt</sub> · (T − T<sub>min</sub>)²(T − T<sub>max</sub>) / ((T<sub>opt</sub> − T<sub>min</sub>)[(T<sub>opt</sub> − T<sub>min</sub>)(T − T<sub>opt</sub>) − (T<sub>opt</sub> − T<sub>max</sub>)(T<sub>opt</sub> + T<sub>min</sub> − 2T)]), shown relative to μ<sub>opt</sub>, and 0 outside T<sub>min</sub>–T<sub>max</sub>.</li>
             <li>Cardinal temperatures for <span class="gm-label">{{ index.label }}</span>: T<sub>min</sub> <span class="gm-tmin">{{ index.t_min }}</span> °C, T<sub>opt</sub> <span class="gm-topt">{{ index.t_opt }}</span> °C, T<sub>max</sub> <span class="gm-tmax">{{ index.t_max }}</span> °C (<span class="gm-source">{{ index.source }}</span>).</li>
             <li>Temperature: the daily mean air temperature per NUTS2 region behind the pathogen model data. It comes from a single climate projection covering 1971–2095, which the source does not name, so there are no climate scenarios (RCPs) to compare.</li>
-            <li>Regional, not gridded: each region has one temperature per day, so local hot spots are averaged away. Gridded results from WP2 could be added later as a second layer.</li>
-            <li>Daily mean temperature only. WP2 also tested the daily maximum, which gives higher rates. No minimum duration (such as 2–3 consecutive warm days) and no humidity are applied; both are open questions in WP2.</li>
+            <li>Regional, not gridded: each region has one temperature per day, so local hot spots are averaged away. Gridded results could be added later as a second layer.</li>
+            <li>Daily mean temperature only; the daily maximum would give higher rates. No minimum duration (such as 2–3 consecutive warm days) and no humidity are applied yet.</li>
             <li>Week, month and year values are means of the daily rates. Periods with too little data are left empty: weeks under 5 days, months under 20, years under 330.</li>
             <li>Month and year steps read a monthly table that is precomputed from the same daily temperatures and rebuilt after each data sync.</li>
         </ul>
         <h3 class="ws-gm-refs-title">References</h3>
         <ul class="ws-gm-refs">
-            <li>Rosso L., Lobry J.R., Flandrois J.P. (1993). An unexpected correlation between cardinal temperatures of microbial growth highlighted by a new model. <em>Journal of Theoretical Biology</em> 162: 447–463. <a href="https://doi.org/10.1006/jtbi.1993.1099" target="_blank" rel="noopener">doi:10.1006/jtbi.1993.1099</a></li>
-            <li>EFSA cardinal temperatures for <span class="gm-label">{{ index.label }}</span> on fresh produce, as used by AMBROSIA WP2. Full reference to follow.</li>
+            <li><a href="https://doi.org/10.1006/jtbi.1993.1099" target="_blank" rel="noopener">Rosso et al., 1993</a>: the cardinal temperature model.</li>
+            <li><a href="https://doi.org/10.1016/j.jfp.2026.100849" target="_blank" rel="noopener">Stathas et al., 2026</a>: using the cardinal model in place of climate indices.</li>
+            <li>EFSA thresholds for <span class="gm-label">{{ index.label }}</span> in fresh produce: T<sub>min</sub> <span class="gm-tmin">{{ index.t_min }}</span> °C, T<sub>opt</sub> <span class="gm-topt">{{ index.t_opt }}</span> °C, T<sub>max</sub> <span class="gm-tmax">{{ index.t_max }}</span> °C.</li>
         </ul>
     </details>
 </div>
