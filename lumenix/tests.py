@@ -321,6 +321,21 @@ class CardinalGrowthDataTests(TestCase):
         expected = (mu(20.0, self.ecoli) * 364 + mu(21.0, self.ecoli) * 365 + mu(22.0, self.ecoli) * 365) / 1094
         self.assertAlmostEqual(self.value(windowed, "2001–2003", "ZZ01"), expected, delta=0.001)
 
+    def test_gaps_name_the_missing_periods(self):
+        from lumenix.models import PathogenConcentrationRecord
+        from lumenix.services.cardinal_growth import build_monthly, frames
+
+        PathogenConcentrationRecord.objects.filter(observed_on__range=(date(2002, 7, 1), date(2002, 12, 31))).delete()
+        build_monthly(self.ecoli)
+        self.assertEqual(frames(self.ecoli, "day", 2002, 2002)["gaps"], [{"from": "2002-07-01", "to": "2002-12-31", "frames": 184}])
+        self.assertEqual(frames(self.ecoli, "week", 2002, 2002)["gaps"], [{"from": "2002-07-01", "to": "2002-12-23", "frames": 26}])
+        self.assertEqual(frames(self.ecoli, "month", 2002, 2002)["gaps"], [{"from": "2002-07", "to": "2002-12", "frames": 6}])
+        yearly = frames(self.ecoli, "year", 2001, 2003)
+        self.assertEqual(yearly["frames"], ["2001", "2003"])
+        self.assertEqual(yearly["gaps"], [{"from": "2002", "to": "2002", "frames": 1}])
+        self.assertEqual(yearly["short_years"], [2002])
+        self.assertEqual(frames(self.ecoli, "day", 2001, 2001)["gaps"], [], "one region's NaN day is not a gap")
+
     def test_endpoint_validates_the_period(self):
         url = reverse("pathogen-growth-frames")
         self.assertEqual(self.client.get(url, {"step": "day", "start": "2001", "end": "2001"}).status_code, 302)
@@ -351,4 +366,6 @@ class CardinalGrowthDataTests(TestCase):
         resp = self.client.get(reverse("pathogen-growth"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'id="gm-config"')
+        self.assertContains(resp, "What this map is made of")
+        self.assertNotContains(resp, "SCiO", msg_prefix="no partner names on the page")
         self.assertEqual(resp.context["default_year"], 2001, "2000 is not in the data, so the first year is used")

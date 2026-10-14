@@ -30,7 +30,7 @@ for the response curve and for checking the SQL.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from django.db import connection, transaction
 
@@ -152,16 +152,29 @@ def monthly_coverage(index):
 def frames(index, step, start_year, end_year, window=1):
     """
     Map frames for one index: {"frames": [label], "regions": [code],
-    "mu": [[value per region] per frame], "temperature": [...]}. Values are
-    None where a region has no (or too little) data in that frame.
+    "mu": [[value per region] per frame], "temperature": [...],
+    "gaps": [{"from", "to", "frames"}]}. Values are None where a region has no
+    (or too little) data in that frame. `gaps` lists the runs of frames that
+    the data should cover but that no region has, so the page can say why
+    playback jumps; year steps also name the `short_years` behind them.
     """
+    complete_years = None
     if step in ("day", "week"):
         rows = _rows_from_daily(index, step, start_year, end_year)
-    elif step == "month":
-        rows = _rows_from_monthly(index, start_year, end_year)
+        first, last = daily_coverage()
     else:
-        rows = _rows_by_year(index, start_year, end_year, window)
-    return _to_matrix(rows, MIN_DAYS[step])
+        if step == "month":
+            rows = _rows_from_monthly(index, start_year, end_year)
+        else:
+            rows, complete_years = _rows_by_year(index, start_year, end_year, window)
+        first, last = monthly_coverage(index)
+        last = _month_end(last) if last else None
+    data = _to_matrix(rows, MIN_DAYS[step])
+    expected, coverable_years = _expected_labels(step, start_year, end_year, window, first, last)
+    data["gaps"] = _gaps(expected, set(data["frames"]))
+    if complete_years is not None:
+        data["short_years"] = [y for y in coverable_years if y not in complete_years]
+    return data
 
 
 def _rows_from_daily(index, step, start_year, end_year):
@@ -193,7 +206,8 @@ def _rows_by_year(index, start_year, end_year, window):
     """
     Day-weighted yearly means, then a trailing `window`-year mean per region:
     the frame labelled "1991–2000" averages those ten years. A year short of
-    MIN_DAYS["year"] does not count towards a window.
+    MIN_DAYS["year"] does not count towards a window. Returns (rows, the years
+    that at least one region has in full).
     """
     with connection.cursor() as cursor:
         cursor.execute(
@@ -210,6 +224,7 @@ def _rows_by_year(index, start_year, end_year, window):
         for code, year, mu_sum, t_sum, days in cursor.fetchall():
             if days >= MIN_DAYS["year"]:
                 yearly[(code, year)] = (mu_sum, t_sum, days)
+    complete_years = {year for _, year in yearly}
 
     rows = []
     for code in {code for code, _ in yearly}:
@@ -220,7 +235,7 @@ def _rows_by_year(index, start_year, end_year, window):
             days = sum(y[2] for y in years)
             label = str(last) if window == 1 else f"{last - window + 1}–{last}"
             rows.append((code, label, sum(y[0] for y in years) / days, sum(y[1] for y in years) / days, days))
-    return rows
+    return rows, complete_years
 
 
 def _to_matrix(rows, min_days):
@@ -241,6 +256,69 @@ def _to_matrix(rows, min_days):
 def _label_order(label):
     # ISO dates, "YYYY-MM" and "YYYY" sort as strings; a window label sorts by its last year.
     return label.split("–")[-1] if "–" in label else label
+
+
+def _month_end(day):
+    following = date(day.year + (day.month == 12), day.month % 12 + 1, 1)
+    return following - timedelta(days=1)
+
+
+def _days_between(lo, hi):
+    return (hi - lo).days + 1 if hi >= lo else 0
+
+
+def _expected_labels(step, start_year, end_year, window, first, last):
+    """
+    The frame labels the data could fill: the requested period clipped to the
+    data's coverage, with the same minimum-days rule as the frames. Also
+    returns the years that coverage spans in full (for naming short years).
+    """
+    if first is None or last is None:
+        return [], []
+    lo, hi = max(date(start_year, 1, 1), first), min(date(end_year, 12, 31), last)
+    if lo > hi:
+        return [], []
+    if step == "day":
+        return [(lo + timedelta(days=i)).isoformat() for i in range(_days_between(lo, hi))], []
+    if step == "week":
+        labels, monday = [], lo - timedelta(days=lo.weekday())
+        while monday <= hi:
+            if _days_between(max(monday, lo), min(monday + timedelta(days=6), hi)) >= MIN_DAYS["week"]:
+                labels.append(monday.isoformat())
+            monday += timedelta(days=7)
+        return labels, []
+    if step == "month":
+        labels, month = [], date(lo.year, lo.month, 1)
+        while month <= hi:
+            if _days_between(max(month, lo), min(_month_end(month), hi)) >= MIN_DAYS["month"]:
+                labels.append(month.isoformat()[:7])
+            month = _month_end(month) + timedelta(days=1)
+        return labels, []
+    years = [
+        y for y in range(lo.year, hi.year + 1)
+        if _days_between(max(date(y, 1, 1), lo), min(date(y, 12, 31), hi)) >= MIN_DAYS["year"]
+    ]
+    full = set(years)
+    labels = []
+    for last_year in range(start_year + window - 1, end_year + 1):
+        if all(y in full for y in range(last_year - window + 1, last_year + 1)):
+            labels.append(str(last_year) if window == 1 else f"{last_year - window + 1}–{last_year}")
+    return labels, years
+
+
+def _gaps(expected, present):
+    """Runs of expected labels with no frame: [{"from", "to", "frames"}]."""
+    runs, run = [], []
+    for label in expected:
+        if label in present:
+            if run:
+                runs.append(run)
+                run = []
+        else:
+            run.append(label)
+    if run:
+        runs.append(run)
+    return [{"from": r[0], "to": r[-1], "frames": len(r)} for r in runs]
 
 
 # ---- monthly table ----------------------------------------------------------
