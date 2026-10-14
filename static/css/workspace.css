@@ -713,3 +713,44 @@ body.ws-modal-open { overflow: hidden; }
 .ws-cmp-controls label { display: flex; align-items: center; gap: 6px; }
 .ws-cmp-controls input[type="number"] { width: 76px; padding: 5px 7px; border: 1px solid var(--ws-border); border-radius: 7px; font-size: 13px; color: var(--ws-ink); }
 .ws-cmp-msg { color: var(--ws-danger); font-size: 12.5px; }
+
+/* Pathogen growth in Europe: animated map with a player bar. */
+.ws-gm { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 32%); gap: 20px; align-items: start; }
+.ws-gm-controls { margin-bottom: 0; }
+.ws-gm-controls select, .ws-gm-speed select { padding: 5px 7px; border: 1px solid var(--ws-border); border-radius: 7px; font-size: 13px; color: var(--ws-ink); background: #fff; }
+.ws-gm-stage { position: relative; }
+.ws-chart.ws-gm-map { height: 560px; border-radius: 8px; }
+.ws-gm-frame-big {
+    position: absolute; left: 56px; top: 12px; z-index: 1000; pointer-events: none;
+    padding: 4px 12px; border-radius: 8px; background: rgba(255, 255, 255, .88);
+    font-size: 20px; font-weight: 700; color: var(--ws-ink); font-variant-numeric: tabular-nums;
+}
+.ws-gm-frame-big:empty { display: none; }
+.ws-gm-hover {
+    position: absolute; right: 12px; top: 12px; z-index: 1000; pointer-events: none;
+    display: flex; flex-direction: column; gap: 2px; max-width: 260px;
+    padding: 8px 12px; border-radius: 8px; background: rgba(255, 255, 255, .94);
+    box-shadow: 0 1px 4px rgba(17, 43, 57, .18); font-size: 12.5px; color: var(--ws-label);
+}
+.ws-gm-hover strong { color: var(--ws-ink); }
+.ws-gm-hover[hidden] { display: none; }
+.ws-gm-player { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--ws-label); }
+.ws-gm-player input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--ws-blue); }
+.ws-gm-player label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; }
+.ws-gm-play { min-width: 92px; }
+.ws-gm-play .ws-gm-icon-pause, .ws-gm-play.is-playing .ws-gm-icon-play { display: none; }
+.ws-gm-play.is-playing .ws-gm-icon-pause { display: inline; }
+.ws-gm-frame { min-width: 150px; font-weight: 600; color: var(--ws-ink); font-variant-numeric: tabular-nums; }
+.ws-gm-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ws-muted); white-space: nowrap; }
+.ws-gm-legend-bar { width: 140px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #eaf3fd, #376EB5, #112b39); }
+.ws-gm-legend-nodata { width: 14px; height: 10px; margin-left: 10px; border: 1px dashed #94a3b8; border-radius: 2px; }
+.ws-chart.ws-gm-region { height: 300px; }
+.ws-gm-mean { margin: 0 0 8px; font-size: 13px; color: var(--ws-label); }
+.ws-gm-top { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.ws-gm-top li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid #eef2f7; cursor: pointer; }
+.ws-gm-top li:hover span { color: var(--ws-blue); }
+.ws-gm-top strong { font-variant-numeric: tabular-nums; color: var(--ws-ink); }
+@media (max-width: 1100px) {
+    .ws-gm { grid-template-columns: 1fr; }
+    .ws-gm-player { flex-wrap: wrap; }
+}

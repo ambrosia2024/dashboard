@@ -918,6 +918,38 @@ class PathogenConcentrationRecord(BaseModel):
         return f"{self.plant}/{self.pathogen}/{self.nuts_code} @ {self.observed_on}"
 
 
+class CardinalGrowthMonthly(models.Model):
+    """
+    Monthly mean of the cardinal-model (Rosso 1993) growth response per region,
+    derived from the daily temperatures on PathogenConcentrationRecord by the
+    `build_cardinal_growth` command. It lets the Europe growth map step through
+    decades without aggregating the record table on every request. Derived
+    data, rebuilt wholesale, so no BaseModel status or timestamps.
+    """
+
+    index_key = models.SlugField(max_length=40, help_text="Key in lumenix.services.cardinal_growth.INDICES, e.g. 'ecoli'.")
+    nuts_code = models.CharField(max_length=32)
+    month = models.DateField(help_text="First day of the month.")
+    mu_mean = models.FloatField(help_text="Mean of the daily relative growth rate mu(T)/mu_opt, 0-1.")
+    temperature_mean = models.FloatField(help_text="Mean daily air temperature, °C.")
+    days = models.PositiveSmallIntegerField(help_text="Days with a temperature in the month.")
+
+    class Meta:
+        db_table = "cardinal_growth_monthly"
+        verbose_name = "Cardinal growth (monthly)"
+        verbose_name_plural = "Cardinal growth (monthly)"
+        constraints = [
+            models.UniqueConstraint(fields=["index_key", "nuts_code", "month"], name="uq_cardinal_growth_month"),
+        ]
+        indexes = [
+            # The map reads one index over a range of months, all regions at once.
+            models.Index(fields=["index_key", "month"], name="idx_cardinal_growth_month"),
+        ]
+
+    def __str__(self):
+        return f"{self.index_key}/{self.nuts_code} {self.month:%Y-%m}: {self.mu_mean:.3f}"
+
+
 class SavedSituation(BaseModel):
     """
     A named, reusable set of assessment inputs (V2 design 03-assessment),

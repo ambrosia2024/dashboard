@@ -184,3 +184,171 @@ class GrowthComparisonEndpointTests(TestCase):
         self.assessment.save(update_fields=["snapshot"])
         snap = _ensure_snapshot_schema(self.assessment)
         self.assertEqual(snap.get("schema"), 1, "old snapshot must survive until the index is backfilled")
+
+
+from datetime import timedelta
+
+from lumenix.services.cardinal_growth import INDICES, mu, response_curve
+
+
+class CardinalModelMathTests(SimpleTestCase):
+    """The Rosso (1993) CTMI as used for the Europe growth map."""
+
+    def setUp(self):
+        self.ecoli = INDICES["ecoli"]
+
+    def test_cardinal_points(self):
+        self.assertAlmostEqual(mu(self.ecoli.t_opt, self.ecoli), 1.0)
+        self.assertEqual(mu(self.ecoli.t_min, self.ecoli), 0.0)
+        self.assertEqual(mu(self.ecoli.t_max, self.ecoli), 0.0)
+        self.assertEqual(mu(-5.0, self.ecoli), 0.0, "too cold: no growth")
+        self.assertEqual(mu(50.0, self.ecoli), 0.0, "too hot: no growth")
+        self.assertIsNone(mu(None, self.ecoli))
+        self.assertIsNone(mu(float("nan"), self.ecoli))
+
+    def test_rises_to_the_optimum_and_falls_after(self):
+        rising = [mu(t, self.ecoli) for t in range(7, 37)]
+        self.assertEqual(rising, sorted(rising))
+        self.assertGreater(mu(40.0, self.ecoli), mu(44.0, self.ecoli))
+        self.assertTrue(all(0.0 <= mu(t / 10, self.ecoli) <= 1.0 for t in range(-100, 500)))
+
+    def test_registered_parameters_are_valid_for_the_ctmi(self):
+        # The model is only defined for Topt above the midpoint of Tmin and Tmax.
+        for index in INDICES.values():
+            self.assertLess(index.t_min, index.t_opt)
+            self.assertLess(index.t_opt, index.t_max)
+            self.assertGreater(index.t_opt, (index.t_min + index.t_max) / 2, index.key)
+
+    def test_response_curve_samples_the_plot_range(self):
+        curve = response_curve(self.ecoli)
+        self.assertEqual(curve[0], [-10.0, 0.0])
+        self.assertEqual(curve[-1], [50.0, 0.0])
+        self.assertIn([36.0, 1.0], curve)
+
+
+class CardinalGrowthDataTests(TestCase):
+    """Frames and the monthly table, on synthetic temperatures with known growth rates."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from lumenix.models import PathogenConcentrationRecord, UserProfile
+
+        cls.user = get_user_model().objects.create_user("mapper", password="x", first_name="Map", last_name="User")
+        UserProfile.objects.update_or_create(user=cls.user, defaults={"role": "farmer"})
+        cls.ecoli = INDICES["ecoli"]
+
+        def record(code, day, temperature, pathogen="salmonella"):
+            return PathogenConcentrationRecord(
+                plant="lettuce", pathogen=pathogen, nuts_code=code, observed_on=day,
+                temperature_c=temperature, status=1,
+            )
+
+        rows = []
+        day = date(2001, 1, 1)
+        while day <= date(2003, 12, 31):
+            # ZZ01 is warm and one degree warmer each year; ZZ02 is below Tmin.
+            rows.append(record("ZZ01", day, 20.0 + (day.year - 2001)))
+            rows.append(record("ZZ02", day, 4.0))
+            day += timedelta(days=1)
+        for d in range(10):
+            # A second crop + hazard pair on the same region-days: must count once.
+            rows.append(record("ZZ01", date(2001, 1, 1) + timedelta(days=d), 20.0, pathogen="listeria"))
+            # ZZ03 has only ten days: too few for a month or a year.
+            rows.append(record("ZZ03", date(2001, 1, 1) + timedelta(days=d), 25.0))
+        PathogenConcentrationRecord.objects.bulk_create(rows)
+        # A day without a climate input.
+        PathogenConcentrationRecord.objects.filter(
+            nuts_code="ZZ01", observed_on=date(2001, 2, 1)
+        ).update(temperature_c=float("nan"))
+
+    def value(self, data, label, code, key="mu"):
+        return data[key][data["frames"].index(label)][data["regions"].index(code)]
+
+    def test_day_frames_match_the_python_formula(self):
+        from lumenix.services.cardinal_growth import frames
+
+        data = frames(self.ecoli, "day", 2001, 2001)
+        self.assertEqual(len(data["frames"]), 365)
+        self.assertEqual(data["regions"], ["ZZ01", "ZZ02", "ZZ03"])
+        self.assertAlmostEqual(self.value(data, "2001-01-05", "ZZ01"), mu(20.0, self.ecoli), delta=0.001)
+        self.assertAlmostEqual(self.value(data, "2001-01-05", "ZZ03"), mu(25.0, self.ecoli), delta=0.001)
+        self.assertEqual(self.value(data, "2001-01-05", "ZZ02"), 0.0)
+        self.assertIsNone(self.value(data, "2001-02-01", "ZZ01"), "a NaN day has no value")
+        self.assertEqual(self.value(data, "2001-01-05", "ZZ01", "temperature"), 20.0)
+
+    def test_monthly_build_counts_each_day_once(self):
+        from lumenix.models import CardinalGrowthMonthly
+        from lumenix.services.cardinal_growth import build_monthly
+
+        build_monthly(self.ecoli)
+        jan = CardinalGrowthMonthly.objects.get(index_key="ecoli", nuts_code="ZZ01", month=date(2001, 1, 1))
+        self.assertEqual(jan.days, 31, "the second crop + hazard pair must not add days")
+        self.assertAlmostEqual(jan.mu_mean, mu(20.0, self.ecoli), places=6)
+        feb = CardinalGrowthMonthly.objects.get(index_key="ecoli", nuts_code="ZZ01", month=date(2001, 2, 1))
+        self.assertEqual(feb.days, 27, "the NaN day is skipped")
+
+        rows = CardinalGrowthMonthly.objects.count()
+        build_monthly(self.ecoli)
+        self.assertEqual(CardinalGrowthMonthly.objects.count(), rows, "a rebuild replaces, never duplicates")
+
+        from lumenix.models import PathogenConcentrationRecord
+        PathogenConcentrationRecord.objects.filter(nuts_code="ZZ03").delete()
+        build_monthly(self.ecoli)
+        self.assertFalse(CardinalGrowthMonthly.objects.filter(nuts_code="ZZ03").exists())
+
+    def test_month_step_leaves_thin_months_empty(self):
+        from lumenix.services.cardinal_growth import build_monthly, frames
+
+        build_monthly(self.ecoli)
+        data = frames(self.ecoli, "month", 2001, 2001)
+        self.assertEqual(data["frames"][0], "2001-01")
+        self.assertEqual(len(data["frames"]), 12)
+        self.assertNotIn("ZZ03", data["regions"], "ten days do not make a month")
+        self.assertAlmostEqual(self.value(data, "2001-01", "ZZ01"), mu(20.0, self.ecoli), delta=0.001)
+
+    def test_year_step_and_rolling_window(self):
+        from lumenix.services.cardinal_growth import build_monthly, frames
+
+        build_monthly(self.ecoli)
+        yearly = frames(self.ecoli, "year", 2001, 2003)
+        self.assertEqual(yearly["frames"], ["2001", "2002", "2003"])
+        self.assertNotIn("ZZ03", yearly["regions"], "ten days do not make a year")
+        for year, temperature in ((2001, 20.0), (2002, 21.0), (2003, 22.0)):
+            self.assertAlmostEqual(self.value(yearly, str(year), "ZZ01"), mu(temperature, self.ecoli), delta=0.001)
+
+        windowed = frames(self.ecoli, "year", 2001, 2003, window=3)
+        self.assertEqual(windowed["frames"], ["2001–2003"])
+        expected = (mu(20.0, self.ecoli) * 364 + mu(21.0, self.ecoli) * 365 + mu(22.0, self.ecoli) * 365) / 1094
+        self.assertAlmostEqual(self.value(windowed, "2001–2003", "ZZ01"), expected, delta=0.001)
+
+    def test_endpoint_validates_the_period(self):
+        url = reverse("pathogen-growth-frames")
+        self.assertEqual(self.client.get(url, {"step": "day", "start": "2001", "end": "2001"}).status_code, 302)
+        self.client.force_login(self.user)
+
+        resp = self.client.get(url, {"step": "day", "start": "2001", "end": "2002"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("at most 1 year", resp.json()["error"])
+        resp = self.client.get(url, {"step": "year", "start": "2001", "end": "2003", "window": "5"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("at least 5 years", resp.json()["error"])
+        self.assertEqual(self.client.get(url, {"index": "nope", "start": "2001", "end": "2001"}).status_code, 400)
+        self.assertEqual(self.client.get(url, {"step": "hour", "start": "2001", "end": "2001"}).status_code, 400)
+
+        data = self.client.get(url, {"step": "week", "start": "2001", "end": "2001"}).json()
+        self.assertEqual(data["index"]["key"], "ecoli")
+        self.assertEqual(len(data["mu"]), len(data["frames"]))
+        self.assertEqual(len(data["mu"][0]), len(data["regions"]))
+
+    def test_month_step_before_a_build_says_so(self):
+        self.client.force_login(self.user)
+        data = self.client.get(reverse("pathogen-growth-frames"), {"step": "month", "start": "2001", "end": "2001"}).json()
+        self.assertEqual(data["frames"], [])
+        self.assertIn("build_cardinal_growth", data["message"])
+
+    def test_page_renders_with_its_config(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("pathogen-growth"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'id="gm-config"')
+        self.assertEqual(resp.context["default_year"], 2001, "2000 is not in the data, so the first year is used")
