@@ -6,6 +6,7 @@ from .views import DashboardView, ClimateDataGeoJSONView, RiskChartsView
 from .views.chart_ai import chart_qa_stream
 from .views.pathogen_api import pathogen_concentration_meta, pathogen_concentration_query
 from .views.workspace import PreferencesView, WorkspaceView
+from .views.growth_map import PathogenGrowthFramesView, PathogenGrowthMapView
 from .views.ambra import AmbraAskView, AmbraDownloadView, AmbraMessagesView
 from .views.situations import (
     RunDeleteView, SituationDeleteView, SituationDuplicateView, SituationRenameView, SituationsView,
@@ -36,6 +37,8 @@ urlpatterns = [
     path("api/assessments/<int:run_id>/geographic/", AssessmentGeographicView.as_view(), name="assessment-geographic"),
     path("guidance/", FutureConceptView.as_view(), {"concept": "guidance"}, name="guidance"),
     path("supply-chain/", FutureConceptView.as_view(), {"concept": "supply-chain"}, name="supply-chain"),
+    path("pathogen-growth/", PathogenGrowthMapView.as_view(), name="pathogen-growth"),
+    path("api/pathogen-growth/frames/", PathogenGrowthFramesView.as_view(), name="pathogen-growth-frames"),
     path("api/climate-data/", ClimateDataGeoJSONView.as_view(), name="climate_data_geojson"),
 
     path("dashboard/", DashboardView.as_view(), name="dashboard"),

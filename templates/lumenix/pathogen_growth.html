@@ -1,0 +1,544 @@
+{% extends 'lumenix/base/base.html' %}
+{% load static %}
+
+{% block title %}Pathogen growth in Europe{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'vendor/leaflet/1.9.4/leaflet.css' %}">
+    <link rel="stylesheet" href="{% static 'css/workspace.css' %}">
+{% endblock extra_css %}
+
+{% block risk_context %}{% endblock risk_context %}
+
+{% block content %}
+<script src="{% static 'vendor/leaflet/1.9.4/leaflet.js' %}"></script>
+<script src="{% static 'vendor/echarts/5.5.0/echarts.min.js' %}"></script>
+<div class="ws ws--wide ws--full">
+    <nav class="ws-crumbs" aria-label="Breadcrumb"><a href="{% url 'overview' %}">Home</a><span>›</span><span class="is-current">Pathogen growth in Europe</span></nav>
+    <div class="ws-head">
+        <div>
+            <h1>Pathogen growth in Europe</h1>
+            <p>How favourable the temperature is for <span class="gm-label">{{ index.label }}</span> to grow, region by region, from the cardinal temperature model of Rosso et al. (1993). Choose a period and press play to watch it change.</p>
+        </div>
+    </div>
+
+    <div class="ws-info" style="margin-bottom:18px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><strong>A growth rate, not a risk.</strong> 1 means the temperature is at the optimum for growth (<span class="gm-topt">{{ index.t_opt }}</span> °C); 0 means too cold or too hot for any growth (at or below <span class="gm-tmin">{{ index.t_min }}</span> °C, at or above <span class="gm-tmax">{{ index.t_max }}</span> °C). How the growth rate translates into food-safety risk is still an open question in WP2.</span>
+    </div>
+
+    <section class="ws-card ws-chart-card">
+        <form class="ws-cmp-controls ws-gm-controls" id="gm-form" novalidate>
+            <label>Pathogen
+                <select id="gm-index">
+                    {% for i in indices %}<option value="{{ i.key }}"{% if i.key == default_index %} selected{% endif %}>{{ i.label }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>Step
+                <select id="gm-step">
+                    <option value="day" selected>Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                    <option value="year">Year</option>
+                </select>
+            </label>
+            <label>From <input type="number" id="gm-start" min="1900" max="2100" value="{{ default_year }}"></label>
+            <label>to <input type="number" id="gm-end" min="1900" max="2100" value="{{ default_year }}"></label>
+            <label id="gm-window-wrap" hidden>Average over
+                <select id="gm-window">
+                    <option value="1">single years</option>
+                    <option value="5">5 years</option>
+                    <option value="10" selected>10 years</option>
+                    <option value="30">30 years</option>
+                </select>
+            </label>
+            <button type="submit" class="ws-btn ws-btn-primary ws-btn--sm" id="gm-show">Show</button>
+            <span id="gm-msg" class="ws-cmp-msg" role="status"></span>
+        </form>
+        <p class="ws-stats-note" id="gm-hint"></p>
+    </section>
+
+    <div class="ws-gm">
+        <section class="ws-card ws-chart-card ws-gm-main">
+            <div class="ws-chart-head">
+                <div><h2>Relative growth rate μ(T) <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-map">i</button></h2><small id="gm-sub">…</small></div>
+                <div class="ws-gm-legend" aria-hidden="true">
+                    <span>0</span><span class="ws-gm-legend-bar"></span><span>1</span>
+                    <span class="ws-gm-legend-nodata"></span><span>no data</span>
+                </div>
+            </div>
+            <div id="tip-map" class="ws-tip" hidden>
+                <p>Each region is coloured by its growth rate μ(T): how fast <span class="gm-label">{{ index.label }}</span> could grow at the region's daily mean air temperature, relative to its fastest. The scale is fixed from 0 to 1, so frames can be compared with each other.</p>
+                <p>With a week, month or year step, a region's colour is the average of its daily values in that period. Regions are whole NUTS2 areas with one temperature per day, so a warm valley inside a mild region is averaged away.</p>
+                <p><strong>Year steps:</strong> a single year mostly shows that year's weather — year-to-year swings are nearly as large as the change over 30 years. Averaging over 10 or 30 years shows the climate trend; the frame labelled 1991–2000 averages those ten years.</p>
+                <p>Dashed outlines mark regions without data for the frame.</p>
+            </div>
+            <div class="ws-gm-stage">
+                <div id="gm-map" class="ws-chart ws-gm-map is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Loading the map…</div></div>
+                <div class="ws-gm-frame-big" id="gm-frame-big" aria-hidden="true"></div>
+                <div class="ws-gm-hover" id="gm-hover" hidden></div>
+            </div>
+            <div class="ws-gm-player">
+                <button type="button" class="ws-btn ws-btn-secondary ws-btn--sm" id="gm-prev" aria-label="Previous frame" title="Previous frame (←)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button type="button" class="ws-btn ws-btn-primary ws-btn--sm ws-gm-play" id="gm-play" aria-label="Play" title="Play or pause (space)">
+                    <svg class="ws-gm-icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20"/></svg>
+                    <svg class="ws-gm-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>
+                    <span id="gm-play-text">Play</span>
+                </button>
+                <button type="button" class="ws-btn ws-btn-secondary ws-btn--sm" id="gm-next" aria-label="Next frame" title="Next frame (→)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <input type="range" id="gm-slider" min="0" max="0" value="0" step="1" aria-label="Frame">
+                <span class="ws-gm-frame" id="gm-frame">—</span>
+                <label class="ws-gm-speed">Speed
+                    <select id="gm-speed">
+                        <option value="3">Slow</option>
+                        <option value="6" selected>Normal</option>
+                        <option value="12">Fast</option>
+                        <option value="24">Very fast</option>
+                    </select>
+                </label>
+                <label class="ws-check ws-gm-loop"><input type="checkbox" id="gm-loop"> Loop</label>
+            </div>
+            <p class="ws-stats-note">Space plays or pauses; the arrow keys step one frame. Click a region to follow it over time.</p>
+        </section>
+
+        <aside class="ws-gm-side">
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>Response curve <button type="button" class="ws-info-btn" aria-label="What does this curve show?" data-tip="tip-curve">i</button></h2><small>The model, with this frame's regions on it</small></div>
+                </div>
+                <div id="tip-curve" class="ws-tip" hidden>
+                    <p>The line is the model: growth starts above <span class="gm-tmin">{{ index.t_min }}</span> °C, is fastest at <span class="gm-topt">{{ index.t_opt }}</span> °C and stops at <span class="gm-tmax">{{ index.t_max }}</span> °C.</p>
+                    <p>Each dot is one region in the current frame, at its mean temperature and its mean growth rate. With a day step every dot sits on the line. With longer steps dots can sit off it, mostly above it in cool months: a few warm days add growth that the average temperature hides.</p>
+                </div>
+                <div id="gm-curve" class="ws-chart ws-chart--sm"></div>
+            </section>
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2 id="gm-region-title">Selected region</h2><small id="gm-region-sub">Growth rate and temperature over the period</small></div>
+                </div>
+                <div id="gm-region" class="ws-chart ws-gm-region is-loading"><div class="ws-chart-loading">Click a region on the map to follow it over time.</div></div>
+            </section>
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>This frame</h2><small id="gm-frame-sub">Highest growth rates</small></div>
+                </div>
+                <p class="ws-gm-mean" id="gm-mean"></p>
+                <ol class="ws-gm-top" id="gm-top"></ol>
+            </section>
+        </aside>
+    </div>
+
+    <details class="ws-card ws-details">
+        <summary>Method, data and limitations</summary>
+        <ul>
+            <li>Model: the cardinal temperature model with inflection (Rosso et al., 1993), μ(T) = μ<sub>opt</sub> · (T − T<sub>min</sub>)²(T − T<sub>max</sub>) / ((T<sub>opt</sub> − T<sub>min</sub>)[(T<sub>opt</sub> − T<sub>min</sub>)(T − T<sub>opt</sub>) − (T<sub>opt</sub> − T<sub>max</sub>)(T<sub>opt</sub> + T<sub>min</sub> − 2T)]), shown relative to μ<sub>opt</sub>, and 0 outside T<sub>min</sub>–T<sub>max</sub>.</li>
+            <li>Cardinal temperatures for <span class="gm-label">{{ index.label }}</span>: T<sub>min</sub> <span class="gm-tmin">{{ index.t_min }}</span> °C, T<sub>opt</sub> <span class="gm-topt">{{ index.t_opt }}</span> °C, T<sub>max</sub> <span class="gm-tmax">{{ index.t_max }}</span> °C (<span class="gm-source">{{ index.source }}</span>).</li>
+            <li>Temperature: the daily mean air temperature per NUTS2 region behind the pathogen model data. It comes from a single climate projection covering 1971–2095, which the source does not name, so there are no climate scenarios (RCPs) to compare.</li>
+            <li>Regional, not gridded: each region has one temperature per day, so local hot spots are averaged away. Gridded results from WP2 could be added later as a second layer.</li>
+            <li>Daily mean temperature only. WP2 also tested the daily maximum, which gives higher rates. No minimum duration (such as 2–3 consecutive warm days) and no humidity are applied; both are open questions in WP2.</li>
+            <li>Week, month and year values are means of the daily rates. Periods with too little data are left empty: weeks under 5 days, months under 20, years under 330.</li>
+            <li>Month and year steps read a monthly table that is precomputed from the same daily temperatures and rebuilt after each data sync.</li>
+        </ul>
+    </details>
+</div>
+
+{{ config|json_script:"gm-config" }}
+<script>
+(function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var cfg = JSON.parse($("gm-config").textContent);
+    var BLUE = "#376EB5", INK = "#112b39", MUTED = "#64748b";
+    var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    // Same light-to-dark blue ramp as the outcome page's geographic heatmap,
+    // on a fixed 0-1 scale so every frame is coloured alike.
+    var RAMP = [[234, 243, 253], [55, 110, 181], [17, 43, 57]];
+
+    function colour(v) {
+        var t = Math.max(0, Math.min(1, v)), from = t < 0.5 ? RAMP[0] : RAMP[1], to = t < 0.5 ? RAMP[1] : RAMP[2];
+        var u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+        return "rgb(" + [0, 1, 2].map(function (i) { return Math.round(from[i] + (to[i] - from[i]) * u); }).join(",") + ")";
+    }
+    function fmt(v, digits) { return v == null ? "—" : v.toFixed(digits); }
+
+    var state = { data: null, frame: 0, playing: false, timer: null, selected: null, hovered: null, regionAt: {} };
+    var layers = {}, names = {}, map = null;
+
+    // ---- labels -----------------------------------------------------------
+    function labelLong(label, step) {
+        if (!label) { return "—"; }
+        if (step === "day" || step === "week") {
+            var p = label.split("-"), text = +p[2] + " " + MONTHS[+p[1] - 1] + " " + p[0];
+            return step === "week" ? "Week of " + text : text;
+        }
+        if (step === "month") { var m = label.split("-"); return MONTHS[+m[1] - 1] + " " + m[0]; }
+        return label.indexOf("–") > -1 ? label + " average" : label;
+    }
+    function stepWord(step, win) {
+        return { day: "Daily values", week: "Weekly means", month: "Monthly means",
+                 year: win > 1 ? win + "-year means" : "Yearly means" }[step];
+    }
+
+    // ---- the period form ----------------------------------------------------
+    var form = $("gm-form"), stepSel = $("gm-step"), startIn = $("gm-start"), endIn = $("gm-end");
+    var winWrap = $("gm-window-wrap"), winSel = $("gm-window"), indexSel = $("gm-index"), msg = $("gm-msg");
+
+    function coverageYears(step) {
+        var range = (step === "month" || step === "year") ? (cfg.indices[indexSel.value] || {}).monthly : cfg.daily;
+        if (!range || !range[0]) { return null; }
+        return [+range[0].slice(0, 4), +range[1].slice(0, 4)];
+    }
+
+    function updateHint() {
+        var daily = cfg.daily[0] ? cfg.daily[0] + " to " + cfg.daily[1] : "none yet";
+        var monthly = (cfg.indices[indexSel.value] || {}).monthly || [];
+        $("gm-hint").textContent = "Daily temperatures: " + daily + ". Monthly table: " +
+            (monthly[0] ? monthly[0].slice(0, 7) + " to " + monthly[1].slice(0, 7) : "not built yet") +
+            ". A day step covers one year, a week step up to " + cfg.maxSpan.week + ", a month step up to " +
+            cfg.maxSpan.month + "; a year step any span.";
+    }
+
+    // Switching the step pre-fills a period that suits it, inside the data.
+    function fitPeriod(step) {
+        var cov = coverageYears(step), start = +startIn.value || cfg.defaultYear;
+        if (cov) { start = Math.min(Math.max(start, cov[0]), cov[1]); }
+        var end;
+        if (step === "day") { end = start; }
+        else if (step === "week") { end = start + cfg.maxSpan.week - 1; }
+        else if (step === "month") { end = start + 9; }
+        else if (cov) { start = cov[0]; end = cov[1]; }
+        else { end = start + 29; }
+        if (cov) { end = Math.min(end, cov[1]); }
+        startIn.value = start; endIn.value = end;
+        if (step === "year") {
+            var span = end - start + 1, w = +winSel.value;
+            if (span < w) { winSel.value = String(cfg.windows.filter(function (x) { return x <= span; }).pop() || 1); }
+        }
+    }
+
+    function params() {
+        var p = { index: indexSel.value, step: stepSel.value, start: startIn.value, end: endIn.value };
+        if (p.step === "year") { p.window = winSel.value; }
+        return p;
+    }
+
+    function load(p) {
+        pause();
+        msg.textContent = "";
+        $("gm-show").disabled = true;
+        $("gm-sub").textContent = "Loading…";
+        history.replaceState(null, "", "?" + new URLSearchParams(p).toString());
+        fetch(cfg.framesUrl + "?" + new URLSearchParams(p).toString(), { headers: { Accept: "application/json" } })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                if (!res.ok) { msg.textContent = res.d.error || "The frames could not be loaded."; $("gm-sub").textContent = ""; return; }
+                setData(res.d);
+            })
+            .catch(function () { msg.textContent = "The frames could not be loaded."; $("gm-sub").textContent = ""; })
+            .then(function () { $("gm-show").disabled = false; });
+    }
+
+    form.addEventListener("submit", function (e) { e.preventDefault(); load(params()); });
+    stepSel.addEventListener("change", function () {
+        winWrap.hidden = stepSel.value !== "year";
+        fitPeriod(stepSel.value);
+        load(params());
+    });
+    indexSel.addEventListener("change", function () { updateHint(); load(params()); });
+    winSel.addEventListener("change", function () { load(params()); });
+
+    // ---- data ---------------------------------------------------------------
+    function setData(d) {
+        state.data = d;
+        state.regionAt = {};
+        d.regions.forEach(function (code, i) { state.regionAt[code] = i; });
+        var ix = d.index;
+        document.querySelectorAll(".gm-label").forEach(function (el) { el.textContent = ix.label; });
+        document.querySelectorAll(".gm-tmin").forEach(function (el) { el.textContent = ix.t_min; });
+        document.querySelectorAll(".gm-topt").forEach(function (el) { el.textContent = ix.t_opt; });
+        document.querySelectorAll(".gm-tmax").forEach(function (el) { el.textContent = ix.t_max; });
+        document.querySelectorAll(".gm-source").forEach(function (el) { el.textContent = ix.source; });
+
+        var n = d.frames.length;
+        $("gm-slider").max = Math.max(0, n - 1);
+        if (!n) {
+            msg.textContent = d.message || "Nothing to show for this period.";
+            $("gm-sub").textContent = "";
+        } else {
+            var period = d.start === d.end ? String(d.start) : d.start + "–" + d.end;
+            $("gm-sub").textContent = ix.label + " · " + stepWord(d.step, d.window) + ", " + period + " · " +
+                d.regions.length + " regions · " + n + " frames";
+        }
+        drawCurve(ix);
+        renderRegion();
+        setFrame(0);
+    }
+
+    // ---- frame ----------------------------------------------------------------
+    function setFrame(i) {
+        var d = state.data, n = d ? d.frames.length : 0;
+        state.frame = n ? Math.max(0, Math.min(n - 1, i)) : 0;
+        var label = n ? labelLong(d.frames[state.frame], d.step) : "—";
+        $("gm-slider").value = state.frame;
+        $("gm-slider").setAttribute("aria-valuetext", label);
+        $("gm-frame").textContent = n ? label : "—";
+        $("gm-frame-big").textContent = n ? label : "";
+        paint();
+        updateCurve();
+        updateRegionMarker();
+        updateTop();
+        updateHover();
+    }
+
+    function valueAt(code, key) {
+        var d = state.data, i = state.regionAt[code];
+        if (!d || i == null || !d.frames.length) { return null; }
+        return d[key][state.frame][i];
+    }
+
+    function styleFor(code) {
+        var v = valueAt(code, "mu"), sel = code === state.selected;
+        if (v == null) {
+            return { fillOpacity: 0, color: sel ? INK : "#94a3b8", weight: sel ? 2.5 : 0.6, dashArray: "3 3" };
+        }
+        return { fillColor: colour(v), fillOpacity: 0.88, color: sel ? INK : "#ffffff", weight: sel ? 2.5 : 0.5, dashArray: null };
+    }
+
+    function paint() {
+        Object.keys(layers).forEach(function (code) { layers[code].setStyle(styleFor(code)); });
+        if (state.selected && layers[state.selected]) { layers[state.selected].bringToFront(); }
+    }
+
+    // ---- player ---------------------------------------------------------------
+    function setPlaying(on) {
+        state.playing = on;
+        $("gm-play").classList.toggle("is-playing", on);
+        $("gm-play").setAttribute("aria-label", on ? "Pause" : "Play");
+        $("gm-play-text").textContent = on ? "Pause" : "Play";
+    }
+    function tick() {
+        state.timer = window.setTimeout(function () {
+            if (!state.playing) { return; }
+            var last = state.data.frames.length - 1;
+            if (state.frame >= last) {
+                if ($("gm-loop").checked) { setFrame(0); } else { pause(); return; }
+            } else {
+                setFrame(state.frame + 1);
+            }
+            tick();
+        }, 1000 / (+$("gm-speed").value || 6));
+    }
+    function play() {
+        if (!state.data || state.data.frames.length < 2) { return; }
+        if (state.frame >= state.data.frames.length - 1) { setFrame(0); }
+        setPlaying(true);
+        tick();
+    }
+    function pause() { setPlaying(false); window.clearTimeout(state.timer); }
+    function toggle() { if (state.playing) { pause(); } else { play(); } }
+
+    $("gm-play").addEventListener("click", toggle);
+    $("gm-prev").addEventListener("click", function () { pause(); setFrame(state.frame - 1); });
+    $("gm-next").addEventListener("click", function () { pause(); setFrame(state.frame + 1); });
+    $("gm-slider").addEventListener("input", function () { pause(); setFrame(+this.value); });
+    document.addEventListener("keydown", function (e) {
+        var t = e.target, tag = t && t.tagName;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON" || (t && t.isContentEditable)) { return; }
+        if (e.key === " ") { e.preventDefault(); toggle(); }
+        else if (e.key === "ArrowLeft") { e.preventDefault(); pause(); setFrame(state.frame - 1); }
+        else if (e.key === "ArrowRight") { e.preventDefault(); pause(); setFrame(state.frame + 1); }
+    });
+
+    // ---- map ------------------------------------------------------------------
+    var mapEl = $("gm-map");
+    var geoReady = fetch("{% static 'data/nuts/NUTS_RG_20M_2024_4326.geojson' %}", { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.json(); })
+        .then(function (fc) {
+            var feats = (fc.features || []).filter(function (f) { return String(f.properties.LEVL_CODE) === "2"; });
+            feats.forEach(function (f) { names[f.properties.NUTS_ID] = f.properties.NAME_LATN || f.properties.NUTS_ID; });
+            mapEl.classList.remove("is-loading"); mapEl.innerHTML = "";
+            map = L.map(mapEl, { preferCanvas: true, zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([53, 12], 4);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { referrerPolicy: "strict-origin-when-cross-origin", opacity: 0.85 }).addTo(map);
+            L.geoJSON(feats, {
+                style: function (f) { return styleFor(f.properties.NUTS_ID); },
+                onEachFeature: function (f, layer) {
+                    var code = f.properties.NUTS_ID;
+                    layers[code] = layer;
+                    layer.on("mouseover", function () { state.hovered = code; updateHover(); });
+                    layer.on("mouseout", function () { if (state.hovered === code) { state.hovered = null; updateHover(); } });
+                    layer.on("click", function () { selectRegion(code === state.selected ? null : code); });
+                }
+            }).addTo(map);
+            setTimeout(function () { map.invalidateSize(); }, 100);
+
+            // Scroll-wheel zoom is armed by clicking the map, as on the outcome page.
+            map.on("click", function () { map.scrollWheelZoom.enable(); });
+            mapEl.addEventListener("mouseleave", function () { map.scrollWheelZoom.disable(); });
+            paint();
+        })
+        .catch(function () {
+            mapEl.classList.remove("is-loading");
+            mapEl.innerHTML = '<div class="ws-chart-loading">The region boundaries could not be loaded.</div>';
+        });
+
+    function updateHover() {
+        var box = $("gm-hover"), code = state.hovered;
+        if (!code) { box.hidden = true; return; }
+        var v = valueAt(code, "mu"), t = valueAt(code, "temperature");
+        box.innerHTML = "";
+        var title = document.createElement("strong");
+        title.textContent = (names[code] || code) + " (" + code + ")";
+        var line = document.createElement("span");
+        line.textContent = v == null ? "No data in this frame" : "μ " + fmt(v, 2) + " · " + fmt(t, 1) + " °C";
+        box.appendChild(title); box.appendChild(line);
+        box.hidden = false;
+    }
+
+    // ---- response curve -----------------------------------------------------------
+    var curve = echarts.init($("gm-curve"));
+    window.addEventListener("resize", function () { curve.resize(); });
+
+    function drawCurve(ix) {
+        var cardinal = [["Tmin", ix.t_min], ["Topt", ix.t_opt], ["Tmax", ix.t_max]];
+        curve.setOption({
+            animation: false,
+            grid: { left: 44, right: 14, top: 48, bottom: 44 },
+            legend: { top: 0, right: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: MUTED, fontSize: 11 }, data: ["Model", "Regions this frame"] },
+            tooltip: { trigger: "item", formatter: function (p) {
+                if (p.seriesIndex === 0) { return "μ(" + p.data[0] + " °C) = " + p.data[1].toFixed(2); }
+                return "<strong>" + (names[p.data[2]] || p.data[2]) + "</strong><br>" + p.data[0].toFixed(1) + " °C · μ " + p.data[1].toFixed(2);
+            } },
+            xAxis: { type: "value", min: -10, max: 50, name: "Temperature (°C)", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: MUTED },
+                     axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
+            yAxis: { type: "value", min: 0, max: 1, name: "μ / μopt", nameTextStyle: { color: MUTED }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
+            series: [
+                { name: "Model", type: "line", data: ix.curve, showSymbol: false, lineStyle: { width: 2, color: INK }, itemStyle: { color: INK }, z: 2,
+                  markLine: { silent: true, symbol: "none", lineStyle: { type: "dashed", color: "#94a3b8", width: 1 },
+                              label: { color: MUTED, fontSize: 10, formatter: function (p) { return p.name; } },
+                              data: cardinal.map(function (c) { return { name: c[0], xAxis: c[1] }; }) } },
+                { name: "Regions this frame", type: "scatter", data: [], symbolSize: 7, z: 3,
+                  itemStyle: { color: "rgba(55,110,181,.55)", borderColor: "#fff", borderWidth: 1 } },
+                { name: "Selected", type: "scatter", data: [], symbolSize: 11, z: 4, itemStyle: { color: "#D97706", borderColor: "#fff", borderWidth: 2 } }
+            ]
+        }, true);
+    }
+
+    function updateCurve() {
+        var d = state.data, pts = [], sel = [];
+        if (!d) { return; }  // the chart has no series until the first frames arrive
+        if (d.frames.length) {
+            var mus = d.mu[state.frame], ts = d.temperature[state.frame];
+            d.regions.forEach(function (code, i) {
+                if (mus[i] == null || ts[i] == null) { return; }
+                var p = [ts[i], mus[i], code];
+                pts.push(p);
+                if (code === state.selected) { sel.push(p); }
+            });
+        }
+        curve.setOption({ series: [{}, { data: pts }, { data: sel }] });
+    }
+
+    // ---- selected region --------------------------------------------------------
+    var regionEl = $("gm-region"), regionChart = null;
+
+    function selectRegion(code) {
+        state.selected = code;
+        paint();
+        renderRegion();
+        updateCurve();
+    }
+
+    function renderRegion() {
+        var d = state.data, code = state.selected, i = code ? state.regionAt[code] : null;
+        $("gm-region-title").textContent = code ? (names[code] || code) + " (" + code + ")" : "Selected region";
+        if (!code || !d || i == null || !d.frames.length) {
+            if (regionChart) { regionChart.dispose(); regionChart = null; }
+            regionEl.classList.add("is-loading");
+            regionEl.innerHTML = '<div class="ws-chart-loading">' + (code ? "No data for this region in this period." : "Click a region on the map to follow it over time.") + "</div>";
+            return;
+        }
+        if (!regionChart) {
+            regionEl.classList.remove("is-loading"); regionEl.innerHTML = "";
+            regionChart = echarts.init(regionEl);
+            window.addEventListener("resize", function () { if (regionChart) { regionChart.resize(); } });
+        }
+        var labels = d.frames.map(function (l) { return labelLong(l, d.step); });
+        var marker = { silent: true, symbol: "none", animation: false, label: { show: false }, lineStyle: { color: "#D97706", width: 1.5 }, data: [{ xAxis: state.frame }] };
+        // Two panels on one time axis rather than one chart with two y-scales.
+        regionChart.setOption({
+            animation: false,
+            grid: [{ left: 44, right: 28, top: 26, height: "34%" }, { left: 44, right: 28, top: "60%", bottom: 30 }],
+            axisPointer: { link: [{ xAxisIndex: "all" }] },
+            tooltip: { trigger: "axis", formatter: function (ps) {
+                var row = labels[ps[0].dataIndex], out = "<strong>" + row + "</strong>";
+                ps.forEach(function (p) { out += "<br>" + p.seriesName + ": " + (p.value == null ? "no data" : p.value + (p.seriesIndex ? " °C" : "")); });
+                return out;
+            } },
+            xAxis: [
+                { type: "category", data: labels, gridIndex: 0, boundaryGap: false, axisLabel: { show: false }, axisTick: { show: false } },
+                { type: "category", data: labels, gridIndex: 1, boundaryGap: false, axisLabel: { color: MUTED, fontSize: 10, hideOverlap: true } }
+            ],
+            yAxis: [
+                { type: "value", gridIndex: 0, min: 0, max: 1, name: "Growth rate μ", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
+                { type: "value", gridIndex: 1, name: "Mean temperature (°C)", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } }
+            ],
+            series: [
+                { name: "Growth rate μ", type: "line", xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, connectNulls: false,
+                  lineStyle: { width: 2, color: BLUE }, itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.08)" },
+                  data: d.mu.map(function (row) { return row[i]; }), markLine: marker },
+                { name: "Temperature", type: "line", xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, connectNulls: false,
+                  lineStyle: { width: 1.5, color: MUTED }, itemStyle: { color: MUTED },
+                  data: d.temperature.map(function (row) { return row[i]; }), markLine: JSON.parse(JSON.stringify(marker)) }
+            ]
+        }, true);
+    }
+
+    function updateRegionMarker() {
+        if (!regionChart) { return; }
+        regionChart.setOption({ series: [{ markLine: { data: [{ xAxis: state.frame }] } }, { markLine: { data: [{ xAxis: state.frame }] } }] });
+    }
+
+    // ---- this frame: mean and highest regions -------------------------------------
+    function updateTop() {
+        var d = state.data, list = $("gm-top"), mean = $("gm-mean");
+        list.innerHTML = "";
+        if (!d || !d.frames.length) { mean.textContent = ""; return; }
+        var mus = d.mu[state.frame], rows = [], sum = 0;
+        d.regions.forEach(function (code, i) { if (mus[i] != null) { rows.push([code, mus[i]]); sum += mus[i]; } });
+        mean.textContent = rows.length ? "Mean across " + rows.length + " regions: μ " + (sum / rows.length).toFixed(2) : "No region has data in this frame.";
+        rows.sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5).forEach(function (r) {
+            var li = document.createElement("li"), name = document.createElement("span"), val = document.createElement("strong");
+            name.textContent = (names[r[0]] || r[0]) + " (" + r[0] + ")";
+            val.textContent = r[1].toFixed(2);
+            li.appendChild(name); li.appendChild(val);
+            li.addEventListener("click", function () { selectRegion(r[0]); });
+            list.appendChild(li);
+        });
+    }
+
+    // ---- plain-language tips ---------------------------------------------------------
+    document.querySelectorAll(".ws-info-btn").forEach(function (btn) {
+        var tip = document.getElementById(btn.dataset.tip);
+        if (!tip) { return; }
+        btn.addEventListener("click", function () {
+            tip.hidden = !tip.hidden;
+            btn.setAttribute("aria-expanded", tip.hidden ? "false" : "true");
+        });
+    });
+
+    // ---- start: from the address bar if it carries a period, else the default year --
+    var q = new URLSearchParams(window.location.search);
+    if (q.get("index") && cfg.indices[q.get("index")]) { indexSel.value = q.get("index"); }
+    if (["day", "week", "month", "year"].indexOf(q.get("step")) > -1) { stepSel.value = q.get("step"); }
+    if (q.get("start")) { startIn.value = q.get("start"); }
+    if (q.get("end")) { endIn.value = q.get("end"); }
+    if (q.get("window") && cfg.windows.indexOf(+q.get("window")) > -1) { winSel.value = q.get("window"); }
+    winWrap.hidden = stepSel.value !== "year";
+    updateHint();
+    geoReady.then(function () { load(params()); });
+})();
+</script>
+{% endblock content %}
