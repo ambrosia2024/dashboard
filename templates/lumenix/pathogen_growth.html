@@ -17,14 +17,14 @@
     <nav class="ws-crumbs" aria-label="Breadcrumb"><a href="{% url 'overview' %}">Home</a><span>›</span><span class="is-current">Pathogen growth in Europe</span></nav>
     <div class="ws-head">
         <div>
-            <h1>Pathogen growth in Europe</h1>
+            <h1>Pathogen growth in Europe <span class="ws-gm-demo" title="Calculated from temperatures in the data with a published model; not validated">Demo</span></h1>
             <p>How favourable the temperature is for <span class="gm-label">{{ index.label }}</span> to grow, region by region, from the cardinal temperature model of Rosso et al. (1993). Choose a period and press play to watch it change.</p>
         </div>
     </div>
 
     <div class="ws-info" style="margin-bottom:18px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <span><strong>A growth rate, not a risk.</strong> 1 means the temperature is at the optimum for growth (<span class="gm-topt">{{ index.t_opt }}</span> °C); 0 means too cold or too hot for any growth (at or below <span class="gm-tmin">{{ index.t_min }}</span> °C, at or above <span class="gm-tmax">{{ index.t_max }}</span> °C). How the growth rate translates into food-safety risk is still an open question in WP2.</span>
+        <span><strong>A growth rate, not a risk.</strong> 1 means the temperature is at the optimum for growth (<span class="gm-topt">{{ index.t_opt }}</span> °C); 0 means too cold or too hot for any growth (at or below <span class="gm-tmin">{{ index.t_min }}</span> °C, at or above <span class="gm-tmax">{{ index.t_max }}</span> °C). How the growth rate translates into food-safety risk is still an open question in WP2. <a href="#gm-made">What the map is made of</a> · <a href="#gm-method" data-open-method>How it is calculated</a></span>
     </div>
 
     <section class="ws-card ws-chart-card">
@@ -59,6 +59,7 @@
     </section>
 
     <div class="ws-gm">
+        <div class="ws-gm-col">
         <section class="ws-card ws-chart-card ws-gm-main">
             <div class="ws-chart-head">
                 <div><h2>Relative growth rate μ(T) <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-map">i</button></h2><small id="gm-sub">…</small></div>
@@ -102,13 +103,53 @@
                 </label>
                 <label class="ws-check ws-gm-loop"><input type="checkbox" id="gm-loop"> Loop</label>
             </div>
+            <p class="ws-gm-gaps" id="gm-gaps" role="status" hidden></p>
             <p class="ws-stats-note">Space plays or pauses; the arrow keys step one frame. Click a region to follow it over time.</p>
         </section>
+            <section class="ws-card ws-chart-card" id="gm-made">
+                <div class="ws-chart-head">
+                    <div><h2>What this map is made of</h2><small>What comes from the data, and what is calculated or assumed here</small></div>
+                </div>
+                <dl class="ws-gm-made">
+                    <div>
+                        <dt><span class="ws-badge ws-badge--live">From the data</span></dt>
+                        <dd><ul>
+                            <li>Daily mean air temperature for each NUTS2 region{% if daily_first %}, {{ daily_first|date:"Y" }}–{{ daily_last|date:"Y" }}{% endif %}.</li>
+                            <li>One climate projection. The data does not say which one, so there are no climate scenarios to compare.</li>
+                            {% if last_synced %}<li>Last updated {{ last_synced|date:"j M Y" }}.</li>{% endif %}
+                        </ul></dd>
+                    </div>
+                    <div>
+                        <dt><span class="ws-badge ws-badge--derived">Calculated here</span></dt>
+                        <dd><ul>
+                            <li>The growth rate μ for every region and day, from that day's temperature with the Rosso et al. (1993) cardinal model.</li>
+                            <li>Week, month and year values: averages of the daily rates.</li>
+                        </ul></dd>
+                    </div>
+                    <div>
+                        <dt><span class="ws-badge ws-gm-badge--assumed">Assumed</span></dt>
+                        <dd><ul>
+                            <li><span class="gm-label">{{ index.label }}</span> grows between <span class="gm-tmin">{{ index.t_min }}</span> and <span class="gm-tmax">{{ index.t_max }}</span> °C, fastest at <span class="gm-topt">{{ index.t_opt }}</span> °C (EFSA values, as used by WP2).</li>
+                            <li>The daily mean temperature drives growth, not the daily maximum.</li>
+                            <li>No effect of humidity, and no minimum number of warm days in a row.</li>
+                        </ul></dd>
+                    </div>
+                    <div>
+                        <dt><span class="ws-badge ws-gm-badge--missing">Not included</span></dt>
+                        <dd><ul>
+                            <li>Measurements of <span class="gm-label">{{ index.label }}</span> or outbreak data; the map has not been checked against them.</li>
+                            <li>Where produce is actually grown: every region is coloured.</li>
+                            <li>Uncertainty. It is not available, which does not mean it is small.</li>
+                        </ul></dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
 
         <aside class="ws-gm-side">
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
-                    <div><h2>Response curve <button type="button" class="ws-info-btn" aria-label="What does this curve show?" data-tip="tip-curve">i</button></h2><small>The model, with this frame's regions on it</small></div>
+                    <div><h2>Response curve <button type="button" class="ws-info-btn" aria-label="What does this curve show?" data-tip="tip-curve">i</button></h2><small>The model, with this frame's regions placed at their temperature from the data</small></div>
                 </div>
                 <div id="tip-curve" class="ws-tip" hidden>
                     <p>The line is the model: growth starts above <span class="gm-tmin">{{ index.t_min }}</span> °C, is fastest at <span class="gm-topt">{{ index.t_opt }}</span> °C and stops at <span class="gm-tmax">{{ index.t_max }}</span> °C.</p>
@@ -132,7 +173,7 @@
         </aside>
     </div>
 
-    <details class="ws-card ws-details">
+    <details class="ws-card ws-details" id="gm-method">
         <summary>Method, data and limitations</summary>
         <ul>
             <li>Model: the cardinal temperature model with inflection (Rosso et al., 1993), μ(T) = μ<sub>opt</sub> · (T − T<sub>min</sub>)²(T − T<sub>max</sub>) / ((T<sub>opt</sub> − T<sub>min</sub>)[(T<sub>opt</sub> − T<sub>min</sub>)(T − T<sub>opt</sub>) − (T<sub>opt</sub> − T<sub>max</sub>)(T<sub>opt</sub> + T<sub>min</sub> − 2T)]), shown relative to μ<sub>opt</sub>, and 0 outside T<sub>min</sub>–T<sub>max</sub>.</li>
@@ -142,6 +183,11 @@
             <li>Daily mean temperature only. WP2 also tested the daily maximum, which gives higher rates. No minimum duration (such as 2–3 consecutive warm days) and no humidity are applied; both are open questions in WP2.</li>
             <li>Week, month and year values are means of the daily rates. Periods with too little data are left empty: weeks under 5 days, months under 20, years under 330.</li>
             <li>Month and year steps read a monthly table that is precomputed from the same daily temperatures and rebuilt after each data sync.</li>
+        </ul>
+        <h3 class="ws-gm-refs-title">References</h3>
+        <ul class="ws-gm-refs">
+            <li>Rosso L., Lobry J.R., Flandrois J.P. (1993). An unexpected correlation between cardinal temperatures of microbial growth highlighted by a new model. <em>Journal of Theoretical Biology</em> 162: 447–463. <a href="https://doi.org/10.1006/jtbi.1993.1099" target="_blank" rel="noopener">doi:10.1006/jtbi.1993.1099</a></li>
+            <li>EFSA cardinal temperatures for <span class="gm-label">{{ index.label }}</span> on fresh produce, as used by AMBROSIA WP2. Full reference to follow.</li>
         </ul>
     </details>
 </div>
@@ -273,6 +319,7 @@
                 d.regions.length + " regions · " + n + " frames";
         }
         drawCurve(ix);
+        renderGaps(d);
         renderRegion();
         setFrame(0);
     }
@@ -391,9 +438,20 @@
         box.innerHTML = "";
         var title = document.createElement("strong");
         title.textContent = (names[code] || code) + " (" + code + ")";
-        var line = document.createElement("span");
-        line.textContent = v == null ? "No data in this frame" : "μ " + fmt(v, 2) + " · " + fmt(t, 1) + " °C";
-        box.appendChild(title); box.appendChild(line);
+        box.appendChild(title);
+        if (v == null) {
+            var none = document.createElement("span");
+            none.textContent = "No data in this frame";
+            box.appendChild(none);
+        } else {
+            [["Temperature " + fmt(t, 1) + " °C", "from the data"], ["Growth rate μ " + fmt(v, 2), "calculated"]].forEach(function (pair) {
+                var line = document.createElement("span"), tag = document.createElement("small");
+                line.textContent = pair[0] + " ";
+                tag.textContent = "· " + pair[1];
+                line.appendChild(tag);
+                box.appendChild(line);
+            });
+        }
         box.hidden = false;
     }
 
@@ -405,8 +463,8 @@
         var cardinal = [["Tmin", ix.t_min], ["Topt", ix.t_opt], ["Tmax", ix.t_max]];
         curve.setOption({
             animation: false,
-            grid: { left: 44, right: 14, top: 48, bottom: 44 },
-            legend: { top: 0, right: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: MUTED, fontSize: 11 }, data: ["Model", "Regions this frame"] },
+            grid: { left: 44, right: 14, top: 58, bottom: 44 },
+            legend: { top: 0, right: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: MUTED, fontSize: 11 }, data: ["Model (EFSA parameters)", "Regions (data temperatures)"] },
             tooltip: { trigger: "item", formatter: function (p) {
                 if (p.seriesIndex === 0) { return "μ(" + p.data[0] + " °C) = " + p.data[1].toFixed(2); }
                 return "<strong>" + (names[p.data[2]] || p.data[2]) + "</strong><br>" + p.data[0].toFixed(1) + " °C · μ " + p.data[1].toFixed(2);
@@ -415,11 +473,11 @@
                      axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
             yAxis: { type: "value", min: 0, max: 1, name: "μ / μopt", nameTextStyle: { color: MUTED }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
             series: [
-                { name: "Model", type: "line", data: ix.curve, showSymbol: false, lineStyle: { width: 2, color: INK }, itemStyle: { color: INK }, z: 2,
+                { name: "Model (EFSA parameters)", type: "line", data: ix.curve, showSymbol: false, lineStyle: { width: 2, color: INK }, itemStyle: { color: INK }, z: 2,
                   markLine: { silent: true, symbol: "none", lineStyle: { type: "dashed", color: "#94a3b8", width: 1 },
                               label: { color: MUTED, fontSize: 10, formatter: function (p) { return p.name; } },
                               data: cardinal.map(function (c) { return { name: c[0], xAxis: c[1] }; }) } },
-                { name: "Regions this frame", type: "scatter", data: [], symbolSize: 7, z: 3,
+                { name: "Regions (data temperatures)", type: "scatter", data: [], symbolSize: 7, z: 3,
                   itemStyle: { color: "rgba(55,110,181,.55)", borderColor: "#fff", borderWidth: 1 } },
                 { name: "Selected", type: "scatter", data: [], symbolSize: 11, z: 4, itemStyle: { color: "#D97706", borderColor: "#fff", borderWidth: 2 } }
             ]
@@ -482,14 +540,14 @@
                 { type: "category", data: labels, gridIndex: 1, boundaryGap: false, axisLabel: { color: MUTED, fontSize: 10, hideOverlap: true } }
             ],
             yAxis: [
-                { type: "value", gridIndex: 0, min: 0, max: 1, name: "Growth rate μ", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
-                { type: "value", gridIndex: 1, name: "Mean temperature (°C)", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } }
+                { type: "value", gridIndex: 0, min: 0, max: 1, name: "Growth rate μ · calculated", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } },
+                { type: "value", gridIndex: 1, name: "Mean temperature (°C) · from the data", nameTextStyle: { color: MUTED, align: "left" }, axisLabel: { color: MUTED }, splitLine: { lineStyle: { color: "#eef2f7" } } }
             ],
             series: [
-                { name: "Growth rate μ", type: "line", xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, connectNulls: false,
+                { name: "Growth rate μ (calculated)", type: "line", xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, connectNulls: false,
                   lineStyle: { width: 2, color: BLUE }, itemStyle: { color: BLUE }, areaStyle: { color: "rgba(55,110,181,.08)" },
                   data: d.mu.map(function (row) { return row[i]; }), markLine: marker },
-                { name: "Temperature", type: "line", xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, connectNulls: false,
+                { name: "Temperature (from the data)", type: "line", xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, connectNulls: false,
                   lineStyle: { width: 1.5, color: MUTED }, itemStyle: { color: MUTED },
                   data: d.temperature.map(function (row) { return row[i]; }), markLine: JSON.parse(JSON.stringify(marker)) }
             ]
@@ -518,6 +576,40 @@
             list.appendChild(li);
         });
     }
+
+    // ---- gaps in the data ----------------------------------------------------------------
+    // Without this the animation silently jumps over periods the data does not cover.
+    function shortLabel(label, step) {
+        if (step === "week") { return "the week of " + labelLong(label, "day"); }
+        if (step === "year") { return label; }
+        return labelLong(label, step);
+    }
+    function renderGaps(d) {
+        var el = $("gm-gaps"), gaps = d.gaps || [], short = d.short_years || [];
+        if (!d.frames.length || !gaps.length) { el.hidden = true; el.textContent = ""; return; }
+        var total = gaps.reduce(function (n, g) { return n + g.frames; }, 0);
+        var first = shortLabel(gaps[0].from, d.step), last = shortLabel(gaps[gaps.length - 1].to, d.step);
+        var span = total === 1 ? first : first + " to " + last;
+        var why = short.length
+            ? " " + short.join(", ") + (short.length > 1 ? " have" : " has") + " too little data to count as a full year (a year needs at least 330 days)."
+            : "";
+        var text;
+        if (d.step === "year") {
+            var noun = d.window > 1 ? "averages" : "years";
+            text = "Playback skips " + (total === 1 ? span : total + " " + noun + ", " + span) + "." + why;
+        } else {
+            var unit = { day: "day", week: "week", month: "month" }[d.step];
+            text = "Missing data for " + (gaps.length > 1 ? total + " " + unit + "s between " + first + " and " + last : span + (total > 1 ? " (" + total + " " + unit + "s)" : "")) +
+                   ", so playback skips " + (total > 1 ? "them" : "it") + ".";
+        }
+        el.textContent = text;
+        el.hidden = false;
+    }
+
+    // "How it is calculated" opens the method section it points to.
+    document.querySelectorAll("[data-open-method]").forEach(function (a) {
+        a.addEventListener("click", function () { $("gm-method").open = true; });
+    });
 
     // ---- plain-language tips ---------------------------------------------------------
     document.querySelectorAll(".ws-info-btn").forEach(function (btn) {

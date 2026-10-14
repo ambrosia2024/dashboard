@@ -7,6 +7,7 @@ so playback only recolours regions and never waits on the server.
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Max
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -14,6 +15,7 @@ from django.views import View
 from django.views.decorators.gzip import gzip_page
 from django.views.generic import TemplateView
 
+from lumenix.models import PathogenQuerySpec
 from lumenix.services.cardinal_growth import (
     INDICES, MAX_SPAN_YEARS, STEPS, YEAR_WINDOWS, daily_coverage, frames, index_payload, monthly_coverage,
 )
@@ -47,6 +49,8 @@ class PathogenGrowthMapView(LoginRequiredMixin, TemplateView):
             "index": INDICES[DEFAULT_INDEX],
             "daily_first": first,
             "daily_last": last,
+            # From the specs (hundreds of rows), not the 24M-row record table.
+            "last_synced": PathogenQuerySpec.objects.aggregate(at=Max("last_synced_at"))["at"],
             "default_year": default_year,
             "config": {
                 "framesUrl": reverse("pathogen-growth-frames"),
