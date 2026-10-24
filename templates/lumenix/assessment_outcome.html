@@ -56,42 +56,20 @@
             {% else %}
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
-                    <div><h2>Modelled growth potential over time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean of the daily growth-potential index (AUC)</small></div>
-                    <div style="display:flex;align-items:center;gap:12px;">
-                        <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
-                        <span class="ws-badge ws-badge--live">Source data</span>
-                    </div>
-                </div>
-                <div id="tip-series" class="ws-tip" hidden>
-                    <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen; 0 means the day was too cold for any growth.</p>
-                    <p><strong>What one day's number is:</strong> the growth model is run for 48 hours at that day's temperature, and the index is how much simulated growth accumulates above the starting level in that window. It reacts strongly to warmth — a warm day can score thirty times a cool one — which is what makes days, seasons and regions comparable.</p>
-                    <p><strong>How the band is made:</strong> for each {{ run.get_resolution_display|lower }} period the days in it are grouped and three numbers are taken: their average, which is the line; the smallest day, which is the bottom of the band; and the largest day, which is the top. Nothing is smoothed or estimated. Hover a point to see the three numbers for that period.</p>
-                    <p>Drag the slider under the chart to zoom into a few years. The highest single day scored <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical day is around <strong>{{ stats.mean }}</strong>.</p>
-                    <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
-                    <p>The numbers are on the model's own scale, not a measured amount, and they are not a guarantee.</p>
-                </div>
-                <div id="chart-series" class="ws-chart"></div>
-                <div class="ws-stats">
-                    <div><small>Mean</small><strong>{{ stats.mean|default_if_none:"—" }}</strong><small>over all days</small></div>
-                    <div><small>Peak day</small><strong>{{ stats.max|default_if_none:"—" }}</strong><small>{{ stats.peak_date|default:"" }}</small></div>
-                    <div><small>Lowest day</small><strong>{{ stats.min|default_if_none:"—" }}</strong></div>
-                    <div><small>Days of data</small><strong>{{ stats.days }}</strong></div>
-                </div>
-                <p class="ws-stats-note">These figures describe the individual days. The line above plots {{ run.get_resolution_display|lower }} means, so its highest point is lower than the peak day — averaging a period flattens its worst day.</p>
-            </section>
-
-            <section class="ws-card ws-chart-card">
-                <div class="ws-chart-head">
-                    <div><h2>Projected change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this comparison show?" data-tip="tip-compare">i</button></h2><small>Mean modelled growth-potential index (AUC) per calendar month, baseline versus future window</small></div>
+                    <div><h2>Projected change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this comparison show?" data-tip="tip-compare">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · mean per calendar month, baseline versus future window</small></div>
                     <span class="ws-badge ws-badge--derived">Derived</span>
                 </div>
                 <div id="tip-compare" class="ws-tip" hidden>
-                    <p>Each line averages the index per calendar month over one window of years, so the gap between the lines is the projected change for each part of the growing season. Both windows come from the same climate projection — they are two periods, not two scenarios.</p>
+                    <p><strong>What does growth potential mean?</strong> It describes how favourable the temperature is for bacterial growth, <em>assuming the bacteria are already present</em>. For each day the model simulates growth over a standardised 48-hour period using that day's average temperature; the resulting index reflects how much and how quickly the bacteria are predicted to grow in that period.</p>
+                    <p><strong>How should I read this chart?</strong> Each line averages the index per calendar month over one window of years, so the gap between the lines is the projected change for that part of the season. Switch on <em>Show temperature</em> to see the degrees behind it: the dashed lines are the average temperature of each window, and the table below gives the month-by-month Δ°C next to the change in growth potential.</p>
+                    <p>Both windows come from the same climate projection — they are two periods, not two scenarios.</p>
                     <p>A window must cover at least 5 years: comparing single years shows weather, not climate — one year against another gives the wrong direction of change roughly one time in ten. Beyond that the windows are yours to choose: any two slices of the run's years, in any order — "baseline" and "future" are labels, the chart simply compares window A with window B.</p>
                     <p><strong>Reading a flat warm month:</strong> the index has a ceiling — within its 48-hour window a very warm day cannot score much higher than a warm one. If a summer month shows little change, read it as "already near the maximum", not "unaffected". The clearest climate signal is usually in winter and the shoulder months, where the model reacts steeply to every degree.</p>
                     <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> where the orange line sits above the blue one, that month is projected to become more favourable for {{ run.hazard_label|lower }} than it has been.</p>
+                    <p><strong>Important:</strong> the index does not tell you whether bacteria are actually present on the crop, how many there are, or how likely contamination or illness is. It only describes how temperature influences bacterial growth under standardised model conditions.</p>
                 </div>
                 <div class="ws-cmp-controls">
+                    <label class="ws-check" style="margin:0;"><input type="checkbox" id="cmp-temp" checked> Show temperature</label>
                     <label>Baseline climate conditions
                         <input type="number" id="cmp-b1" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}"> – <input type="number" id="cmp-b2" min="{{ run.start_date.year }}" max="{{ run.end_date.year }}">
                     </label>
@@ -103,7 +81,53 @@
                 </div>
                 <div id="chart-compare" class="ws-chart is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Comparing climate windows…</div></div>
                 <p class="ws-stats-note" id="cmp-summary"></p>
+                <table class="ws-cmp-table" id="cmp-table" hidden>
+                    <thead><tr><th>Month</th><th>Temperature</th><th>Δ°C</th><th>Growth potential</th><th>Δ index</th><th>Δ %</th></tr></thead>
+                    <tbody></tbody>
+                </table>
                 <p class="ws-stats-note">Demonstrator output based on a packaged/fresh-cut product model; not validated for growth on living plants.</p>
+            </section>
+
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>Projected regional change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-delta">i</button></h2><small>Change per NUTS2 region between the same two windows · <span id="delta-windows">…</span></small></div>
+                    <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-delta" data-title="Projected regional change" aria-label="Show the change map full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
+                </div>
+                <div id="tip-delta" class="ws-tip" hidden>
+                    <p>Each region is coloured by how much its growth-potential index <em>changes</em> between the baseline and future windows chosen above — red means the future window is more favourable for {{ run.hazard_label|lower }}, blue means less, and white means no change. The scale is centred on zero, so the colour shows direction as well as size.</p>
+                    <p>Hover a region for its baseline and future values, the change in index, and the temperature change behind it. Grey regions have no data in one of the two windows. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined.</p>
+                    <p>A percentage change is only shown where the baseline is above 1.0: in regions too cold to grow anything, a tiny absolute change would otherwise read as a huge percentage.</p>
+                    <p>The map does not take into account how much of the crop is actually grown in each region.</p>
+                </div>
+                <div id="chart-delta" class="ws-chart is-loading"><div class="ws-chart-loading"><span class="ws-spinner"></span>Comparing regions…</div></div>
+                <p class="ws-stats-note" id="delta-summary"></p>
+            </section>
+
+            <section class="ws-card ws-chart-card">
+                <div class="ws-chart-head">
+                    <div><h2>Modelled growth potential over time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean, in log₁₀ CFU/g × h</small></div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
+                        <span class="ws-badge ws-badge--live">Source data</span>
+                    </div>
+                </div>
+                <div id="tip-series" class="ws-tip" hidden>
+                    <p>This line shows how favourable the weather was for <strong>{{ run.hazard_label|lower }}</strong> on <strong>{{ run.crop_label|lower }}</strong> in <strong>{{ run.nuts2_name }}</strong>, {{ run.get_resolution_display|lower }} by {{ run.get_resolution_display|lower }}. Higher means more favourable for the pathogen; 0 means the day was too cold for any growth.</p>
+                    <p><strong>What does growth potential mean?</strong> It describes how favourable the temperature is for bacterial growth, <em>assuming the bacteria are already present</em>. For each day the model simulates growth over a standardised 48-hour period using that day's average temperature, and the index is how much growth accumulates above the starting level — measured in log₁₀ CFU/g × h.</p>
+                    <p><strong>How should I interpret the values?</strong> Higher values mean the temperature favours stronger and/or earlier growth; lower values mean less growth is predicted in the same period. Comparing is what makes it useful — see the baseline-versus-future chart above.</p>
+                    <p><strong>How the band is made:</strong> for each {{ run.get_resolution_display|lower }} period the days in it are grouped and three numbers are taken: their average, which is the line; the smallest day, which is the bottom of the band; and the largest day, which is the top. Nothing is smoothed or estimated. Hover a point to see the three numbers for that period.</p>
+                    <p>Drag the slider under the chart to zoom into a few years. The highest single day scored <strong>{{ stats.max }}</strong> on {{ stats.peak_date }}; the typical day is around <strong>{{ stats.mean }}</strong>.</p>
+                    <p class="ws-tip-role"><strong>{% if role_word %}For you as {{ role_article }} {{ role_word }}:{% else %}What it means:{% endif %}</strong> {{ role_hints.series }}</p>
+                    <p><strong>Important:</strong> the index does not tell you whether bacteria are actually present on the crop, how many there are, or how likely contamination or illness is. It only describes how temperature influences bacterial growth under standardised model conditions.</p>
+                </div>
+                <div id="chart-series" class="ws-chart"></div>
+                <div class="ws-stats">
+                    <div><small>Mean</small><strong>{{ stats.mean|default_if_none:"—" }}</strong><small>over all days</small></div>
+                    <div><small>Peak day</small><strong>{{ stats.max|default_if_none:"—" }}</strong><small>{{ stats.peak_date|default:"" }}</small></div>
+                    <div><small>Lowest day</small><strong>{{ stats.min|default_if_none:"—" }}</strong></div>
+                    <div><small>Days of data</small><strong>{{ stats.days }}</strong></div>
+                </div>
+                <p class="ws-stats-note">These figures describe the individual days. The line above plots {{ run.get_resolution_display|lower }} means, so its highest point is lower than the peak day — averaging a period flattens its worst day.</p>
             </section>
 
             <div class="ws-chart-grid">
@@ -369,16 +393,82 @@
     }
 
     // ---- baseline vs future comparison ------------------------------------
+    // The index and the temperature that produced it travel together: degrees
+    // are the model's only input, so the degrees explain the index change.
     (function () {
         var el = $("chart-compare");
         if (!el) { return; }
         var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        var cmp = null;
-        var msg = $("cmp-msg"), summary = $("cmp-summary");
+        var AMBER = "#D97706";
+        var cmp = null, latest = null;
+        var msg = $("cmp-msg"), summary = $("cmp-summary"), table = $("cmp-table"), showTemp = $("cmp-temp");
 
         function windowLabel(w) { return w.start + "–" + w.end; }
+        function num(v, digits) { return v == null ? "—" : v.toFixed(digits == null ? 2 : digits); }
+        function signed(v, digits) { return v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(digits == null ? 2 : digits); }
+
+        function tooltip(params) {
+            if (!params.length || !latest) { return ""; }
+            var i = params[0].dataIndex;
+            var b = latest.baseline.months[i], f = latest.future.months[i], d = latest.deltas[i];
+            var rows = [
+                "<strong>" + MONTHS[i] + "</strong>",
+                "Growth potential: " + num(b.value) + " → " + num(f.value) +
+                    " (" + signed(d.delta) + (d.delta_pct == null ? "" : ", " + signed(d.delta_pct, 0) + "%") + ")",
+                "Temperature: " + num(b.temperature_c, 1) + " °C → " + num(f.temperature_c, 1) +
+                    " °C (" + signed(d.delta_temperature_c, 1) + " °C)"
+            ];
+            return rows.join("<br>");
+        }
+
+        function series(d, withTemp) {
+            var out = [
+                { name: "Baseline climate conditions (" + windowLabel(d.baseline) + ")", type: "line", smooth: true,
+                  lineStyle: { width: 2.5, color: BLUE }, itemStyle: { color: BLUE },
+                  data: d.baseline.months.map(function (r) { return r.value; }) },
+                { name: "Future climate conditions (" + windowLabel(d.future) + ")", type: "line", smooth: true,
+                  lineStyle: { width: 2.5, color: AMBER }, itemStyle: { color: AMBER },
+                  data: d.future.months.map(function (r) { return r.value; }) }
+            ];
+            if (withTemp) {
+                out.push(
+                    { name: "Baseline temperature", type: "line", smooth: true, yAxisIndex: 1, symbol: "none",
+                      lineStyle: { width: 1.6, type: "dashed", color: BLUE, opacity: 0.65 },
+                      data: d.baseline.months.map(function (r) { return r.temperature_c; }) },
+                    { name: "Future temperature", type: "line", smooth: true, yAxisIndex: 1, symbol: "none",
+                      lineStyle: { width: 1.6, type: "dashed", color: AMBER, opacity: 0.65 },
+                      data: d.future.months.map(function (r) { return r.temperature_c; }) }
+                );
+            }
+            return out;
+        }
+
+        function fillTable(d) {
+            var body = table.querySelector("tbody");
+            body.innerHTML = "";
+            d.baseline.months.forEach(function (b, i) {
+                var f = d.future.months[i], delta = d.deltas[i];
+                var tr = document.createElement("tr");
+                [
+                    MONTHS[i],
+                    num(b.temperature_c, 1) + " → " + num(f.temperature_c, 1) + " °C",
+                    signed(delta.delta_temperature_c, 1),
+                    num(b.value) + " → " + num(f.value),
+                    signed(delta.delta),
+                    delta.delta_pct == null ? "—" : signed(delta.delta_pct, 0) + "%"
+                ].forEach(function (text, col) {
+                    var cell = document.createElement("td");
+                    cell.textContent = text;
+                    if (col > 0) { cell.className = "ws-num"; }
+                    tr.appendChild(cell);
+                });
+                body.appendChild(tr);
+            });
+            table.hidden = false;
+        }
 
         function render(d) {
+            latest = d;
             $("cmp-b1").value = d.baseline.start; $("cmp-b2").value = d.baseline.end;
             $("cmp-f1").value = d.future.start; $("cmp-f2").value = d.future.end;
             msg.textContent = "";
@@ -390,25 +480,27 @@
                 window.addEventListener("resize", function () { cmp.resize(); });
             }
             cmp.setOption({
-                grid: { left: 56, right: 16, top: 34, bottom: 36 },
-                legend: { top: 0, textStyle: { color: "#64748b" } },
-                tooltip: { trigger: "axis", valueFormatter: function (v) { return v == null ? "no data" : v.toFixed(2); } },
+                grid: { left: 62, right: 56, top: 34, bottom: 36 },
+                legend: { top: 0, textStyle: { color: "#64748b" }, data: series(d, showTemp.checked).map(function (x) { return x.name; }) },
+                tooltip: { trigger: "axis", formatter: tooltip },
                 xAxis: { type: "category", data: MONTHS, boundaryGap: false },
-                yAxis: { type: "value", name: "mean index (AUC)", nameTextStyle: { color: "#64748b" } },
-                series: [
-                    { name: "Baseline climate conditions (" + windowLabel(d.baseline) + ")", type: "line", smooth: true,
-                      lineStyle: { width: 2.5, color: BLUE }, itemStyle: { color: BLUE },
-                      data: d.baseline.months.map(function (r) { return r.value; }) },
-                    { name: "Future climate conditions (" + windowLabel(d.future) + ")", type: "line", smooth: true,
-                      lineStyle: { width: 2.5, color: "#D97706" }, itemStyle: { color: "#D97706" },
-                      data: d.future.months.map(function (r) { return r.value; }) }
-                ]
+                yAxis: [
+                    { type: "value", name: "log₁₀ CFU/g × h", nameTextStyle: { color: "#64748b" } },
+                    { type: "value", name: "°C", nameTextStyle: { color: "#64748b" }, splitLine: { show: false } }
+                ],
+                series: series(d, showTemp.checked)
             }, true);
-            if (d.baseline.mean != null && d.future.mean != null && d.baseline.mean > 0.01) {
+            fillTable(d);
+            if (d.baseline.mean != null && d.future.mean != null && d.baseline.mean >= 1) {
                 var pct = 100 * (d.future.mean / d.baseline.mean - 1);
-                summary.textContent = "Across all months, the mean index moves from " + d.baseline.mean.toFixed(2) +
-                    " (" + windowLabel(d.baseline) + ") to " + d.future.mean.toFixed(2) + " (" + windowLabel(d.future) + "), " +
-                    (pct >= 0 ? "+" : "") + pct.toFixed(0) + "%.";
+                var degrees = (d.baseline.mean_temperature_c != null && d.future.mean_temperature_c != null)
+                    ? " The average temperature moves from " + num(d.baseline.mean_temperature_c, 1) + " °C to " +
+                      num(d.future.mean_temperature_c, 1) + " °C (" +
+                      signed(d.future.mean_temperature_c - d.baseline.mean_temperature_c, 1) + " °C)."
+                    : "";
+                summary.textContent = "Across all months, mean growth potential moves from " + num(d.baseline.mean) +
+                    " (" + windowLabel(d.baseline) + ") to " + num(d.future.mean) + " (" + windowLabel(d.future) + "), " +
+                    signed(pct, 0) + "%." + degrees;
             } else {
                 summary.textContent = "";
             }
@@ -422,6 +514,11 @@
                 .then(function (res) {
                     if (!res.ok) { msg.textContent = res.d.error || "The comparison could not be computed."; return; }
                     render(res.d);
+                    // Isolated: the delta map reports its own failures, and a
+                    // throw there must not land in this chart's catch and wipe it.
+                    if (window.wsRegionalChange) {
+                        try { window.wsRegionalChange(res.d.baseline, res.d.future); } catch (e) { /* handled by that card */ }
+                    }
                 })
                 .catch(function () {
                     el.classList.remove("is-loading");
@@ -433,6 +530,7 @@
             load({ base_start: $("cmp-b1").value, base_end: $("cmp-b2").value,
                    future_start: $("cmp-f1").value, future_end: $("cmp-f2").value });
         });
+        showTemp.addEventListener("change", function () { if (latest) { render(latest); } });
         load(null);
     })();
 
@@ -472,10 +570,107 @@
             });
         }).catch(function () { var el2 = document.getElementById("chart-seasonal"); if (el2) { el2.classList.remove("is-loading"); el2.innerHTML = '<div class="ws-chart-loading">The seasonal heatmap could not be loaded.</div>'; } });
 
+    // ---- NUTS geometry, shared by both maps -------------------------------
+    var NUTS_FC = fetch("/static/data/nuts/NUTS_RG_20M_2024_4326.geojson", { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.json(); });
+
+    // ---- projected regional change (delta map) ----------------------------
+    (function () {
+        var el = $("chart-delta");
+        if (!el) { return; }
+        var map = null, layer = null, values = {}, selected = "", bound = 1;
+
+        function colour(v) {
+            // Diverging, centred on zero: blue = less favourable, red = more.
+            if (v == null) { return "#e5e7eb"; }
+            var t = Math.max(-1, Math.min(1, v / bound));
+            var white = [248, 250, 252], blue = [37, 99, 235], red = [185, 28, 28];
+            var to = t < 0 ? blue : red, u = Math.abs(t);
+            return "rgb(" + [0, 1, 2].map(function (i) { return Math.round(white[i] + (to[i] - white[i]) * u); }).join(",") + ")";
+        }
+
+        function tooltipFor(id, name) {
+            var v = values[id];
+            if (!v) { return "<strong>" + name + " (" + id + ")</strong><br>No data in one of the windows"; }
+            var pct = v.delta_pct == null ? "" : " (" + (v.delta_pct >= 0 ? "+" : "") + v.delta_pct.toFixed(0) + "%)";
+            var degrees = v.delta_temperature_c == null ? "" :
+                "<br>Temperature: " + v.baseline_temperature_c.toFixed(1) + " → " + v.future_temperature_c.toFixed(1) +
+                " °C (" + (v.delta_temperature_c >= 0 ? "+" : "") + v.delta_temperature_c.toFixed(1) + " °C)";
+            return "<strong>" + name + " (" + id + ")</strong>" +
+                "<br>Growth potential: " + v.baseline.toFixed(2) + " → " + v.future.toFixed(2) +
+                "<br>Change: " + (v.delta >= 0 ? "+" : "") + v.delta.toFixed(2) + pct + degrees;
+        }
+
+        function draw(fc, data) {
+            values = data.values || {};
+            selected = data.selected || "";
+            $("delta-windows").textContent = data.baseline.start + "–" + data.baseline.end + " vs " +
+                data.future.start + "–" + data.future.end + " · " + data.regions + " regions";
+            var deltas = Object.keys(values).map(function (k) { return values[k].delta; });
+            // Symmetric bound so equal gains and losses read as equal colour.
+            bound = Math.max.apply(null, deltas.map(Math.abs).concat([0.01]));
+
+            var feats = (fc.features || []).filter(function (f) { return String(f.properties.LEVL_CODE) === "2"; });
+            if (!map) {
+                el.classList.remove("is-loading"); el.innerHTML = "";
+                map = L.map(el, { zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([52, 8], 4);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { referrerPolicy: "strict-origin-when-cross-origin", opacity: 0.85 }).addTo(map);
+                setTimeout(function () { map.invalidateSize(); }, 100);
+                onResized("chart-delta", function () {
+                    map.invalidateSize();
+                    if (el.classList.contains("is-expanded")) { map.scrollWheelZoom.enable(); }
+                    else { map.scrollWheelZoom.disable(); }
+                });
+                map.on("click", function () { map.scrollWheelZoom.enable(); });
+                el.addEventListener("mouseleave", function () {
+                    if (!el.classList.contains("is-expanded")) { map.scrollWheelZoom.disable(); }
+                });
+            }
+            if (layer) { map.removeLayer(layer); }
+            layer = L.geoJSON(feats, {
+                style: function (f) {
+                    var id = f.properties.NUTS_ID, v = values[id];
+                    return { color: id === selected ? "#112b39" : "#ffffff", weight: id === selected ? 2.5 : 0.6,
+                             fillColor: colour(v ? v.delta : null), fillOpacity: v ? 0.85 : 0.25 };
+                },
+                onEachFeature: function (f, l) {
+                    var id = f.properties.NUTS_ID;
+                    l.bindTooltip(tooltipFor(id, f.properties.NAME_LATN || id), { sticky: true });
+                }
+            }).addTo(map);
+            var sel = feats.find(function (f) { return f.properties.NUTS_ID === selected; });
+            if (sel && !layer._fitted) { map.fitBounds(L.geoJSON(sel).getBounds().pad(2.5)); layer._fitted = true; }
+
+            var mine = values[selected];
+            var rising = deltas.filter(function (d) { return d > 0; }).length;
+            $("delta-summary").textContent = mine
+                ? "Your region changes by " + (mine.delta >= 0 ? "+" : "") + mine.delta.toFixed(2) +
+                  (mine.delta_pct == null ? "" : " (" + (mine.delta_pct >= 0 ? "+" : "") + mine.delta_pct.toFixed(0) + "%)") +
+                  ". " + rising + " of " + deltas.length + " regions become more favourable for this pathogen."
+                : rising + " of " + deltas.length + " regions become more favourable for this pathogen.";
+        }
+
+        // Called by the comparison chart so both cards always show the same windows.
+        window.wsRegionalChange = function (baseline, future) {
+            var url = "{% url 'assessment-regional-change' run.id %}?" + new URLSearchParams({
+                base_start: baseline.start, base_end: baseline.end,
+                future_start: future.start, future_end: future.end
+            }).toString();
+            Promise.all([NUTS_FC, fetch(url, { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); })])
+                .then(function (res) {
+                    if (res[1].error) { throw new Error(res[1].error); }
+                    draw(res[0], res[1]);
+                })
+                .catch(function () {
+                    if (!map) { el.classList.remove("is-loading"); el.innerHTML = '<div class="ws-chart-loading">The change map could not be loaded.</div>'; }
+                });
+        };
+    })();
+
     // ---- geographic heatmap ---------------------------------------------
     Promise.all([
         fetch("{% url 'assessment-geographic' run.id %}", { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }),
-        fetch("/static/data/nuts/NUTS_RG_20M_2024_4326.geojson", { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); })
+        NUTS_FC
     ]).then(function (res) {
         var data = res[0], fc = res[1], el3 = document.getElementById("chart-geo");
         if (!el3) return;
