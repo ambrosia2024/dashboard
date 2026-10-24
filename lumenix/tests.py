@@ -142,11 +142,13 @@ class GrowthComparisonEndpointTests(TestCase):
         # June 1st of every year 2000-2019: index 10 in the first decade, 30 in
         # the second, so the window means are unambiguous.
         for year in range(2000, 2020):
-            rows.append(PathogenConcentrationRecord(
-                plant="lettuce", pathogen="salmonella", nuts_code="ZZ99",
-                observed_on=date(year, 6, 1), pathogen_model_value=5.0,
-                growth_potential_auc=10.0 if year < 2010 else 30.0, status=1,
-            ))
+            for code in ("ZZ99", "ZZ88"):
+                rows.append(PathogenConcentrationRecord(
+                    plant="lettuce", pathogen="salmonella", nuts_code=code,
+                    observed_on=date(year, 6, 1), pathogen_model_value=5.0,
+                    growth_potential_auc=(10.0 if year < 2010 else 30.0) + (0.0 if code == "ZZ99" else 5.0),
+                    temperature_c=(12.0 if year < 2010 else 15.0), status=1,
+                ))
         PathogenConcentrationRecord.objects.bulk_create(rows)
         cls.assessment = AssessmentRun.objects.create(
             user=cls.user, name="t", nuts2_code="ZZ99", nuts2_name="Testland",
@@ -165,6 +167,44 @@ class GrowthComparisonEndpointTests(TestCase):
         self.assertEqual(june_base["value"], 10.0)
         self.assertEqual(june_fut["value"], 30.0)
         self.assertIsNone(next(m for m in data["baseline"]["months"] if m["month"] == 1)["value"])
+
+    def test_month_carries_temperature_and_deltas(self):
+        """The feedback asked for the temperature change beside the index change."""
+        self.client.force_login(self.user)
+        data = self.client.get(reverse("assessment-growth-comparison", args=[self.assessment.id])).json()
+        june_base = next(m for m in data["baseline"]["months"] if m["month"] == 6)
+        june_fut = next(m for m in data["future"]["months"] if m["month"] == 6)
+        june_delta = next(d for d in data["deltas"] if d["month"] == 6)
+        self.assertEqual(june_base["temperature_c"], 12.0)
+        self.assertEqual(june_fut["temperature_c"], 15.0)
+        self.assertEqual(june_delta["delta_temperature_c"], 3.0)
+        self.assertEqual(june_delta["delta"], 20.0)
+        self.assertEqual(june_delta["delta_pct"], 200.0)
+        self.assertEqual(data["baseline"]["mean_temperature_c"], 12.0)
+
+    def test_regional_change_map(self):
+        self.client.force_login(self.user)
+        data = self.client.get(reverse("assessment-regional-change", args=[self.assessment.id])).json()
+        self.assertEqual(data["regions"], 2)
+        self.assertEqual(data["selected"], "ZZ99")
+        self.assertEqual(data["values"]["ZZ99"]["baseline"], 10.0)
+        self.assertEqual(data["values"]["ZZ99"]["future"], 30.0)
+        self.assertEqual(data["values"]["ZZ99"]["delta"], 20.0)
+        self.assertEqual(data["values"]["ZZ88"]["delta"], 20.0)
+        self.assertEqual(data["values"]["ZZ99"]["delta_temperature_c"], 3.0)
+
+    def test_relative_change_floor_suppresses_tiny_baselines(self):
+        """A near-zero baseline must not report a vast percentage change."""
+        from lumenix.models import PathogenConcentrationRecord
+
+        PathogenConcentrationRecord.objects.filter(
+            nuts_code="ZZ99", observed_on__year__lt=2010
+        ).update(growth_potential_auc=0.01)
+        self.client.force_login(self.user)
+        data = self.client.get(reverse("assessment-growth-comparison", args=[self.assessment.id])).json()
+        june_delta = next(d for d in data["deltas"] if d["month"] == 6)
+        self.assertIsNotNone(june_delta["delta"], "the absolute change is still reported")
+        self.assertIsNone(june_delta["delta_pct"], "the relative change is suppressed below the floor")
 
     def test_short_window_is_refused(self):
         self.client.force_login(self.user)

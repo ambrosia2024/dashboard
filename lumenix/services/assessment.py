@@ -157,25 +157,88 @@ def provenance(qs):
 
 def monthly_window_means(qs, start_year, end_year):
     """
-    Mean growth-potential index per calendar month over a window of years -
-    one line of the baseline-versus-future comparison chart.
+    Mean growth-potential index and mean temperature per calendar month over a
+    window of years - one line of the baseline-versus-future comparison chart.
+
+    The temperature travels with the index because it is the model's only
+    input: the change in degrees is what explains the change in the index.
     """
     rows = (
         qs.filter(observed_on__year__gte=start_year, observed_on__year__lte=end_year)
         .annotate(month=ExtractMonth("observed_on"))
         .values("month")
-        .annotate(value=Avg("growth_potential_auc"), days=Count("id"))
+        .annotate(
+            value=Avg("growth_potential_auc"),
+            temperature_c=Avg("temperature_c"),
+            days=Count("id"),
+        )
         .order_by("month")
     )
     by_month = {r["month"]: r for r in rows}
+
+    def at(month, key, digits):
+        row = by_month.get(month)
+        if not row or row[key] is None or row[key] != row[key]:  # NaN-safe
+            return None
+        return round(row[key], digits)
+
     return [
         {
             "month": m,
-            "value": round(by_month[m]["value"], 4) if m in by_month and by_month[m]["value"] is not None else None,
+            "value": at(m, "value", 4),
+            "temperature_c": at(m, "temperature_c", 2),
             "days": by_month[m]["days"] if m in by_month else 0,
         }
         for m in range(1, 13)
     ]
+
+
+def regional_change(plant, pathogen, baseline, future):
+    """
+    Per-region growth-potential index in two year windows and the change
+    between them, for the spec's NUTS2 delta map.
+
+    `baseline` and `future` are (start_year, end_year). Regions missing from
+    either window are dropped rather than shown as a change of zero.
+    """
+    def window(years):
+        rows = (
+            PathogenConcentrationRecord.active_objects.filter(
+                plant__in=identifier_variants(plant),
+                pathogen__in=identifier_variants(pathogen),
+                observed_on__year__gte=years[0],
+                observed_on__year__lte=years[1],
+            )
+            .values("nuts_code")
+            .annotate(value=Avg("growth_potential_auc"), temperature_c=Avg("temperature_c"), days=Count("id"))
+        )
+        return {r["nuts_code"]: r for r in rows if r["value"] is not None}
+
+    base_rows, future_rows = window(baseline), window(future)
+    out = {}
+    for code, base in base_rows.items():
+        fut = future_rows.get(code)
+        if not fut:
+            continue
+        delta = fut["value"] - base["value"]
+        temps = [base["temperature_c"], fut["temperature_c"]]
+        out[code] = {
+            "baseline": round(base["value"], 4),
+            "future": round(fut["value"], 4),
+            "delta": round(delta, 4),
+            # Relative change needs a floor: near-zero baselines (regions too
+            # cold to grow anything) would otherwise explode into huge percentages.
+            "delta_pct": round(100 * delta / base["value"], 1) if base["value"] >= RELATIVE_CHANGE_FLOOR else None,
+            "baseline_temperature_c": round(temps[0], 2) if temps[0] is not None else None,
+            "future_temperature_c": round(temps[1], 2) if temps[1] is not None else None,
+            "delta_temperature_c": round(temps[1] - temps[0], 2) if None not in temps else None,
+            "days": base["days"] + fut["days"],
+        }
+    return out
+
+
+# The spec's epsilon: below this baseline index a relative change is not shown.
+RELATIVE_CHANGE_FLOOR = 1.0
 
 
 SNAPSHOT_SCHEMA = 2  # 1 plotted the curve's end value; 2 plots the AUC index.

@@ -28,8 +28,8 @@ from django.views.generic import TemplateView
 
 from lumenix.models import AssessmentRun, NutsRegion, PathogenConcept, PlantConcept, SavedSituation
 from lumenix.services.assessment import (
-    SNAPSHOT_SCHEMA, aggregate_series, build_snapshot, geographic_means, monthly_window_means,
-    seasonal_matrix, variability,
+    RELATIVE_CHANGE_FLOOR, SNAPSHOT_SCHEMA, aggregate_series, build_snapshot, geographic_means,
+    monthly_window_means, regional_change, seasonal_matrix, variability,
 )
 from lumenix.views.pathogen_api import _models_for_queryset, _resolve_pathogen_queryset
 
@@ -512,6 +512,39 @@ def _cached_derived(run, key, compute):
     return derived[key]
 
 
+class AssessmentRegionalChangeView(_OwnedRunMixin, View):
+    """
+    Change in the growth-potential index per NUTS2 region between two year
+    windows - the spec's delta map. Shares the comparison chart's window rules,
+    so both cards always describe the same two climates.
+    """
+
+    def get(self, request, *args, **kwargs):
+        run = self.get_run()
+        comparison = AssessmentGrowthComparisonView()
+        comparison.kwargs, comparison.request = self.kwargs, request
+        try:
+            baseline, future = comparison._windows(request, run)
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        plant = concept_identifier(run.crop) if run.crop else ""
+        pathogen = concept_identifier(run.hazard) if run.hazard else ""
+        values = _cached_derived(
+            run,
+            f"regional_change:{baseline[0]}-{baseline[1]}:{future[0]}-{future[1]}",
+            lambda: regional_change(plant, pathogen, baseline, future),
+        )
+        return JsonResponse({
+            "values": values,
+            "selected": run.nuts2_code,
+            "baseline": {"start": baseline[0], "end": baseline[1]},
+            "future": {"start": future[0], "end": future[1]},
+            "regions": len(values),
+            "unit": "change in modelled growth potential (log10 CFU/g x h)",
+        })
+
+
 class AssessmentGrowthComparisonView(_OwnedRunMixin, View):
     """
     Mean growth-potential index per calendar month over two year windows - the
@@ -538,14 +571,31 @@ class AssessmentGrowthComparisonView(_OwnedRunMixin, View):
         def window(start, end):
             months = monthly_window_means(qs, start, end)
             values = [r["value"] for r in months if r["value"] is not None]
+            temps = [r["temperature_c"] for r in months if r["temperature_c"] is not None]
             return {
                 "start": start,
                 "end": end,
                 "months": months,
                 "mean": round(sum(values) / len(values), 4) if values else None,
+                "mean_temperature_c": round(sum(temps) / len(temps), 2) if temps else None,
             }
 
-        return JsonResponse({"baseline": window(b1, b2), "future": window(f1, f2)})
+        baseline, future = window(b1, b2), window(f1, f2)
+        # Per-month deltas so the chart and its tooltip never recompute them.
+        deltas = []
+        for base_month, future_month in zip(baseline["months"], future["months"]):
+            pair = (base_month["value"], future_month["value"])
+            temps = (base_month["temperature_c"], future_month["temperature_c"])
+            deltas.append({
+                "month": base_month["month"],
+                "delta": round(pair[1] - pair[0], 4) if None not in pair else None,
+                "delta_pct": (
+                    round(100 * (pair[1] - pair[0]) / pair[0], 1)
+                    if None not in pair and pair[0] >= RELATIVE_CHANGE_FLOOR else None
+                ),
+                "delta_temperature_c": round(temps[1] - temps[0], 2) if None not in temps else None,
+            })
+        return JsonResponse({"baseline": baseline, "future": future, "deltas": deltas})
 
     def _windows(self, request, run):
         lo, hi = run.start_date.year, run.end_date.year
