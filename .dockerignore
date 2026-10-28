@@ -83,6 +83,7 @@ api_test/
 pidrive/
 deliverables/
 docs/
+video/
 
 # Large or local-only data exports
 /*.nc
