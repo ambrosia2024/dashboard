@@ -1,5 +1,7 @@
 # lumenix/admin.py
 
+import json
+
 from datetime import date, timedelta
 from urllib.parse import urlparse
 
@@ -8,7 +10,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.contrib import admin, messages
 from django.db.models import Count, JSONField, Max, Min
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -27,7 +29,7 @@ from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
                      PathogenQuerySpec, PathogenConcentrationRecord, GrowthPotentialLookup, AdminMenuMaster,
-                     SavedSituation, AssessmentRun)
+                     SavedSituation, AssessmentRun, UserEvent)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
 from .services.pathogen_query import sync_pathogen_query_spec
@@ -1723,3 +1725,43 @@ class AssessmentRunAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user",)
     raw_id_fields = ("crop", "hazard", "situation", "parent_run")
     readonly_fields = ("snapshot", "created_at", "updated_at")
+
+
+@admin.register(UserEvent)
+class UserEventAdmin(admin.ModelAdmin):
+    """
+    Read-only view of the workshop evaluation log, with a CSV action so the
+    facilitators can be handed a file rather than a database.
+    """
+
+    list_display = ("occurred_at", "user", "cohort", "event", "url_name", "payload")
+    list_filter = ("event", "cohort")
+    search_fields = ("user__email", "url_name")
+    date_hierarchy = "occurred_at"
+    readonly_fields = ("user", "session_key", "cohort", "event", "url_name", "payload", "occurred_at")
+    actions = ("export_csv",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description="Export selected events to CSV")
+    def export_csv(self, request, queryset):
+        import csv as _csv
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="ambrosia-user-events.csv"'
+        writer = _csv.writer(response)
+        writer.writerow(["occurred_at", "user", "cohort", "event", "url_name", "payload"])
+        for e in queryset.select_related("user").order_by("occurred_at"):
+            writer.writerow([
+                e.occurred_at.isoformat(),
+                getattr(e.user, "email", "") or "",
+                e.cohort,
+                e.event,
+                e.url_name,
+                json.dumps(e.payload, sort_keys=True),
+            ])
+        return response

@@ -529,6 +529,13 @@ class UserProfile(models.Model):
         blank=True,
         help_text="When the user last saved the preferences page.",
     )
+    cohort = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="Evaluation group this account belongs to, e.g. 'dr-greece-2026-11'. "
+                  "Copied onto each UserEvent so workshop results can be split per Demonstrator Region.",
+    )
 
     class Meta:
         db_table = "user_profiles"
@@ -1088,3 +1095,66 @@ class AmbraMessage(models.Model):
 
     def __str__(self):
         return f"{self.role}: {self.content[:40]}"
+
+
+class UserEvent(models.Model):
+    """
+    Append-only record of what a user did, for the T5.2 workshop evaluation.
+
+    Deliberately not a BaseModel subclass: soft-delete and the active flag make
+    no sense for a log, and active_objects would quietly hide rows.
+
+    This only covers what the domain tables cannot already answer. Whether a
+    situation was saved and reused, which crop/hazard/region combinations were
+    tried and whether a run succeeded are all readable from SavedSituation and
+    AssessmentRun, which carry created_at through BaseModel. What is missing
+    there, and recorded here, is whether the form was reached at all, where the
+    participant stalled, which validation errors blocked them, and whether they
+    opened the charts or asked Ambra.
+    """
+
+    class Event(models.TextChoices):
+        FORM_OPENED = "assessment.form_opened", "Assessment form opened"
+        SUBMIT_REJECTED = "assessment.submit_rejected", "Assessment submit rejected"
+        SITUATION_SAVED = "assessment.situation_saved", "Situation saved"
+        RUN_CREATED = "assessment.run_created", "Run created"
+        OUTCOME_VIEWED = "assessment.outcome_viewed", "Outcome viewed"
+        RUN_AGAIN = "assessment.run_again", "Run again"
+        EXPORTED = "assessment.exported", "Run exported"
+        SITUATIONS_LIST = "situations.list_viewed", "Saved situations viewed"
+        SITUATION_REUSED = "situations.reused", "Saved situation reused"
+        CHART_VIEWED = "chart.viewed", "Chart viewed"
+        AMBRA_ASKED = "ambra.asked", "Ambra asked"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="events",
+    )
+    session_key = models.CharField(max_length=40, blank=True, default="")
+    cohort = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Copied from the user's profile when the event is written.",
+    )
+    event = models.CharField(max_length=64, choices=Event.choices, db_index=True)
+    url_name = models.CharField(max_length=64, blank=True, default="")
+    payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "user_events"
+        ordering = ["-occurred_at"]
+        verbose_name = "User event"
+        verbose_name_plural = "User events"
+        indexes = [
+            models.Index(fields=["user", "occurred_at"], name="idx_event_user_time"),
+            models.Index(fields=["event", "occurred_at"], name="idx_event_name_time"),
+        ]
+
+    def __str__(self):
+        return f"{self.occurred_at:%Y-%m-%d %H:%M} {self.event} ({self.user_id})"

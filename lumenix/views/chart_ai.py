@@ -8,7 +8,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 
-from lumenix.models import DashboardChart
+from lumenix.models import DashboardChart, UserEvent
+from lumenix.services.events import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +182,8 @@ def chart_qa_stream(request, chart_identifier: str):
     )
     if not chart:
         return JsonResponse({"error": f"Unknown or inactive risk chart identifier: {chart_identifier}"}, status=404)
+
+    log_event(request, UserEvent.Event.AMBRA_ASKED, chart=chart_identifier)
 
     context = payload.get("context") or {}
     context_summary = {}

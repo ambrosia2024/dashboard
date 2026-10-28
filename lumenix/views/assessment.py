@@ -26,7 +26,8 @@ from django.utils.translation import get_language
 from django.views import View
 from django.views.generic import TemplateView
 
-from lumenix.models import AssessmentRun, NutsRegion, PathogenConcept, PlantConcept, SavedSituation
+from lumenix.models import AssessmentRun, NutsRegion, PathogenConcept, PlantConcept, SavedSituation, UserEvent
+from lumenix.services.events import log_event
 from lumenix.services.assessment import (
     RELATIVE_CHANGE_FLOOR, SNAPSHOT_SCHEMA, aggregate_series, build_snapshot, geographic_means,
     monthly_window_means, regional_change, seasonal_matrix, variability,
@@ -148,6 +149,14 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         crops, hazards = self._choices()
+        # Only the first render counts as "reached the form"; a rejected submit
+        # re-renders through here and is recorded as submit_rejected instead.
+        if self.request.method == "GET":
+            log_event(
+                self.request,
+                UserEvent.Event.FORM_OPENED,
+                prefill_from_situation=bool(self.request.GET.get("situation")),
+            )
         ctx.update({
             "form": self._initial(),
             "errors": kwargs.get("errors", {}),
@@ -161,6 +170,11 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
         return ctx
 
     # ---- submit ----------------------------------------------------------
+
+    def _rejected(self, errors):
+        """Re-render the form with errors, recording which fields blocked the user."""
+        log_event(self.request, UserEvent.Event.SUBMIT_REJECTED, fields=sorted(errors))
+        return self.render_to_response(self.get_context_data(errors=errors))
 
     def post(self, request, *args, **kwargs):
         data = request.POST
@@ -222,7 +236,7 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
             errors["model"] = "The selected model is not valid."
 
         if errors:
-            return self.render_to_response(self.get_context_data(errors=errors))
+            return self._rejected(errors)
 
         # Model / data availability for this exact combination.
         qs, resolved_code = _resolve_pathogen_queryset(concept_identifier(crop), concept_identifier(hazard), nuts2_code)
@@ -232,20 +246,20 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
                 f"No data is available for {_label(crop, 'en')} · {_label(hazard, 'en')} in "
                 f"{nuts2_name or nuts2_code}. Change the crop, hazard or location."
             )
-            return self.render_to_response(self.get_context_data(errors=errors))
+            return self._rejected(errors)
         if end < agg["first"] or start > agg["last"]:
             errors["availability"] = (
                 f"No data between {start.isoformat()} and {end.isoformat()} for this combination. "
                 f"Data is available from {agg['first'].isoformat()} to {agg['last'].isoformat()}."
             )
-            return self.render_to_response(self.get_context_data(errors=errors))
+            return self._rejected(errors)
 
         # The model must be one that actually produced this data; its name comes from our side, not the form.
         models = _models_for_queryset(qs)
         chosen = next((m for m in models if m["uuid"] == model_uuid), None) if model_uuid else (models[0] if models else None)
         if model_uuid and chosen is None:
             errors["model"] = "The selected model does not match this combination. Choose again."
-            return self.render_to_response(self.get_context_data(errors=errors))
+            return self._rejected(errors)
         model_uuid, model_name = (chosen["uuid"], chosen["name"]) if chosen else ("", "")
 
         # Optional named save (create or update the situation being edited).
@@ -266,7 +280,10 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
             situation.resolution = resolution
             situation.model_uuid, situation.model_name = model_uuid, model_name
             situation.last_used_at = timezone.now()
+            is_update = situation.pk is not None
             situation.save()
+            log_event(request, UserEvent.Event.SITUATION_SAVED,
+                      situation_id=situation.pk, is_update=is_update)
 
         # Freeze the request as a run with its outcome snapshot, then show the outcome.
         period_qs = qs.filter(observed_on__gte=start, observed_on__lte=end)
@@ -292,6 +309,9 @@ class AssessmentCreateView(LoginRequiredMixin, TemplateView):
             run_status=AssessmentRun.Status.COMPLETED if period_qs.exists() else AssessmentRun.Status.NO_DATA,
             snapshot=build_snapshot(period_qs, resolution),
         )
+        log_event(request, UserEvent.Event.RUN_CREATED, run_id=run.id,
+                  crop=concept_identifier(crop), hazard=concept_identifier(hazard),
+                  nuts2=run.nuts2_code, status=run.run_status, saved=situation is not None)
         return redirect("assessment-outcome", run_id=run.id)
 
 
@@ -433,6 +453,8 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         run = self.get_run()
+        log_event(self.request, UserEvent.Event.OUTCOME_VIEWED, run_id=run.id,
+                  seconds_since_run=int((timezone.now() - run.created_at).total_seconds()))
         snap = _ensure_snapshot_schema(run)
         stats = snap.get("stats") or {}
         fetched_ms = stats.get("fetched_at_ms")
@@ -472,6 +494,7 @@ class AssessmentRunAgainView(_OwnedRunMixin, View):
             run_status=AssessmentRun.Status.COMPLETED if qs.exists() else AssessmentRun.Status.NO_DATA,
             snapshot=build_snapshot(qs, run.resolution),
         )
+        log_event(request, UserEvent.Event.RUN_AGAIN, from_run_id=run.id, run_id=new.id)
         return redirect("assessment-outcome", run_id=new.id)
 
 
@@ -480,6 +503,7 @@ class AssessmentExportView(_OwnedRunMixin, View):
 
     def get(self, request, *args, **kwargs):
         run = self.get_run()
+        log_event(request, UserEvent.Event.EXPORTED, run_id=run.id)
         snap = run.snapshot or {}
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="ambrosia-{run.run_code}.csv"'

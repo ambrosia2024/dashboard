@@ -18,7 +18,8 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
 
-from lumenix.models import AssessmentRun, SavedSituation
+from lumenix.models import AssessmentRun, SavedSituation, UserEvent
+from lumenix.services.events import log_event
 
 
 class SituationsView(LoginRequiredMixin, TemplateView):
@@ -41,6 +42,7 @@ class SituationsView(LoginRequiredMixin, TemplateView):
         if when in ("7", "30", "90"):
             runs = runs.filter(created_at__gte=timezone.now() - timedelta(days=int(when)))
         runs = list(runs[:50])
+        log_event(self.request, UserEvent.Event.SITUATIONS_LIST, runs=len(runs))
 
         selected = None
         rid = g.get("run")
@@ -97,6 +99,7 @@ class SituationDuplicateView(_SituationAction):
         s.name = f"{s.name} (copy)"[:120]
         s.last_used_at = None
         s.save()
+        log_event(request, UserEvent.Event.SITUATION_REUSED, situation_id=s.pk)
         messages.success(request, "Situation duplicated.")
         return self.back()
 
