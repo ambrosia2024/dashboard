@@ -3,9 +3,10 @@
 //   green = backed by real DB data, amber = illustrative/demo data.
 // Mirrors the Live/Demo badge on the chart pages. Runs site-wide (sidebar is global).
 (function () {
-  // Charts backed by a real data source. Keep in sync with each chart's
-  // DashboardChart.default_config.data_source (only pathogen is wired to real data).
-  const REAL = new Set(["c2_pathogen_over_time"]);
+  // Charts shown as green here. Empty for now: the pathogen chart does read real
+  // synced data, but it plots growth-model output under a "concentration" title,
+  // so it is not presented as live until the label and unit are corrected.
+  const REAL = new Set();
   const LIVE_TIP = "Live data";
   const DEMO_TIP = "Demo / illustrative data";
 
