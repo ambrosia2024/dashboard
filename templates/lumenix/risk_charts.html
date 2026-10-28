@@ -60,6 +60,9 @@
     {% include 'lumenix/partials/_risk_climate_scenarios.html' %}
 {% endblock content %}
 
+{# These charts read a generated series, not the Context panel's selection. #}
+{% block risk_context %}{% endblock risk_context %}
+
 {% block extra_js %}
     <script>
       window.__AMBROSIA_SELECTED_RISK_CHART = null;

@@ -1,0 +1,96 @@
+{# templates/lumenix/charts/risk/growth_potential_change.html #}
+{% load json_extras %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="d-flex align-items-center gap-2 mb-1">
+                    <span>{{ chart_config.title|default:"Projected change in modelled growth potential" }}</span>
+                    {# Always demo: this chart renders the generated series, like the rest of this menu. #}
+                    <span class="chart-data-badge is-demo" title="Illustrative / generated values">Demo data</span>
+                    <div class="dropdown ms-auto">
+                        <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Download growth potential comparison chart"
+                                title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Chart Image</h6></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_change" data-chart-export="png">Download PNG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_change" data-chart-export="jpg">Download JPG</button></li>
+                            <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_change" data-chart-export="pdf">Download PDF</button></li>
+                        </ul>
+                    </div>
+                </h4>
+                <p class="text-muted small mb-3">Mean per calendar month, baseline versus future window.</p>
+
+                <div class="d-flex flex-wrap align-items-end gap-3 mb-3 growth-change-controls">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="growthChangeTemp" checked>
+                        <label class="form-check-label small" for="growthChangeTemp">Show temperature</label>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1 small text-muted">Baseline climate conditions</label>
+                        <div class="d-flex align-items-center gap-1">
+                            <input id="growthChangeB1" type="number" min="1940" max="2095" class="form-control form-control-sm" style="width: 90px;" value="1991">
+                            <span class="text-muted">–</span>
+                            <input id="growthChangeB2" type="number" min="1940" max="2095" class="form-control form-control-sm" style="width: 90px;" value="2020">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1 small text-muted">Future climate conditions</label>
+                        <div class="d-flex align-items-center gap-1">
+                            <input id="growthChangeF1" type="number" min="1940" max="2095" class="form-control form-control-sm" style="width: 90px;" value="2066">
+                            <span class="text-muted">–</span>
+                            <input id="growthChangeF2" type="number" min="1940" max="2095" class="form-control form-control-sm" style="width: 90px;" value="2095">
+                        </div>
+                    </div>
+                    <button type="button" id="growthChangeUpdate" class="btn btn-sm btn-outline-secondary">Update</button>
+                    <span id="growthChangeMsg" class="small text-danger" role="status"></span>
+                </div>
+
+                <div class="risk-chart-loading-shell">
+                    <div id="growthChangeChart" style="height: 380px;"></div>
+                    <div id="growthChangeChartLoadingOverlay" class="risk-chart-loading-overlay d-none" aria-hidden="true">
+                        <div class="risk-chart-loading-badge">
+                            <span class="risk-chart-loading-spinner"></span>
+                            <span>Loading chart data…</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="growthChangeSummary" class="mt-3 small text-muted"></p>
+
+                <div class="table-responsive">
+                    <table id="growthChangeTable" class="table table-sm align-middle small" hidden>
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Temperature</th>
+                                <th>Δ°C</th>
+                                <th>Growth potential</th>
+                                <th>Δ index</th>
+                                <th>Δ %</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="growthChangeExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ chart_config|json_script:"growthChangeChartCfg" }}
+
+<script>
+  window.__AMBROSIA_CHART_CONFIGS = window.__AMBROSIA_CHART_CONFIGS || {};
+  window.__AMBROSIA_CHART_CONFIGS["growthChangeChart"] =
+    JSON.parse(document.getElementById("growthChangeChartCfg").textContent);
+</script>
