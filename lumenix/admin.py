@@ -609,9 +609,12 @@ class ScioModelAdmin(ApiSyncedReadOnlyAdmin):
 #
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "role", "role_other", "show_technical_details", "dashboard_mode", "preferences_saved_at")
-    list_filter = ("role", "show_technical_details")
-    search_fields = ("user__username", "user__email", "dashboard_mode__label", "dashboard_mode__code")
+    list_display = ("user", "cohort", "role", "role_other", "show_technical_details", "dashboard_mode", "preferences_saved_at")
+    # Editable from the list so a whole workshop group can be tagged on one page
+    # rather than one profile at a time.
+    list_editable = ("cohort",)
+    list_filter = ("cohort", "role", "show_technical_details")
+    search_fields = ("user__username", "user__email", "cohort", "dashboard_mode__label", "dashboard_mode__code")
     autocomplete_fields = ("user", "dashboard_mode")
     readonly_fields = ("preferences_saved_at",)
 
