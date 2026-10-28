@@ -7,11 +7,8 @@
             <div class="card-body">
                 <h4 class="d-flex align-items-center gap-2 mb-3">
                     <span>{{ chart_config.title|default:"Pathogen concentration vs time" }}</span>
-                    {% if chart_config.data_source == 'real' %}
-                    <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
-                    {% else %}
+                    {# Always demo: this chart renders the generated series, like the rest of this menu. #}
                     <span class="chart-data-badge is-demo" title="Illustrative / generated values">Demo data</span>
-                    {% endif %}
                     <div class="dropdown ms-auto">
                         <button class="btn btn-link p-0 text-muted dropdown-toggle"
                                 type="button"

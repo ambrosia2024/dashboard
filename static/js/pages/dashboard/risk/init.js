@@ -120,7 +120,7 @@ function explainToxins(rows) {
 }
 
 function explainPathogens(rows) {
-  if (!rows?.length) return "<em>No synced data for the selected location / crop / hazard combination.</em>";
+  if (!rows?.length) return "<em>No values in the selected period.</em>";
 
   const y = rows.map((r) => r.pathogen_model_value).filter((v) => Number.isFinite(v));
   if (!y.length) return "<em>No pathogen model values in the selected period.</em>";
@@ -163,7 +163,7 @@ function explainPathogens(rows) {
     </ul>
     <strong>Note</strong>
     <p class="mb-2">
-      Values are synced source model outputs for the selected crop, pathogen, location, and date range.
+      Values are illustrative dummy outputs - illustrative only.
     </p>
   `;
 }
@@ -1387,6 +1387,7 @@ function aggregateToxinRows(rows, scale) {
       period: bucket.displayLabel,
       toxin_level_ug_per_kg: avg(bucket.rows.map((r) => r.toxin_level_ug_per_kg)),
       pathogen_model_value: avg(bucket.rows.map((r) => r.pathogen_model_value)),
+      pathogen_conc_units_per_g: avg(bucket.rows.map((r) => r.pathogen_conc_units_per_g)),
       temperature_c: avg(bucket.rows.map((r) => r.temperature_c)),
       humidity_pct: avg(bucket.rows.map((r) => r.humidity_pct)),
       source_scale: scale,
@@ -1397,8 +1398,10 @@ function aggregateToxinRows(rows, scale) {
 function aggregatePathogenRows(rows, scale) {
   return aggregateToxinRows(rows, scale).map((row) => ({
     ...row,
-    pathogen_model_value: row.pathogen_model_value ?? row.toxin_level_ug_per_kg ?? null,
-    pathogen_model_unit: row.pathogen_model_unit || "model output",
+    pathogen_model_value:
+      row.pathogen_model_value ?? row.pathogen_conc_units_per_g ?? row.toxin_level_ug_per_kg ?? null,
+    pathogen_model_unit:
+      row.pathogen_model_unit || (row.pathogen_conc_units_per_g != null ? "units/g" : "model output"),
   }));
 }
 
@@ -2066,7 +2069,15 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
 
       if (document.getElementById("pathogenConcChart")) {
-        renderRealPathogenChart(rerows);
+        // Demo data, like every other chart in this menu. The live query in
+        // renderRealPathogenChart is kept but not called: it plots the growth
+        // model's output under a "concentration" title, which is misleading, so
+        // it stays off until the chart is renamed and given its real unit.
+        const pathogenRows = aggregatePathogenRows(rerows, getSelectedToxinScale());
+        window.__pathogenProvenanceCurrent = null;
+        window.renderPathogenConcChart("pathogenConcChart", pathogenRows, pairLabel);
+        const pathEl = document.getElementById("pathogenExplain");
+        if (pathEl) pathEl.innerHTML = explainPathogens(pathogenRows);
       }
 
       if (document.getElementById("probChart")) {
