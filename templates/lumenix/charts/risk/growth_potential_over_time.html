@@ -1,0 +1,80 @@
+{# templates/lumenix/charts/risk/growth_potential_over_time.html #}
+{% load json_extras %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="d-flex align-items-center gap-2 mb-1">
+                    <span>{{ chart_config.title|default:"Modelled growth potential over time" }}</span>
+                    {# Always demo: this chart renders the generated series, like the rest of this menu. #}
+                    <span class="chart-data-badge is-demo" title="Illustrative / generated values">Demo data</span>
+                    <div class="d-flex align-items-center gap-3 ms-auto">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="growthSeriesBand" checked>
+                            <label class="form-check-label small" for="growthSeriesBand">Show min–max band per period</label>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-link p-0 text-muted dropdown-toggle"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                    aria-label="Download growth potential chart"
+                                    title="Download">
+                                <i class="bi bi-download"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><h6 class="dropdown-header">Chart Image</h6></li>
+                                <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_series" data-chart-export="png">Download PNG</button></li>
+                                <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_series" data-chart-export="jpg">Download JPG</button></li>
+                                <li><button class="dropdown-item chart-export-action" type="button" data-chart="growth_series" data-chart-export="pdf">Download PDF</button></li>
+                            </ul>
+                        </div>
+                    </div>
+                </h4>
+                <p class="text-muted small mb-3">Monthly mean, in log₁₀ CFU/g × h.</p>
+
+                <div class="risk-chart-loading-shell">
+                    <div id="growthSeriesChart" style="height: 380px;"></div>
+                    <div id="growthSeriesChartLoadingOverlay" class="risk-chart-loading-overlay d-none" aria-hidden="true">
+                        <div class="risk-chart-loading-badge">
+                            <span class="risk-chart-loading-spinner"></span>
+                            <span>Loading chart data…</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2 growth-series-stats">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted text-uppercase" style="font-size: 11px;">Mean</div>
+                        <div class="fs-4 fw-semibold" id="gpSeriesMean">—</div>
+                        <div class="text-muted" style="font-size: 11px;">over all periods</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted text-uppercase" style="font-size: 11px;">Peak period</div>
+                        <div class="fs-4 fw-semibold" id="gpSeriesPeak">—</div>
+                        <div class="text-muted" style="font-size: 11px;" id="gpSeriesPeakDate"></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted text-uppercase" style="font-size: 11px;">Lowest period</div>
+                        <div class="fs-4 fw-semibold" id="gpSeriesLowest">—</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted text-uppercase" style="font-size: 11px;">Periods plotted</div>
+                        <div class="fs-4 fw-semibold" id="gpSeriesCount">—</div>
+                    </div>
+                </div>
+
+                <div id="growthSeriesExplain" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ chart_config|json_script:"growthSeriesChartCfg" }}
+
+<script>
+  window.__AMBROSIA_CHART_CONFIGS = window.__AMBROSIA_CHART_CONFIGS || {};
+  window.__AMBROSIA_CHART_CONFIGS["growthSeriesChart"] =
+    JSON.parse(document.getElementById("growthSeriesChartCfg").textContent);
+</script>

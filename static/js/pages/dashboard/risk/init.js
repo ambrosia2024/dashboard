@@ -298,6 +298,61 @@ function explainHeatmap(rows) {
   `;
 }
 
+function explainGrowthChange(rows, baseline, future) {
+  if (!rows?.length) return "<em>No values in the generated series.</em>";
+  return `
+    <strong>What this shows</strong>
+    <ul class="mb-2">
+      <li>Mean growth potential per calendar month, <em>${baseline[0]}–${baseline[1]}</em> against <em>${future[0]}–${future[1]}</em>.</li>
+      <li>Both windows come from the same series: they are two periods, not two scenarios.</li>
+      <li>Y axis: <strong>log₁₀ CFU/g × h</strong>; the dashed lines read against the °C axis on the right.</li>
+    </ul>
+    <strong>How to read a flat summer</strong>
+    <p class="mb-2">
+      The index saturates - inside a fixed 48-hour window a very warm day cannot score
+      much above a warm one. Little change in a summer month means "already near the
+      maximum", not "unaffected". The clearest signal sits in winter and the shoulder months.
+    </p>
+    <strong>Note</strong>
+    <p class="mb-2">
+      Values are illustrative dummy outputs - illustrative only. The real comparison,
+      computed from the synced model output, is on the assessment outcome page.
+    </p>
+  `;
+}
+
+function explainGrowthSeries(rows) {
+  if (!rows?.length) return "<em>No values in the generated series.</em>";
+
+  const y = rows.map((r) => r.growth_potential_index).filter((v) => Number.isFinite(v));
+  if (!y.length) return "<em>No growth potential values in the generated series.</em>";
+
+  const avg = mean(y);
+  const slope = linearSlopeYPerStep(y);
+  const trend = slope > 0.0005 ? "rising" : slope < -0.0005 ? "falling" : "flat";
+  const arrow = slope > 0.0005 ? "↑" : slope < -0.0005 ? "↓" : "→";
+  const period = `${monthLabel(rows[0].date)} → ${monthLabel(rows[rows.length - 1].date)}`;
+
+  return `
+    <strong>What this shows</strong>
+    <ul class="mb-2">
+      <li><em>${period}</em> modelled growth potential for <strong>${rows[0].crop}</strong> - <strong>${rows[0].pathogen}</strong>.</li>
+      <li>Y axis: <strong>log₁₀ CFU/g × h</strong>. Higher means the temperature favours faster growth; 0 means too cold for any.</li>
+      <li>The band spans the lowest and highest day inside each period; the line is their mean.</li>
+    </ul>
+    <strong>Key numbers</strong>
+    <ul class="mb-2">
+      <li>Average: <strong>${avg.toFixed(2)}</strong> across ${y.length} periods.</li>
+      <li>Trend: <strong>${trend}</strong> ${arrow} (≈ ${slope.toFixed(4)} per period).</li>
+    </ul>
+    <strong>Note</strong>
+    <p class="mb-2">
+      Values are illustrative dummy outputs - illustrative only. The index describes how
+      temperature influences growth; it says nothing about whether the pathogen is present.
+    </p>
+  `;
+}
+
 function renderExplanations(toxinRows, pathogenRows, heatRows = toxinRows) {
   const toxEl = document.getElementById("toxinsExplain");
   const patEl = document.getElementById("pathogenExplain");
@@ -580,6 +635,46 @@ const CHART_EXPORT_META = {
       }));
     },
   },
+  growth_change: {
+    title: "Projected change in modelled growth potential",
+    instanceKey: "__growthChangeInstance",
+    rowsKey: "__growthChangeRowsCurrent",
+    sheetName: "growth_change_data",
+    buildRows(rows, ctx) {
+      return rows.map((r) => ({
+        date: r.date,
+        year: r.year,
+        month: r.month,
+        crop: r.crop,
+        hazard: r.pathogen,
+        location: ctx.location,
+        nuts2_id: ctx.nuts2,
+        nuts2_name: ctx.nuts2Name,
+        growth_temp_c: r.growth_temp_c,
+        growth_potential_index: r.growth_potential_index,
+      }));
+    },
+  },
+  growth_series: {
+    title: "Modelled growth potential over time",
+    instanceKey: "__growthSeriesInstance",
+    rowsKey: "__growthSeriesRowsCurrent",
+    sheetName: "growth_series_data",
+    buildRows(rows, ctx) {
+      return rows.map((r) => ({
+        date: r.date,
+        crop: r.crop,
+        hazard: r.pathogen,
+        location: ctx.location,
+        nuts2_id: ctx.nuts2,
+        nuts2_name: ctx.nuts2Name,
+        growth_potential_index: r.growth_potential_index,
+        growth_potential_min: r.growth_potential_min,
+        growth_potential_max: r.growth_potential_max,
+        growth_temp_c: r.growth_temp_c,
+      }));
+    },
+  },
 };
 
 function exportBaseName(chartKey, rows) {
@@ -683,6 +778,9 @@ const RISK_MIN_DATE = "1940-01-01";
 // future-dated values (e.g. out to 2040), so we must NOT cap selectable dates
 // at "today" when the real data range is unknown.
 const RISK_MAX_DATE = "2100-12-31";
+// End of the generated demo series. It runs past the present on purpose: the
+// growth charts compare a historical window with a projected one.
+const RISK_DEMO_END_DATE = "2095-12-01";
 const LEGACY_STATIC_START_DATE = "2023-01-01";
 const LEGACY_STATIC_END_DATE = "2023-12-31";
 // Earliest/latest dates actually present in the DB for the current toxin
@@ -1165,9 +1263,24 @@ function persistToxinScaleFilter() {
   window.history.replaceState({}, "", url.toString());
 }
 
+// The chart pages no longer carry date inputs, so there is nothing to read and
+// the defaults would collapse every chart to the current year. Fall back to a
+// fixed illustrative decade instead; the growth charts bypass this entirely
+// because they are about long-term change and carry their own window controls.
+function getDemoWindow() {
+  const endYear = new Date().getFullYear() - 1;
+  return { start: `${endYear - 9}-01-01`, end: `${endYear}-12-31` };
+}
+
 function filterByPeriod(rows) {
-  const s = new Date(document.getElementById("rm-start")?.value || getDefaultRiskStartDate());
-  const e = new Date(document.getElementById("rm-end")?.value || getDefaultRiskEndDate());
+  const demo = getDemoWindow();
+  const hasInputs = !!document.getElementById("rm-start") && !!document.getElementById("rm-end");
+  const s = new Date(
+    document.getElementById("rm-start")?.value || (hasInputs ? getDefaultRiskStartDate() : demo.start)
+  );
+  const e = new Date(
+    document.getElementById("rm-end")?.value || (hasInputs ? getDefaultRiskEndDate() : demo.end)
+  );
 
   return rows.filter((r) => {
     const d = new Date(r.date);
@@ -1985,6 +2098,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     "probChart",
     "casesChart",
     "seasonalHeatmap",
+    "growthChangeChart",
+    "growthSeriesChart",
   ];
   let renderLoadToken = 0;
 
@@ -2011,12 +2126,58 @@ document.addEventListener("DOMContentLoaded", async function () {
   const rows = window.buildDummyRiskSeries({
     ...pair,
     startISO: RISK_MIN_DATE,
-    endISO: `${new Date().getFullYear() + 15}-12-01`,
+    endISO: RISK_DEMO_END_DATE,
     baseProb: 1.2,
     seasonAmp: 1.1,
     noise: 0.25,
     events,
   });
+
+  // Minimum width of a comparison window. Comparing single years shows weather,
+  // not climate, so the control refuses anything shorter rather than drawing it.
+  const MIN_WINDOW_YEARS = 5;
+
+  function readYear(id, fallback) {
+    const value = parseInt(document.getElementById(id)?.value, 10);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function growthChangeOptions() {
+    return {
+      baseline: [readYear("growthChangeB1", 1991), readYear("growthChangeB2", 2020)],
+      future: [readYear("growthChangeF1", 2066), readYear("growthChangeF2", 2095)],
+      showTemp: document.getElementById("growthChangeTemp")?.checked !== false,
+    };
+  }
+
+  function growthWindowError(opts) {
+    for (const [from, to] of [opts.baseline, opts.future]) {
+      if (to < from) return "A window has to end after it starts.";
+      if (to - from + 1 < MIN_WINDOW_YEARS) return `Each window needs at least ${MIN_WINDOW_YEARS} years.`;
+    }
+    return "";
+  }
+
+  function renderGrowthCharts() {
+    if (document.getElementById("growthChangeChart")) {
+      const opts = growthChangeOptions();
+      const msgEl = document.getElementById("growthChangeMsg");
+      const error = growthWindowError(opts);
+      if (msgEl) msgEl.textContent = error;
+      if (!error) {
+        window.renderGrowthPotentialChange("growthChangeChart", rows, pairLabel, opts);
+        const el = document.getElementById("growthChangeExplain");
+        if (el) el.innerHTML = explainGrowthChange(rows, opts.baseline, opts.future);
+      }
+    }
+
+    if (document.getElementById("growthSeriesChart")) {
+      const showBand = document.getElementById("growthSeriesBand")?.checked !== false;
+      window.renderGrowthPotentialSeries("growthSeriesChart", rows, pairLabel, { showBand });
+      const el = document.getElementById("growthSeriesExplain");
+      if (el) el.innerHTML = explainGrowthSeries(rows);
+    }
+  }
 
   function initRiskCardMotion() {
     const cards = Array.from(document.querySelectorAll(".page-content .card"));
@@ -2080,6 +2241,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (pathEl) pathEl.innerHTML = explainPathogens(pathogenRows);
       }
 
+      renderGrowthCharts();
+
       if (document.getElementById("probChart")) {
         window.renderProbChart("probChart", rerows, pairLabel);
         setChartDataSourceBadge("probChart", false);
@@ -2141,6 +2304,17 @@ document.addEventListener("DOMContentLoaded", async function () {
   // initial render for current date range
   renderAllVisible(filterByPeriod(rows), { withSkeleton: true });
   initC1ChartChat();
+
+  // Growth-chart controls. Each only redraws its own chart, so changing a window
+  // does not re-run the rest of the page.
+  document.getElementById("growthChangeUpdate")?.addEventListener("click", renderGrowthCharts);
+  document.getElementById("growthChangeTemp")?.addEventListener("change", renderGrowthCharts);
+  document.getElementById("growthSeriesBand")?.addEventListener("change", renderGrowthCharts);
+  ["growthChangeB1", "growthChangeB2", "growthChangeF1", "growthChangeF2"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") renderGrowthCharts();
+    });
+  });
 
   // Probability modal button (only if present)
   const btn = document.getElementById("probExplainBtn");
@@ -2211,7 +2385,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Keep the same wide span so the dummy fallback still covers any date range.
     const newRows = window.buildDummyRiskSeries({
       startISO: RISK_MIN_DATE,
-      endISO: `${new Date().getFullYear() + 15}-12-01`,
+      endISO: RISK_DEMO_END_DATE,
       ...next,
       events,
     });

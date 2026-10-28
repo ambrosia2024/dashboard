@@ -79,6 +79,18 @@
 
             const pathogen_conc_units_per_g = round1(Math.max(0, pathogenConc));
 
+            // --- Growth potential (log10 CFU/g x h) ---
+            // On its own temperature track, for two reasons: the growth charts need a
+            // long-term warming signal to have anything to compare, and temperature_c
+            // above is a half-sine that peaks in May and sits flat through winter, so
+            // a growth curve built on it would peak in the wrong month. Changing that
+            // curve would move the toxin and pathogen charts too, so this leaves it be.
+            const growth_temp_c = round1(growthTemperature(month, year));
+            const spread = 3 + 2 * Math.random();
+            const growth_potential_index = growthPotentialIndex(growth_temp_c);
+            const growth_potential_min = growthPotentialIndex(growth_temp_c - spread);
+            const growth_potential_max = growthPotentialIndex(growth_temp_c + spread);
+
             // --- Probability of illness (%): logistic-ish growth around toxin limit ---
             const x = (toxin - limit) / 5.0; // scale sensitivity
             let prob = baseProb + 6 / (1 + Math.exp(-x)); // 1–7% typical band in dummy
@@ -105,6 +117,10 @@
                 toxin_level_ug_per_kg: round1(toxin),
                 toxin_limit_ug_per_kg: limit,
                 pathogen_conc_units_per_g,
+                growth_temp_c,
+                growth_potential_index,
+                growth_potential_min,
+                growth_potential_max,
                 prob_illness_pct: round2(Math.max(0.1, prob)),
                 baseline_prob_illness_pct: round2(Math.max(0.1, baselineProb)),
                 risk_multiplier: round2(riskMultiplier),
@@ -118,6 +134,30 @@
         }
         return rows;
     }
+
+  // Coldest in January, warmest in July, plus an illustrative warming signal of
+  // about +0.025 C a year from 1990 - so a 1991-2020 window sits roughly 1.9 C
+  // below a 2066-2095 one. Shaped to look like the projection the real model is
+  // driven by; it is not that projection.
+  function growthTemperature(month, year) {
+    const MEAN_C = 14.5;
+    const AMPLITUDE_C = 5.0;
+    const cycle = -Math.cos((2 * Math.PI * (month - 1)) / 12);
+    const trend = 0.025 * Math.max(0, year - 1990);
+    return MEAN_C + AMPLITUDE_C * cycle + trend + randn(0, 1.0);
+  }
+
+  // Saturating response of the growth model to temperature. Below TMIN nothing
+  // grows; above it the index climbs steeply and then flattens, because within a
+  // fixed 48-hour window a very warm day cannot score much more than a warm one.
+  function growthPotentialIndex(tempC) {
+    const TMIN = 3.0;    // no growth below this
+    const TSPAN = 22.9;  // scales the rise
+    const CEILING = 88;  // the flattening-out level
+    const K = 2.4;
+    const x = Math.max(0, (tempC - TMIN) / TSPAN);
+    return round2(CEILING * (1 - Math.exp(-K * x * x)));
+  }
 
   // Gaussian noise helper
   function randn(mean, sd) {
