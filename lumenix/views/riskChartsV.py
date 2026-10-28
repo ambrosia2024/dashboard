@@ -3,7 +3,8 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 
-from lumenix.models import DashboardViewMode, DashboardViewChart, DashboardChart
+from lumenix.models import DashboardViewMode, DashboardViewChart, DashboardChart, UserEvent
+from lumenix.services.events import log_event
 from lumenix.services.dashboard_modes import chart_emphasis_map
 from lumenix.views.mixins import DashboardModeMixin
 
@@ -27,6 +28,9 @@ class RiskChartsView(DashboardModeMixin, LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+
+        log_event(self.request, UserEvent.Event.CHART_VIEWED,
+                  chart=self.kwargs.get("chart_identifier") or "all")
 
         mode = self.get_active_mode()
         ctx["current_mode"] = mode
