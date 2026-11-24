@@ -766,6 +766,12 @@
         return esc.split("\n").map(function (line) {
             var bullet = /^\s*[\*\-]\s+/.test(line);
             line = line.replace(/^\s*[\*\-]\s+/, "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+            // Markdown links, used by the Codex sources footer. The text is model
+            // output, so only http(s) is allowed through - anything else (javascript:,
+            // data:) is left as literal text rather than turned into a link.
+            line = line.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_m, label, url) {
+                return '<a href="' + url.replace(/"/g, "&quot;") + '" target="_blank" rel="noopener noreferrer">' + label + "</a>";
+            });
             return bullet ? "<div class=\"ws-ambra-li\">" + line + "</div>" : line;
         }).join("<br>").replace(/(<br>){3,}/g, "<br><br>");
     }
