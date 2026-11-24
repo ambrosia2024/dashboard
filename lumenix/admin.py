@@ -29,7 +29,7 @@ from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
                      PathogenQuerySpec, PathogenConcentrationRecord, GrowthPotentialLookup, AdminMenuMaster,
-                     SavedSituation, AssessmentRun, UserEvent)
+                     SavedSituation, AssessmentRun, UserEvent, MitigationMeasure)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
 from .services.pathogen_query import sync_pathogen_query_spec
@@ -1768,3 +1768,36 @@ class UserEventAdmin(admin.ModelAdmin):
                 json.dumps(e.payload, sort_keys=True),
             ])
         return response
+
+
+@admin.register(MitigationMeasure)
+class MitigationMeasureAdmin(admin.ModelAdmin):
+    """The FAO/Codex corpus Ambra cites from (issue #112).
+
+    Editable on purpose: the measures are our paraphrases, so a domain partner
+    correcting one is exactly the right workflow. The source, clause and link are
+    what make a row traceable, so they stay visible in the list.
+    """
+
+    list_display = ("source_code", "clause", "heading", "stage",
+                    "temperature_related", "status")
+    list_filter = ("source_code", "stage", "temperature_related", "status")
+    search_fields = ("clause", "heading", "measure", "source_title")
+    list_editable = ("status",)
+    ordering = ("source_code", "clause")
+    fieldsets = (
+        ("Measure", {"fields": ("clause", "heading", "measure", "stage",
+                                "temperature_related", "status")}),
+        ("Applies to", {
+            "fields": ("commodities", "hazards"),
+            "description": "Lowercase tags, as JSON lists. An empty list means "
+                           "the measure applies to any crop or any hazard.",
+        }),
+        ("Source", {
+            "fields": ("source_code", "source_title", "source_url",
+                       "source_licence", "revision_year"),
+            "description": "Rows are paraphrases of the clause named here, never "
+                           "the published wording. Keep the link working: it is "
+                           "what makes an answer checkable.",
+        }),
+    )
