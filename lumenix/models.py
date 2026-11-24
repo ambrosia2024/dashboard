@@ -1158,3 +1158,68 @@ class UserEvent(models.Model):
 
     def __str__(self):
         return f"{self.occurred_at:%Y-%m-%d %H:%M} {self.event} ({self.user_id})"
+
+
+class MitigationMeasure(models.Model):
+    """
+    One food-safety control measure taken from a published standard, so Ambra can
+    answer "what do I do about it?" with something traceable.
+
+    Deliberately NOT the source document's own wording: each row holds a short
+    paraphrase plus the clause reference and a link, and the authoritative text
+    stays with the publisher. That keeps the corpus clear of reproducing a
+    standard wholesale, and a clause-level measure is a better retrieval unit
+    than a page of PDF anyway.
+    """
+
+    class Stage(models.TextChoices):
+        PRIMARY = "primary", "Primary production"
+        HARVEST = "harvest", "Harvest and field handling"
+        PROCESSING = "processing", "Packing and processing"
+        STORAGE = "storage", "Storage and transport"
+        CONSUMER = "consumer", "Retail and consumer"
+
+    source_code = models.CharField(max_length=40, db_index=True,
+                                   help_text="Standard reference, e.g. 'CXC 53-2003'.")
+    source_title = models.CharField(max_length=300)
+    source_url = models.URLField(max_length=500)
+    source_licence = models.CharField(max_length=80, blank=True, default="",
+                                      help_text="Licence name only, e.g. 'CC BY-NC 4.0'.")
+    revision_year = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    clause = models.CharField(max_length=60, help_text="e.g. 'Annex III 3.3.2'.")
+    heading = models.CharField(max_length=300)
+    measure = models.TextField(help_text="One or two sentences, in our own words, "
+                                         "describing what the clause requires.")
+
+    stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.PRIMARY)
+    commodities = models.JSONField(default=list, blank=True,
+                                   help_text="Lowercase tags, e.g. ['lettuce', 'leafy vegetables']. "
+                                             "Empty means it applies to any commodity.")
+    hazards = models.JSONField(default=list, blank=True,
+                               help_text="Lowercase tags, e.g. ['listeria monocytogenes']. "
+                                         "Empty means it applies to any hazard.")
+    temperature_related = models.BooleanField(
+        default=False,
+        help_text="Set when the measure controls temperature or the cold chain - these are "
+                  "the ones that answer a rising growth-potential chart.",
+    )
+    status = models.SmallIntegerField(default=1, help_text="1 = active, 0 = hidden.")
+
+    class Meta:
+        db_table = "mitigation_measures"
+        ordering = ["source_code", "clause"]
+        verbose_name = "Mitigation measure"
+        verbose_name_plural = "Mitigation measures"
+        constraints = [
+            models.UniqueConstraint(fields=["source_code", "clause"],
+                                    name="uniq_measure_source_clause"),
+        ]
+
+    def __str__(self):
+        return f"{self.source_code} {self.clause} - {self.heading}"
+
+    @property
+    def citation(self):
+        """How the measure should be referred to in an answer."""
+        return f"{self.source_code}, {self.clause}"
