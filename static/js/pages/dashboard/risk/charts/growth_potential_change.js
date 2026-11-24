@@ -140,8 +140,10 @@
         trigger: 'axis',
         valueFormatter: (v) => (v === null || v === undefined ? '—' : Number(v).toFixed(2)),
       },
-      legend: { top: 0, type: 'scroll' },
-      grid: { left: 60, right: showTemp ? 60 : 20, top: 44, bottom: 40 },
+      // Below the plot, matching the outcome page: at the top the legend
+      // overprints the y-axis name, and its last entry clips on a narrow screen.
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: 60, right: showTemp ? 60 : 20, top: 24, bottom: 72 },
       xAxis: { type: 'category', data: MONTHS, boundaryGap: false },
       yAxis: [
         { type: 'value', name: INDEX_UNIT, nameTextStyle: { align: 'left' } },

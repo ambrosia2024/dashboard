@@ -7,8 +7,8 @@
   // synced data, but it plots growth-model output under a "concentration" title,
   // so it is not presented as live until the label and unit are corrected.
   const REAL = new Set();
-  const LIVE_TIP = "Live data";
-  const DEMO_TIP = "Demo / illustrative data";
+  const LIVE_TIP = "Real data";
+  const DEMO_TIP = "Made-up numbers, for demonstration";
 
   function setDot(link, isLive) {
     let dot = link.querySelector(".chart-source-indicator");
