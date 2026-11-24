@@ -337,18 +337,6 @@ class FutureConceptView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
-# All seven catalogue charts, and what this outcome can honestly show for them.
-CHART_STATUS = [
-    ("c2_pathogen_over_time", "Modelled growth potential over time", "real", "Daily growth-potential index for your region and period."),
-    ("c5_seasonal_heatmap", "Seasonal heatmap", "derived", "Monthly means of the same model output."),
-    ("c6_geographic_risk_heatmap", "Growth potential by region", "derived", "Period mean per NUTS2 region for the same crop and hazard."),
-    ("c1_toxin_over_time", "Toxin concentration vs time", "n/a", "Not applicable: this hazard has no toxin model."),
-    ("c3_probability_over_time", "Probability of illness vs time", "n/a", "Needs a dose-response model that the source does not provide."),
-    ("c4_cases_per_100k", "Cases per 100k vs time", "n/a", "Needs exposure and population data that the source does not provide."),
-    ("c7_climate_scenarios", "Climate-adjusted scenarios", "n/a", "Only one climate-driven run is available; no scenarios to compare."),
-]
-
-
 # One sentence per chart, written for the reader's self-declared role. Plain
 # language on purpose; "default" is used for Other / no role.
 ROLE_HINTS = {
@@ -471,7 +459,6 @@ class AssessmentOutcomeView(_OwnedRunMixin, TemplateView):
             "role_word": role_hints_for(self.request.user)[1],
             "role_article": "an" if role_hints_for(self.request.user)[1][:1] in "aeiou" else "a",
             "newer_runs": run.reruns.filter(status=1).order_by("-created_at")[:3],
-            "chart_status": CHART_STATUS,
             "show_technical": getattr(getattr(self.request.user, "profile", None), "show_technical_details", False),
         })
         return ctx

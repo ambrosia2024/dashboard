@@ -472,14 +472,6 @@
 .ws-details summary::after { content: "⌄"; color: var(--ws-muted); }
 .ws-details[open] summary::after { content: "⌃"; }
 .ws-details ul { margin: 0; padding: 0 24px 18px 40px; font-size: 14px; color: var(--ws-label); line-height: 1.6; }
-.ws-explore-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
-.ws-explore-tile { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid var(--ws-border); border-radius: 10px; background: #fff; }
-.ws-explore-tile span { font-size: 14px; font-weight: 600; color: var(--ws-ink); }
-.ws-explore-tile small { font-size: 12px; color: var(--ws-muted); }
-.ws-explore-tile--real { border-color: #bfe6cc; }
-.ws-explore-tile--derived { border-color: #c9ddf3; }
-.ws-explore-tile--n\/a { background: #f8fafc; }
-.ws-explore-tile--n\/a span { color: var(--ws-faint); }
 .ws-actions-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 20px; }
 .ws-actions-row form { margin: 0; }
 .ws-side-title { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: var(--ws-ink); }
