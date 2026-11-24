@@ -169,18 +169,6 @@
             </details>
             {% endif %}
 
-            <section class="ws-card" style="margin-top:20px;">
-                <h2 style="font-size:16px;margin:0 0 12px;">Explore charts</h2>
-                <div class="ws-explore-strip">
-                    {% for ident, label, kind, note in chart_status %}
-                    <div class="ws-explore-tile ws-explore-tile--{{ kind }}" title="{{ note }}">
-                        <span>{{ label }}</span>
-                        <small>{% if kind == "real" %}Shown above{% elif kind == "derived" %}Shown above · derived{% else %}Not available for this combination{% endif %}</small>
-                    </div>
-                    {% endfor %}
-                </div>
-            </section>
-
             <div class="ws-actions-row">
                 <a href="{% url 'assessment-new' %}?run={{ run.id }}" class="ws-btn ws-btn-secondary">Duplicate situation</a>
                 <a href="{% url 'assessment-export' run.id %}" class="ws-btn ws-btn-primary">Export CSV</a>
