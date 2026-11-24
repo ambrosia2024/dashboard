@@ -10,6 +10,16 @@
   // is a century and a half of monthly points, which is unreadable unzoomed.
   const INITIAL_WINDOW_YEARS = 25;
 
+
+  // The crop-hazard pair goes in the card subtitle rather than the chart's own
+  // subtext, which ECharts draws top-left where the y-axis name already sits.
+  function setSubtitle(id, pairLabel) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const tail = el.dataset.subtitleTail || el.textContent;
+    el.textContent = pairLabel ? `${pairLabel} · ${tail}` : tail;
+  }
+
   function setStat(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -91,7 +101,7 @@
       animationDurationUpdate: 420,
       animationEasing: 'cubicOut',
       animationEasingUpdate: 'cubicInOut',
-      title: { text: '', subtext: pairLabel },
+      title: { show: false },
       tooltip: {
         trigger: 'axis',
         formatter: (p) => {
@@ -113,6 +123,7 @@
       series,
     }, { notMerge: true, lazyUpdate: true });
 
+    setSubtitle('growthSeriesSubtitle', pairLabel);
     fillStats(rows);
 
     window.__growthSeriesInstance = chart;

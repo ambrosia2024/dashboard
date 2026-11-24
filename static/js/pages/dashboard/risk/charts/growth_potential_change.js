@@ -30,6 +30,16 @@
 
   function round1(x) { return x === null ? null : Math.round(x * 10) / 10; }
 
+  // The crop-hazard pair goes in the card subtitle rather than the chart's own
+  // subtext, which ECharts draws top-left where the y-axis name already sits.
+  function setSubtitle(id, pairLabel) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const tail = el.dataset.subtitleTail || el.textContent;
+    el.textContent = pairLabel ? `${pairLabel} · ${tail}` : tail;
+  }
+
+
   function line(name, data, color, dashed, axisIndex) {
     return {
       name,
@@ -125,7 +135,7 @@
       animationDurationUpdate: 420,
       animationEasing: 'cubicOut',
       animationEasingUpdate: 'cubicInOut',
-      title: { text: '', subtext: pairLabel },
+      title: { show: false },
       tooltip: {
         trigger: 'axis',
         valueFormatter: (v) => (v === null || v === undefined ? '—' : Number(v).toFixed(2)),
@@ -140,6 +150,7 @@
       series,
     }, { notMerge: true, lazyUpdate: true });
 
+    setSubtitle('growthChangeSubtitle', pairLabel);
     fillSummary(
       document.getElementById('growthChangeSummary'),
       baseMeans, futureMeans, baseTemps, futureTemps, baseline, future,
