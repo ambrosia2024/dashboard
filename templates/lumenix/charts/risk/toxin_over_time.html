@@ -8,9 +8,9 @@
                 <h4 class="d-flex align-items-center gap-2 mb-3">
                     <span>{{ chart_config.title|default:"Toxin concentration vs time" }}</span>
                     {% if chart_config.data_source == 'real' %}
-                    <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
+                    <span class="chart-data-badge is-live" title="Real values, loaded from the project's database.">Live data</span>
                     {% else %}
-                    <span class="chart-data-badge is-demo" title="Illustrative / generated values">Demo data</span>
+                    <span class="chart-data-badge is-demo" title="Made-up numbers that show how the chart works. Not real measurements.">Demo data</span>
                     {% endif %}
                     <div class="d-flex align-items-center gap-2 ms-auto">
                         <label for="toxinsScale" class="mb-0 text-muted small">Timescale</label>

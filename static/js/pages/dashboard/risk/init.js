@@ -1527,15 +1527,19 @@ function setChartDataSourceBadge(domId, isLive, tooltip) {
 }
 
 function toxinSourceTooltip(isLive) {
-  if (!isLive) return "Illustrative sample data (live query unavailable for this selection)";
+  if (!isLive) return "Made-up numbers that show how the chart works. Not real measurements.";
   const p = window.__toxinsProvenanceCurrent;
-  return p && p.model_title ? `Live data - source model "${p.model_title}"` : "Live data from the database";
+  return p && p.model_title
+    ? `Real values, produced by the model "${p.model_title}".`
+    : "Real values, loaded from the project's database.";
 }
 
 function pathogenSourceTooltip(isLive) {
-  if (!isLive) return "Illustrative sample data (live query unavailable for this selection)";
+  if (!isLive) return "Made-up numbers that show how the chart works. Not real measurements.";
   const p = window.__pathogenProvenanceCurrent;
-  return p && p.model_title ? `Live data - source model "${p.model_title}"` : "Live data from the database";
+  return p && p.model_title
+    ? `Real values, produced by the model "${p.model_title}".`
+    : "Real values, loaded from the project's database.";
 }
 
 // Toggle the shimmer skeleton on a single chart and its card.

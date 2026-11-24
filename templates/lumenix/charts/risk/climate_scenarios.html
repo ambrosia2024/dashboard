@@ -9,7 +9,7 @@
                     <h4 class="mb-0 d-flex align-items-center gap-2">
                         <span>{{ chart_config.title|default:"Climate-adjusted scenarios vs time" }}</span>
                         {% if chart_config.data_source == 'real' %}
-                        <span class="chart-data-badge is-live" title="Backed by real synced data">Live data</span>
+                        <span class="chart-data-badge is-live" title="Real values, loaded from the project's database.">Live data</span>
                         {% else %}
                         <span class="chart-data-badge is-demo" title="Illustrative / generated values – not a forecast">Demo data</span>
                         {% endif %}

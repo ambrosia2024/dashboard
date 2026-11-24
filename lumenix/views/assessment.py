@@ -341,7 +341,7 @@ class FutureConceptView(LoginRequiredMixin, TemplateView):
 CHART_STATUS = [
     ("c2_pathogen_over_time", "Modelled growth potential over time", "real", "Daily growth-potential index for your region and period."),
     ("c5_seasonal_heatmap", "Seasonal heatmap", "derived", "Monthly means of the same model output."),
-    ("c6_geographic_risk_heatmap", "Geographic heatmap", "derived", "Period mean per NUTS2 region for the same crop and hazard."),
+    ("c6_geographic_risk_heatmap", "Growth potential by region", "derived", "Period mean per NUTS2 region for the same crop and hazard."),
     ("c1_toxin_over_time", "Toxin concentration vs time", "n/a", "Not applicable: this hazard has no toxin model."),
     ("c3_probability_over_time", "Probability of illness vs time", "n/a", "Needs a dose-response model that the source does not provide."),
     ("c4_cases_per_100k", "Cases per 100k vs time", "n/a", "Needs exposure and population data that the source does not provide."),

@@ -57,7 +57,7 @@
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
                     <div><h2>Projected change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this comparison show?" data-tip="tip-compare">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · mean per calendar month, baseline versus future window</small></div>
-                    <span class="ws-badge ws-badge--derived">Derived</span>
+                    <span class="ws-badge ws-badge--derived" title="Calculated on this page from the model output - averaged, compared between two periods, or summarised by region. Same underlying numbers, nothing newly measured.">Derived</span>
                 </div>
                 <div id="tip-compare" class="ws-tip" hidden>
                     <p><strong>What does growth potential mean?</strong> It describes how favourable the temperature is for bacterial growth, <em>assuming the bacteria are already present</em>. For each day the model simulates growth over a standardised 48-hour period using that day's average temperature; the resulting index reflects how much and how quickly the bacteria are predicted to grow in that period.</p>
@@ -91,7 +91,7 @@
             <section class="ws-card ws-chart-card">
                 <div class="ws-chart-head">
                     <div><h2>Projected regional change in modelled growth potential <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-delta">i</button></h2><small>Change per NUTS2 region between the same two windows · <span id="delta-windows">…</span></small></div>
-                    <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-delta" data-title="Projected regional change" aria-label="Show the change map full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
+                    <div class="ws-head-actions"><span class="ws-badge ws-badge--derived" title="Calculated on this page from the model output - averaged, compared between two periods, or summarised by region. Same underlying numbers, nothing newly measured.">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-delta" data-title="Projected regional change" aria-label="Show the change map full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
                 </div>
                 <div id="tip-delta" class="ws-tip" hidden>
                     <p>Each region is coloured by how much its growth-potential index <em>changes</em> between the baseline and future windows chosen above — red means the future window is more favourable for {{ run.hazard_label|lower }}, blue means less, and white means no change. The scale is centred on zero, so the colour shows direction as well as size.</p>
@@ -108,7 +108,7 @@
                     <div><h2>Modelled growth potential over time <button type="button" class="ws-info-btn" aria-label="What does this chart show?" data-tip="tip-series">i</button></h2><small>{{ run.crop_label }} · {{ run.hazard_label }} · {{ run.get_resolution_display|lower }} mean, in log₁₀ CFU/g × h</small></div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <label class="ws-check" style="font-size:12.5px;margin:0;"><input type="checkbox" id="band-toggle" checked> Show min–max band per period</label>
-                        <span class="ws-badge ws-badge--live">Source data</span>
+                        <span class="ws-badge ws-badge--live" title="The model's own output, plotted as it is. Nothing has been recalculated here.">Source data</span>
                     </div>
                 </div>
                 <div id="tip-series" class="ws-tip" hidden>
@@ -134,7 +134,7 @@
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
                         <div><h2>Seasonal heatmap <button type="button" class="ws-info-btn" aria-label="What does this heatmap show?" data-tip="tip-seasonal">i</button></h2><small>Monthly mean per year, same model output</small></div>
-                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-seasonal" data-title="Seasonal heatmap" aria-label="Show Seasonal heatmap full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
+                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived" title="Calculated on this page from the model output - averaged, compared between two periods, or summarised by region. Same underlying numbers, nothing newly measured.">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-seasonal" data-title="Seasonal heatmap" aria-label="Show Seasonal heatmap full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
                     </div>
                     <div id="tip-seasonal" class="ws-tip" hidden>
                             <p>Each row is one year, each column one month. The darker the blue, the more that month favoured the pathogen.</p>
@@ -145,8 +145,8 @@
                 </section>
                 <section class="ws-card ws-chart-card">
                     <div class="ws-chart-head">
-                        <div><h2>Geographic heatmap <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-geo">i</button></h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
-                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-geo" data-title="Geographic heatmap" aria-label="Show Geographic heatmap full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
+                        <div><h2>Growth potential by region <button type="button" class="ws-info-btn" aria-label="What does this map show?" data-tip="tip-geo">i</button></h2><small>Period mean per NUTS2 region, <span id="geo-count">…</span> regions</small></div>
+                        <div class="ws-head-actions"><span class="ws-badge ws-badge--derived" title="Calculated on this page from the model output - averaged, compared between two periods, or summarised by region. Same underlying numbers, nothing newly measured.">Derived</span><button type="button" class="ws-icon-btn" data-expand="chart-geo" data-title="Growth potential by region" aria-label="Show growth potential by region full screen" title="Show full screen"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4"/></svg></button></div>
                     </div>
                     <div id="tip-geo" class="ws-tip" hidden>
                             <p>Each region is coloured by how favourable its weather was for this pathogen over your period: darker means more favourable. Grey regions have no data yet. Your region, <strong>{{ run.nuts2_name }}</strong>, is outlined. Hover a region to see its value.</p>
@@ -163,7 +163,7 @@
                 <ul>
                     <li>Source model: <strong>{{ run.model_name|default:provenance.model_title|default:"unknown" }}</strong>{% if provenance.variable_name %}, driven by <em>{{ provenance.variable_name }}</em>{% endif %}.</li>
                     <li>Daily model values for region {{ run.nuts2_code }} were averaged per {{ run.get_resolution_display|lower }} period between {{ run.start_date }} and {{ run.end_date }}.</li>
-                    <li>The seasonal heatmap uses calendar-month means of the same values. The geographic heatmap averages the same crop and hazard over the period for every synced region.</li>
+                    <li>The seasonal heatmap uses calendar-month means of the same values. The regional map averages the same crop and hazard over the period for every synced region.</li>
                     {% for line in snapshot.limitations %}<li>{{ line }}</li>{% endfor %}
                 </ul>
             </details>
@@ -480,8 +480,11 @@
                 window.addEventListener("resize", function () { cmp.resize(); });
             }
             cmp.setOption({
-                grid: { left: 62, right: 56, top: 34, bottom: 36 },
-                legend: { top: 0, textStyle: { color: "#64748b" }, data: series(d, showTemp.checked).map(function (x) { return x.name; }) },
+                // Legend sits under the plot: at the top it overprinted the y-axis
+                // name, and on a narrow screen its last entry was clipped. "scroll"
+                // keeps it to one row with arrows instead of wrapping over the chart.
+                grid: { left: 62, right: 56, top: 34, bottom: 68 },
+                legend: { bottom: 0, type: "scroll", textStyle: { color: "#64748b" }, data: series(d, showTemp.checked).map(function (x) { return x.name; }) },
                 tooltip: { trigger: "axis", formatter: tooltip },
                 xAxis: { type: "category", data: MONTHS, boundaryGap: false },
                 yAxis: [
@@ -667,7 +670,7 @@
         };
     })();
 
-    // ---- geographic heatmap ---------------------------------------------
+    // ---- growth potential by region (map) --------------------------------
     Promise.all([
         fetch("{% url 'assessment-geographic' run.id %}", { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }),
         NUTS_FC
