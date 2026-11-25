@@ -29,7 +29,7 @@ from .forms import EmailOrUsernameAdminAuthenticationForm
 from .models import (Vocabulary, Scheme, Concept, PlantConcept, PathogenConcept, ConceptHistory, DashboardChart,
                      DashboardViewChart, DashboardViewMode, SidebarChartLink, NutsRegion, ScioModel, UserProfile,
                      PathogenQuerySpec, PathogenConcentrationRecord, GrowthPotentialLookup, AdminMenuMaster,
-                     SavedSituation, AssessmentRun, UserEvent, MitigationMeasure)
+                     SavedSituation, AssessmentRun, UserEvent, MitigationMeasure, ClimateData)
 from .services.models_sync import sync_models
 from .services.nuts_sync import sync_nuts
 from .services.pathogen_query import sync_pathogen_query_spec
@@ -1801,3 +1801,55 @@ class MitigationMeasureAdmin(admin.ModelAdmin):
                            "what makes an answer checkable.",
         }),
     )
+
+
+@admin.register(ClimateData)
+class ClimateDataAdmin(admin.ModelAdmin):
+    """
+    Read-only view over the ERA5 climate records.
+
+    This table is keyed by point location and timestamp, not by NUTS region, so
+    it does not line up row-for-row with the pathogen records. It is the only
+    temperature source here that carries a daily minimum and maximum, which is
+    why it is worth being able to look at: the growth charts are driven by a
+    single value a day from a different source entirely.
+
+    Sized like the pathogen record admin in case the table is large - estimated
+    counts, no date hierarchy, no plain-field filters, and ordering only on the
+    indexed timestamp.
+    """
+
+    paginator = EstimatedCountPaginator
+    show_full_result_count = False
+    show_facets = admin.ShowFacets.NEVER
+    list_per_page = 50
+    list_max_show_all = 200
+    ordering = ("-timestamp",)
+    list_display = (
+        "timestamp", "place", "temperature_2m",
+        "min_temperature_2m", "max_temperature_2m", "daily_range",
+        "sea_surface_temperature", "skin_temperature",
+    )
+    list_display_links = ("timestamp",)
+
+    @admin.display(description="Location (lat, lon)")
+    def place(self, obj):
+        if not obj.location:
+            return "—"
+        return f"{obj.location.y:.3f}, {obj.location.x:.3f}"
+
+    @admin.display(description="Daily range")
+    def daily_range(self, obj):
+        lo, hi = obj.min_temperature_2m, obj.max_temperature_2m
+        if lo is None or hi is None:
+            return "—"
+        return f"{hi - lo:.1f} °C"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
